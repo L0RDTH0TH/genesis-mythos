@@ -1,0 +1,25 @@
+[gd_scene load_steps=2 format=3 uid="uid://world_root"]
+
+[ext_resource type="Environment" path="res://assets/environments/eryndor_base.tres" id="1_eryndor_env"]
+
+[node name="WorldRoot" type="Node3D"]
+
+[node name="MainCamera" type="Camera3D" parent="."]
+transform = Transform3D(0.906308, 0, 0.422618, 0, 1, 0, -0.422618, 0, 0.906308, 0, 25, 45)
+current = true
+fov = 70.0
+near = 0.05
+far = 5000.0
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.819152, -0.40558, 0.40558, 0, 0.707107, 0.707107, -0.573576, -0.579228, 0.579228, 0, 0, 0)
+light_color = Color(1, 0.863, 0.706, 1)
+light_energy = 12.0
+shadow_enabled = true
+directional_shadow_mode = 0
+directional_shadow_max_distance = 1000.0
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = ExtResource("1_eryndor_env")
+
+[node name="ProceduralWorld" type="Node3D" parent="."]
