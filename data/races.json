@@ -1,0 +1,282 @@
+[
+	{
+		"id": "dwarf",
+		"name": "Dwarf",
+		"description": "Dwarves are short humanoid people who make some of the finest warriors, miners, and smiths in Faerun.",
+		"speed": "7.5m / 25ft",
+		"size": "Medium",
+		"features": [
+			"Darkvision up to 12m",
+			"Dwarven Resilience: Advantage on saving throws against poison, resistance to poison damage",
+			"Dwarven Weapon Training: Proficient with battleaxe, handaxe, light hammer, warhammer"
+		],
+		"ability_bonuses": { "constitution": 2 },
+		"subraces": [
+			{
+				"id": "hill_dwarf",
+				"name": "Hill Dwarf",
+				"description": "Hill dwarves have keen senses, deep intuition, and remarkable resilience.",
+				"features": ["Dwarven Toughness: Hit point maximum increases by 1 per level"],
+				"ability_bonuses": { "wisdom": 1 }
+			},
+			{
+				"id": "mountain_dwarf",
+				"name": "Mountain Dwarf",
+				"description": "As a mountain dwarf, you have strong and hardy legs that are accustomed to long treks and difficult terrain.",
+				"features": ["Dwarven Armour Training: Proficiency with light and medium armour"],
+				"ability_bonuses": { "strength": 2 }
+			}
+		]
+	},
+	{
+		"id": "elf",
+		"name": "Elf",
+		"description": "Elves are recognisable by their signature pointed ears, but apart from this, they look a lot like humans.",
+		"speed": "9m / 30ft",
+		"size": "Medium",
+		"features": [
+			"Darkvision up to 12m",
+			"Fey Ancestry: Advantage on Saving Throws against being charmed, magic can't put them to sleep",
+			"Keen Senses: Proficiency in Perception",
+			"Elven Weapon Training: Proficient with longswords, shortswords, shortbows, and longbows"
+		],
+		"ability_bonuses": { "dexterity": 2 },
+		"subraces": [
+			{
+				"id": "high_elf",
+				"name": "High Elf",
+				"description": "Heirs of the mystical Feywild, High Elves value magic in all its forms, and even those who do not study spellcraft can manipulate the Weave.",
+				"features": ["High Elf Cantrip: Learn one wizard cantrip, Intelligence is spellcasting ability"],
+				"ability_bonuses": { "intelligence": 1 }
+			},
+			{
+				"id": "wood_elf",
+				"name": "Wood Elf",
+				"description": "These Elves spend their reclusive lives in Faerun's forests. Decades of training in archery and camouflage are enhanced by an otherworldly swiftness.",
+				"features": ["Fleet of Foot: Base walking speed 10.5m / 35ft", "Mask of the Wild: Proficiency in Stealth"],
+				"ability_bonuses": { "wisdom": 1 }
+			},
+			{
+				"id": "drow",
+				"name": "Drow",
+				"description": "Drow are sometimes referred to as Dark Elves due to their history with the evil goddess Lolth. Drow resemble Elves, with similar pointed ears, but tend to have darker skin shades.",
+				"features": [
+					"Superior Darkvision up to 24m",
+					"Drow Weapon Training: Proficient with rapiers, shortswords, and hand crossbows",
+					"Drow Magic: Dancing Lights (level 1), Faerie Fire (level 3), Darkness (level 5)"
+				],
+				"ability_bonuses": { "charisma": 1 }
+			}
+		]
+	},
+	{
+		"id": "gnome",
+		"name": "Gnome",
+		"description": "Gnomes are quite similar in appearance to Halflings, but they have pointed ears, and are known for being clever and energetic.",
+		"speed": "7.5m / 25ft",
+		"size": "Small",
+		"features": [
+			"Gnome Cunning: Advantage on Intelligence, Wisdom, Charisma saving throws"
+		],
+		"ability_bonuses": { "intelligence": 2 },
+		"subraces": [
+			{
+				"id": "forest_gnome",
+				"name": "Forest Gnome",
+				"description": "With their knack for illusion and innate curiosity, Forest Gnomes tend to get along well with the animals and fey of Faerun's woodlands.",
+				"features": ["Darkvision up to 12m", "Speak with Animals: Cast Speak with Animals at will"],
+				"ability_bonuses": { "dexterity": 1 }
+			},
+			{
+				"id": "rock_gnome",
+				"name": "Rock Gnome",
+				"description": "Small and inquisitive, Rock Gnomes are the tinkers and inventors of the gnomish people.",
+				"features": ["Darkvision up to 12m", "Artificer's Lore: Add twice proficiency bonus to History checks related to magic items, alchemical objects, or technological devices"],
+				"ability_bonuses": { "constitution": 1 }
+			},
+			{
+				"id": "deep_gnome",
+				"name": "Deep Gnome",
+				"description": "These gnomes dwell in the depths of the Underdark. Their often grim demeanour is coloured by a sardonic wit that can blossom into whimsical in the company of other gnomes.",
+				"features": ["Superior Darkvision up to 24m", "Stone Camouflage: Advantage on Stealth checks to hide in rocky terrain"],
+				"ability_bonuses": { "dexterity": 1 }
+			}
+		]
+	},
+	{
+		"id": "halfling",
+		"name": "Halfling",
+		"description": "Halflings are a small Hobbit-like Race who prefer the comforts of home, but have natural luck and dexterity.",
+		"speed": "7.5m / 25ft",
+		"size": "Small",
+		"features": [
+			"Brave: Advantage on saving throws against being frightened",
+			"Lucky: Reroll 1s on attack rolls, ability checks, saving throws"
+		],
+		"ability_bonuses": { "dexterity": 2 },
+		"subraces": [
+			{
+				"id": "lightfoot_halfling",
+				"name": "Lightfoot Halfling",
+				"description": "Stealthy but social, these halflings travel all over Faerun to make names for themselves.",
+				"features": ["Naturally Stealthy: Advantage on Stealth checks"],
+				"ability_bonuses": { "charisma": 1 }
+			},
+			{
+				"id": "stout_halfling",
+				"name": "Stout Halfling",
+				"description": "Stout halflings are hardier than other halflings and share some of the dwarven resistance to poison.",
+				"features": ["Stout Resilience: Advantage on saving throws against poison, resistance to poison damage"],
+				"ability_bonuses": { "constitution": 1 }
+			}
+		]
+	},
+	{
+		"id": "human",
+		"name": "Human",
+		"description": "The most common face in Faerun, Humans are known for their tenacity, creativity, and endless capacity for growth.",
+		"speed": "9m / 30ft",
+		"size": "Medium",
+		"features": [
+			"Human Versatility: Proficiency in one skill of choice, carrying capacity increased by 25%",
+			"Civil Militia: Proficiency with spears, pikes, halberds, glaives, light armour, shields"
+		],
+		"ability_bonuses": { "all": 1 },
+		"subraces": []
+	},
+	{
+		"id": "half_elf",
+		"name": "Half-Elf",
+		"description": "Half-Elves have pointed ears and are curious, ambitious, versatile, and welcomed everywhere in Faerun.",
+		"speed": "9m / 30ft",
+		"size": "Medium",
+		"features": [
+			"Darkvision up to 12m",
+			"Fey Ancestry: Advantage on Saving Throws against being charmed, magic can't put them to sleep",
+			"Civil Militia: Proficiency with spears, pikes, halberds, glaives, light armour, shields"
+		],
+		"ability_bonuses": { "charisma": 2 },
+		"subraces": [
+			{
+				"id": "high_half_elf",
+				"name": "High Half-Elf",
+				"description": "A touch of the Feywild remains in Half-Elves with this bloodline, and even those untrained in magic possess a hint of wild power.",
+				"features": ["High Elf Cantrip: Learn one wizard cantrip, Intelligence is spellcasting ability"],
+				"ability_bonuses": { "intelligence": 1 }
+			},
+			{
+				"id": "wood_half_elf",
+				"name": "Wood Half-Elf",
+				"description": "Like their Wood Elf parent, these Half-Elves have a quickened stride and an eye for stealth. Yet many break away from isolation in Faerun's forests to explore the rest of the Realms.",
+				"features": ["Fleet of Foot: Base walking speed 10.5m / 35ft", "Mask of the Wild: Proficiency in Stealth"],
+				"ability_bonuses": { "wisdom": 1 }
+			},
+			{
+				"id": "drow_half_elf",
+				"name": "Drow Half-Elf",
+				"description": "Most Half-Drow result from liaisons between Drow and surfacers. While Half-Drow inherit a few magical gifts, they aren't usually raised in the Underdark.",
+				"features": ["Drow Magic: Dancing Lights (level 1), Faerie Fire (level 3), Darkness (level 5)"],
+				"ability_bonuses": { "intelligence": 1 }
+			}
+		]
+	},
+	{
+		"id": "half_orc",
+		"name": "Half-Orc",
+		"description": "A sturdy race with orcish strength and resilience.",
+		"speed": "9m / 30ft",
+		"size": "Medium",
+		"features": [
+			"Darkvision up to 12m",
+			"Savage Attacks: Roll one extra damage die on melee critical hits",
+			"Relentless Endurance: When reduced to 0 HP, drop to 1 HP instead (once per long rest)",
+			"Menacing: Proficiency in Intimidation"
+		],
+		"ability_bonuses": { "strength": 2, "constitution": 1 },
+		"subraces": []
+	},
+	{
+		"id": "tiefling",
+		"name": "Tiefling",
+		"description": "Tiefling are a horned humanoid race descended from devils of the Nine Hells.",
+		"speed": "9m / 30ft",
+		"size": "Medium",
+		"features": [
+			"Darkvision up to 12m",
+			"Hellish Resistance: Resistance to Fire damage"
+		],
+		"ability_bonuses": { "charisma": 2, "intelligence": 1 },
+		"subraces": []
+	},
+	{
+		"id": "dragonborn",
+		"name": "Dragonborn",
+		"description": "A proud race with draconic ancestry and breath weapons.",
+		"speed": "9m / 30ft",
+		"size": "Medium",
+		"features": [],
+		"ability_bonuses": { "strength": 2, "charisma": 1 },
+		"subraces": [
+			{
+				"id": "black_dragonborn",
+				"name": "Black Dragonborn",
+				"description": "Dragonborn with black dragon ancestry.",
+				"features": ["Draconic Ancestry: Resistance to Acid damage", "Breath Weapon: 5x30ft line of Acid damage"]
+			},
+			{
+				"id": "blue_dragonborn",
+				"name": "Blue Dragonborn",
+				"description": "Dragonborn with blue dragon ancestry.",
+				"features": ["Draconic Ancestry: Resistance to Lightning damage", "Breath Weapon: 5x30ft line of Lightning damage"]
+			},
+			{
+				"id": "brass_dragonborn",
+				"name": "Brass Dragonborn",
+				"description": "Dragonborn with brass dragon ancestry.",
+				"features": ["Draconic Ancestry: Resistance to Fire damage", "Breath Weapon: 5x30ft line of Fire damage"]
+			},
+			{
+				"id": "bronze_dragonborn",
+				"name": "Bronze Dragonborn",
+				"description": "Dragonborn with bronze dragon ancestry.",
+				"features": ["Draconic Ancestry: Resistance to Lightning damage", "Breath Weapon: 5x30ft line of Lightning damage"]
+			},
+			{
+				"id": "copper_dragonborn",
+				"name": "Copper Dragonborn",
+				"description": "Dragonborn with copper dragon ancestry.",
+				"features": ["Draconic Ancestry: Resistance to Acid damage", "Breath Weapon: 5x30ft line of Acid damage"]
+			},
+			{
+				"id": "gold_dragonborn",
+				"name": "Gold Dragonborn",
+				"description": "Dragonborn with gold dragon ancestry.",
+				"features": ["Draconic Ancestry: Resistance to Fire damage", "Breath Weapon: 15ft cone of Fire damage"]
+			},
+			{
+				"id": "green_dragonborn",
+				"name": "Green Dragonborn",
+				"description": "Dragonborn with green dragon ancestry.",
+				"features": ["Draconic Ancestry: Resistance to Poison damage", "Breath Weapon: 15ft cone of Poison damage"]
+			},
+			{
+				"id": "red_dragonborn",
+				"name": "Red Dragonborn",
+				"description": "Dragonborn with red dragon ancestry.",
+				"features": ["Draconic Ancestry: Resistance to Fire damage", "Breath Weapon: 15ft cone of Fire damage"]
+			},
+			{
+				"id": "silver_dragonborn",
+				"name": "Silver Dragonborn",
+				"description": "Dragonborn with silver dragon ancestry.",
+				"features": ["Draconic Ancestry: Resistance to Cold damage", "Breath Weapon: 15ft cone of Cold damage"]
+			},
+			{
+				"id": "white_dragonborn",
+				"name": "White Dragonborn",
+				"description": "Dragonborn with white dragon ancestry.",
+				"features": ["Draconic Ancestry: Resistance to Cold damage", "Breath Weapon: 15ft cone of Cold damage"]
+			}
+		]
+	}
+]

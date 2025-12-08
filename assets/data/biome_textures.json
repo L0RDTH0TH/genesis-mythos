@@ -1,0 +1,76 @@
+{
+	"biome_textures": {
+		"forest": {
+			"texture_path": "res://assets/textures/biomes/forest.png",
+			"normal_path": "res://assets/textures/biomes/forest_normal.png",
+			"color": [0.2, 0.6, 0.2],
+			"splat_channel": 0
+		},
+		"desert": {
+			"texture_path": "res://assets/textures/biomes/desert.png",
+			"normal_path": "res://assets/textures/biomes/desert_normal.png",
+			"color": [0.9, 0.8, 0.5],
+			"splat_channel": 1
+		},
+		"tundra": {
+			"texture_path": "res://assets/textures/biomes/tundra.png",
+			"normal_path": "res://assets/textures/biomes/tundra_normal.png",
+			"color": [0.8, 0.9, 0.9],
+			"splat_channel": 2
+		},
+		"swamp": {
+			"texture_path": "res://assets/textures/biomes/swamp.png",
+			"normal_path": "res://assets/textures/biomes/swamp_normal.png",
+			"color": [0.3, 0.4, 0.2],
+			"splat_channel": 3
+		},
+		"mountain": {
+			"texture_path": "res://assets/textures/biomes/mountain.png",
+			"normal_path": "res://assets/textures/biomes/mountain_normal.png",
+			"color": [0.6, 0.6, 0.6],
+			"splat_channel": 0
+		},
+		"grassland": {
+			"texture_path": "res://assets/textures/biomes/grassland.png",
+			"normal_path": "res://assets/textures/biomes/grassland_normal.png",
+			"color": [0.6, 0.7, 0.4],
+			"splat_channel": 1
+		},
+		"plains": {
+			"texture_path": "res://assets/textures/biomes/plains.png",
+			"normal_path": "res://assets/textures/biomes/plains_normal.png",
+			"color": [0.7, 0.7, 0.5],
+			"splat_channel": 1
+		},
+		"jungle": {
+			"texture_path": "res://assets/textures/biomes/jungle.png",
+			"normal_path": "res://assets/textures/biomes/jungle_normal.png",
+			"color": [0.1, 0.5, 0.1],
+			"splat_channel": 0
+		},
+		"taiga": {
+			"texture_path": "res://assets/textures/biomes/taiga.png",
+			"normal_path": "res://assets/textures/biomes/taiga_normal.png",
+			"color": [0.4, 0.6, 0.5],
+			"splat_channel": 2
+		},
+		"coast": {
+			"texture_path": "res://assets/textures/biomes/coast.png",
+			"normal_path": "res://assets/textures/biomes/coast_normal.png",
+			"color": [0.4, 0.6, 0.8],
+			"splat_channel": 3
+		},
+		"cold_desert": {
+			"texture_path": "res://assets/textures/biomes/cold_desert.png",
+			"normal_path": "res://assets/textures/biomes/cold_desert_normal.png",
+			"color": [0.7, 0.7, 0.6],
+			"splat_channel": 2
+		}
+	},
+	"splat_channels": {
+		"0": ["forest", "mountain", "jungle"],
+		"1": ["desert", "grassland", "plains"],
+		"2": ["tundra", "taiga", "cold_desert"],
+		"3": ["swamp", "coast"]
+	}
+}

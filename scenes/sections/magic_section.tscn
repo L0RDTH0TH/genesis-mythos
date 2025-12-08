@@ -1,0 +1,106 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/sections/base_section.tscn" id="1_0"]
+[ext_resource type="Script" path="res://scripts/ui/magic_section.gd" id="2_0"]
+
+[node name="magic_section" instance=ExtResource("1_0")]
+script = ExtResource("2_0")
+
+[node name="MarginContainer" parent="." index="0"]
+[node name="VBoxContainer" parent="MarginContainer" index="0"]
+[node name="HBoxContainer" parent="MarginContainer/VBoxContainer" index="0"]
+[node name="Button" parent="MarginContainer/VBoxContainer/HBoxContainer" index="0"]
+[node name="Label" parent="MarginContainer/VBoxContainer/HBoxContainer" index="1"]
+text = "Magic & Ley Lines"
+
+[node name="content" parent="MarginContainer/VBoxContainer" index="1"]
+
+[node name="MagicLevelContainer" type="HBoxContainer" parent="MarginContainer/VBoxContainer/content"]
+layout_mode = 2
+
+[node name="MagicLevelLabel" type="Label" parent="MarginContainer/VBoxContainer/content/MagicLevelContainer"]
+layout_mode = 2
+text = "Magic Level:"
+
+[node name="MagicLevelSlider" type="HSlider" parent="MarginContainer/VBoxContainer/content/MagicLevelContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.0
+max_value = 100.0
+value = 50.0
+step = 1.0
+
+[node name="MagicLevelSpinBox" type="SpinBox" parent="MarginContainer/VBoxContainer/content/MagicLevelContainer"]
+layout_mode = 2
+min_value = 0.0
+max_value = 100.0
+value = 50.0
+step = 1.0
+
+[node name="LeyLineDensityContainer" type="HBoxContainer" parent="MarginContainer/VBoxContainer/content"]
+layout_mode = 2
+
+[node name="LeyLineDensityLabel" type="Label" parent="MarginContainer/VBoxContainer/content/LeyLineDensityContainer"]
+layout_mode = 2
+text = "Ley Line Density:"
+
+[node name="LeyLineDensitySlider" type="HSlider" parent="MarginContainer/VBoxContainer/content/LeyLineDensityContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.0
+max_value = 100.0
+value = 30.0
+step = 1.0
+
+[node name="LeyLineDensitySpinBox" type="SpinBox" parent="MarginContainer/VBoxContainer/content/LeyLineDensityContainer"]
+layout_mode = 2
+min_value = 0.0
+max_value = 100.0
+value = 30.0
+step = 1.0
+
+[node name="ManaWellCountContainer" type="HBoxContainer" parent="MarginContainer/VBoxContainer/content"]
+layout_mode = 2
+
+[node name="ManaWellCountLabel" type="Label" parent="MarginContainer/VBoxContainer/content/ManaWellCountContainer"]
+layout_mode = 2
+text = "Mana Well Count:"
+
+[node name="ManaWellCountSlider" type="HSlider" parent="MarginContainer/VBoxContainer/content/ManaWellCountContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.0
+max_value = 20.0
+value = 5.0
+step = 1.0
+
+[node name="ManaWellCountSpinBox" type="SpinBox" parent="MarginContainer/VBoxContainer/content/ManaWellCountContainer"]
+layout_mode = 2
+min_value = 0.0
+max_value = 20.0
+value = 5.0
+step = 1.0
+
+[node name="WildMagicZonesContainer" type="HBoxContainer" parent="MarginContainer/VBoxContainer/content"]
+layout_mode = 2
+
+[node name="WildMagicZonesLabel" type="Label" parent="MarginContainer/VBoxContainer/content/WildMagicZonesContainer"]
+layout_mode = 2
+text = "Wild Magic Zones:"
+
+[node name="WildMagicZonesSlider" type="HSlider" parent="MarginContainer/VBoxContainer/content/WildMagicZonesContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.0
+max_value = 10.0
+value = 2.0
+step = 1.0
+
+[node name="WildMagicZonesSpinBox" type="SpinBox" parent="MarginContainer/VBoxContainer/content/WildMagicZonesContainer"]
+layout_mode = 2
+min_value = 0.0
+max_value = 10.0
+value = 2.0
+step = 1.0
+
+

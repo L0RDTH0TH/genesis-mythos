@@ -1,0 +1,3 @@
+test_directory = "res://tests"
+include_subdirs = true
+

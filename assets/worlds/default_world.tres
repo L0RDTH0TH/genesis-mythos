@@ -1,0 +1,38 @@
+[gd_resource type="Resource" script_class="WorldData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/WorldData.gd" id="1_0"]
+
+[resource]
+script = ExtResource("1_0")
+seed = 0
+size_preset = 2
+preview_resolution = 1
+generate_in_background = true
+params = {
+"domain_warp_strength": 0.0,
+"domain_warp_frequency": 0.005,
+"domain_warp_amplitude": 30.0,
+"enable_erosion": false,
+"erosion_strength": 0.5,
+"erosion_iterations": 5,
+"enable_foliage": true,
+"foliage_density": 0.6,
+"foliage_variation": 0.4,
+"enable_cities": true,
+"enable_towns": true,
+"enable_ruins": true,
+"enable_resources": true,
+"poi_density": 0.3,
+"min_poi_distance": 80,
+"chunk_size": 64,
+"enable_lod": true,
+"lod_levels": 3,
+"lod_distances": [500.0, 2000.0],
+"preview_mode": 0,
+"use_normal_mapping": true,
+"use_texture_splatting": true,
+"shape_preset": "Square"
+}
+randomness = {}
+biome_metadata = []
+

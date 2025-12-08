@@ -1,0 +1,29 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/character/CharacterPreview3D.gd" id="1_0"]
+[ext_resource type="Script" path="res://scripts/ui/character_preview_camera.gd" id="2_0"]
+
+[node name="root" type="SubViewport"]
+size = Vector2(800, 1000)
+transparent_bg = true
+script = ExtResource("1_0")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+
+[node name="PreviewCamera" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.984808, 0.173648, 0, -0.173648, 0.984808, 0, 1.4, 2.2)
+current = true
+script = ExtResource("2_0")
+target = NodePath("CharacterRoot")
+
+[node name="CharacterRoot" type="Node3D" parent="."]
+
+[node name="CharacterSkeleton" type="Skeleton3D" parent="CharacterRoot"]
+
+[node name="BodyMesh" type="MeshInstance3D" parent="CharacterRoot/CharacterSkeleton"]
+
+[node name="HairMesh" type="MeshInstance3D" parent="CharacterRoot/CharacterSkeleton"]
+
+[node name="HornsMesh" type="MeshInstance3D" parent="CharacterRoot/CharacterSkeleton"]

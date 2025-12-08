@@ -1,0 +1,201 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/sections/base_section.tscn" id="1_0"]
+[ext_resource type="Script" path="res://scripts/ui/civilization_section.gd" id="2_0"]
+
+[node name="civilization_section" instance=ExtResource("1_0")]
+script = ExtResource("2_0")
+
+[node name="MarginContainer" parent="." index="0"]
+[node name="VBoxContainer" parent="MarginContainer" index="0"]
+[node name="HBoxContainer" parent="MarginContainer/VBoxContainer" index="0"]
+[node name="Button" parent="MarginContainer/VBoxContainer/HBoxContainer" index="0"]
+[node name="Label" parent="MarginContainer/VBoxContainer/HBoxContainer" index="1"]
+text = "Civilizations & Settlements"
+
+[node name="content" parent="MarginContainer/VBoxContainer" index="1"]
+
+[node name="PopulationDensityContainer" type="HBoxContainer" parent="MarginContainer/VBoxContainer/content"]
+layout_mode = 2
+
+[node name="PopulationDensityLabel" type="Label" parent="MarginContainer/VBoxContainer/content/PopulationDensityContainer"]
+layout_mode = 2
+text = "Population Density:"
+
+[node name="PopulationDensitySlider" type="HSlider" parent="MarginContainer/VBoxContainer/content/PopulationDensityContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.0
+max_value = 100.0
+value = 30.0
+step = 1.0
+
+[node name="PopulationDensitySpinBox" type="SpinBox" parent="MarginContainer/VBoxContainer/content/PopulationDensityContainer"]
+layout_mode = 2
+min_value = 0.0
+max_value = 100.0
+value = 30.0
+step = 1.0
+
+[node name="CityCountContainer" type="HBoxContainer" parent="MarginContainer/VBoxContainer/content"]
+layout_mode = 2
+
+[node name="CityCountLabel" type="Label" parent="MarginContainer/VBoxContainer/content/CityCountContainer"]
+layout_mode = 2
+text = "City Count:"
+
+[node name="CityCountSlider" type="HSlider" parent="MarginContainer/VBoxContainer/content/CityCountContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.0
+max_value = 50.0
+value = 10.0
+step = 1.0
+
+[node name="CityCountSpinBox" type="SpinBox" parent="MarginContainer/VBoxContainer/content/CityCountContainer"]
+layout_mode = 2
+min_value = 0.0
+max_value = 50.0
+value = 10.0
+step = 1.0
+
+[node name="VillageDensityContainer" type="HBoxContainer" parent="MarginContainer/VBoxContainer/content"]
+layout_mode = 2
+
+[node name="VillageDensityLabel" type="Label" parent="MarginContainer/VBoxContainer/content/VillageDensityContainer"]
+layout_mode = 2
+text = "Village Density:"
+
+[node name="VillageDensitySlider" type="HSlider" parent="MarginContainer/VBoxContainer/content/VillageDensityContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.0
+max_value = 100.0
+value = 40.0
+step = 1.0
+
+[node name="VillageDensitySpinBox" type="SpinBox" parent="MarginContainer/VBoxContainer/content/VillageDensityContainer"]
+layout_mode = 2
+min_value = 0.0
+max_value = 100.0
+value = 40.0
+step = 1.0
+
+[node name="CivilizationTypeContainer" type="HBoxContainer" parent="MarginContainer/VBoxContainer/content"]
+layout_mode = 2
+
+[node name="CivilizationTypeLabel" type="Label" parent="MarginContainer/VBoxContainer/content/CivilizationTypeContainer"]
+layout_mode = 2
+text = "Civilization Type:"
+
+[node name="CivilizationTypeOptionButton" type="OptionButton" parent="MarginContainer/VBoxContainer/content/CivilizationTypeContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+selected = 0
+
+[node name="FoliageContainer" type="VBoxContainer" parent="MarginContainer/VBoxContainer/content"]
+layout_mode = 2
+
+[node name="FoliageLabel" type="Label" parent="MarginContainer/VBoxContainer/content/FoliageContainer"]
+layout_mode = 2
+text = "Foliage & Settlements"
+
+[node name="EnableFoliageCheckBox" type="CheckBox" parent="MarginContainer/VBoxContainer/content/FoliageContainer"]
+layout_mode = 2
+text = "Enable Foliage"
+button_pressed = true
+
+[node name="FoliageDensityContainer" type="HBoxContainer" parent="MarginContainer/VBoxContainer/content/FoliageContainer"]
+layout_mode = 2
+
+[node name="FoliageDensityLabel" type="Label" parent="MarginContainer/VBoxContainer/content/FoliageContainer/FoliageDensityContainer"]
+layout_mode = 2
+text = "Foliage Density:"
+
+[node name="FoliageDensitySlider" type="HSlider" parent="MarginContainer/VBoxContainer/content/FoliageContainer/FoliageDensityContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.0
+max_value = 100.0
+value = 60.0
+step = 1.0
+
+[node name="FoliageDensitySpinBox" type="SpinBox" parent="MarginContainer/VBoxContainer/content/FoliageContainer/FoliageDensityContainer"]
+layout_mode = 2
+min_value = 0.0
+max_value = 100.0
+value = 60.0
+step = 1.0
+
+[node name="FoliageVariationContainer" type="HBoxContainer" parent="MarginContainer/VBoxContainer/content/FoliageContainer"]
+layout_mode = 2
+
+[node name="FoliageVariationLabel" type="Label" parent="MarginContainer/VBoxContainer/content/FoliageContainer/FoliageVariationContainer"]
+layout_mode = 2
+text = "Foliage Variation:"
+
+[node name="FoliageVariationSlider" type="HSlider" parent="MarginContainer/VBoxContainer/content/FoliageContainer/FoliageVariationContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.0
+max_value = 100.0
+value = 40.0
+step = 1.0
+
+[node name="POIContainer" type="VBoxContainer" parent="MarginContainer/VBoxContainer/content"]
+layout_mode = 2
+
+[node name="POILabel" type="Label" parent="MarginContainer/VBoxContainer/content/POIContainer"]
+layout_mode = 2
+text = "Point of Interest Generation"
+
+[node name="EnableCitiesCheckBox" type="CheckBox" parent="MarginContainer/VBoxContainer/content/POIContainer"]
+layout_mode = 2
+text = "Enable Cities"
+button_pressed = true
+
+[node name="EnableTownsCheckBox" type="CheckBox" parent="MarginContainer/VBoxContainer/content/POIContainer"]
+layout_mode = 2
+text = "Enable Towns"
+button_pressed = true
+
+[node name="EnableRuinsCheckBox" type="CheckBox" parent="MarginContainer/VBoxContainer/content/POIContainer"]
+layout_mode = 2
+text = "Enable Ruins"
+button_pressed = true
+
+[node name="EnableResourcesCheckBox" type="CheckBox" parent="MarginContainer/VBoxContainer/content/POIContainer"]
+layout_mode = 2
+text = "Enable Resources"
+button_pressed = true
+
+[node name="POIDensityContainer" type="HBoxContainer" parent="MarginContainer/VBoxContainer/content/POIContainer"]
+layout_mode = 2
+
+[node name="POIDensityLabel" type="Label" parent="MarginContainer/VBoxContainer/content/POIContainer/POIDensityContainer"]
+layout_mode = 2
+text = "POI Density:"
+
+[node name="POIDensitySlider" type="HSlider" parent="MarginContainer/VBoxContainer/content/POIContainer/POIDensityContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.0
+max_value = 100.0
+value = 30.0
+step = 1.0
+
+[node name="MinPOIDistanceContainer" type="HBoxContainer" parent="MarginContainer/VBoxContainer/content/POIContainer"]
+layout_mode = 2
+
+[node name="MinPOIDistanceLabel" type="Label" parent="MarginContainer/VBoxContainer/content/POIContainer/MinPOIDistanceContainer"]
+layout_mode = 2
+text = "Min POI Distance:"
+
+[node name="MinPOIDistanceSpinBox" type="SpinBox" parent="MarginContainer/VBoxContainer/content/POIContainer/MinPOIDistanceContainer"]
+layout_mode = 2
+min_value = 10.0
+max_value = 500.0
+value = 80.0
+step = 1.0
+
+

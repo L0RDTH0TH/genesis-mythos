@@ -1,0 +1,71 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/sections/base_section.tscn" id="1_0"]
+[ext_resource type="Script" path="res://scripts/ui/seed_size_section.gd" id="2_0"]
+
+[node name="seed_size_section" instance=ExtResource("1_0")]
+script = ExtResource("2_0")
+
+[node name="MarginContainer" parent="." index="0"]
+[node name="VBoxContainer" parent="MarginContainer" index="0"]
+[node name="HBoxContainer" parent="MarginContainer/VBoxContainer" index="0"]
+[node name="Button" parent="MarginContainer/VBoxContainer/HBoxContainer" index="0"]
+[node name="Label" parent="MarginContainer/VBoxContainer/HBoxContainer" index="1"]
+text = "Seed & World Size"
+
+[node name="content" parent="MarginContainer/VBoxContainer" index="1"]
+
+[node name="SeedContainer" type="HBoxContainer" parent="MarginContainer/VBoxContainer/content"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="SeedLabel" type="Label" parent="MarginContainer/VBoxContainer/content/SeedContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(100, 0)
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.95, 0.85, 0.6, 1)
+text = "Seed:"
+
+[node name="SeedSpinBox" type="SpinBox" parent="MarginContainer/VBoxContainer/content/SeedContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.0
+max_value = 4294967295.0
+value = 12345.0
+step = 1.0
+
+[node name="FreshSeedButton" type="Button" parent="MarginContainer/VBoxContainer/content/SeedContainer"]
+layout_mode = 2
+text = "Generate Fresh Seed"
+
+[node name="SizeContainer" type="HBoxContainer" parent="MarginContainer/VBoxContainer/content"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="SizeLabel" type="Label" parent="MarginContainer/VBoxContainer/content/SizeContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(100, 0)
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.95, 0.85, 0.6, 1)
+text = "World Size:"
+
+[node name="SizeOptionButton" type="OptionButton" parent="MarginContainer/VBoxContainer/content/SizeContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+selected = 2
+
+[node name="ShapeContainer" type="HBoxContainer" parent="MarginContainer/VBoxContainer/content"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="ShapeLabel" type="Label" parent="MarginContainer/VBoxContainer/content/ShapeContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(100, 0)
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.95, 0.85, 0.6, 1)
+text = "Map Shape:"
+
+[node name="ShapeOptionButton" type="OptionButton" parent="MarginContainer/VBoxContainer/content/ShapeContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+selected = 0

@@ -1,0 +1,40 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://ui/character_creation/tabs/SkillsSelection.gd" id="1_0"]
+[ext_resource type="Theme" path="res://themes/bg3_theme.tres" id="2_0"]
+
+[node name="SkillsSelection" type="VBoxContainer"]
+theme = ExtResource("2_0")
+script = ExtResource("1_0")
+
+[node name="TitleLabel" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Select Skill Proficiencies"
+horizontal_alignment = 1
+
+[node name="DescriptionLabel" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Choose skills in which you are proficient. Some skills are already granted by your class or background."
+autowrap_mode = 3
+horizontal_alignment = 1
+
+[node name="RemainingLabel" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Proficiency Slots Remaining: 2 / 2"
+horizontal_alignment = 1
+
+[node name="SkillsScroll" type="ScrollContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="SkillsVBox" type="VBoxContainer" parent="SkillsScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3

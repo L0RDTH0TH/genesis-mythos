@@ -1,0 +1,22 @@
+{
+	"levels_enabled": {
+		"DEBUG": true,
+		"INFO": true,
+		"WARNING": true,
+		"ERROR": true
+	},
+	"outputs": ["console", "file"],
+	"modules": {
+		"combat": "DEBUG",
+		"dialogue": "INFO",
+		"inventory": "INFO",
+		"quest": "INFO",
+		"character_creation": "DEBUG"
+	},
+	"file_logging": {
+		"enabled": true,
+		"daily_rotation": true,
+		"max_file_size_mb": 10
+	}
+}
+

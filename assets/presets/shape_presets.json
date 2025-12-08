@@ -1,0 +1,29 @@
+{
+	"Square": {
+		"mask_type": "none"
+	},
+	"Continent": {
+		"mask_type": "radial",
+		"centers": 1,
+		"radius_factor": 0.8,
+		"falloff_sharpness": 2.0
+	},
+	"Island Chain": {
+		"mask_type": "multi_radial",
+		"centers": [3, 6],
+		"radius_factor": [0.2, 0.4],
+		"falloff_sharpness": 3.0
+	},
+	"Coastline": {
+		"mask_type": "linear",
+		"direction": "x",
+		"start_pos": 0.0,
+		"falloff_width": 0.3
+	},
+	"Trench": {
+		"mask_type": "inverted_radial",
+		"centers": 2,
+		"radius_factor": 0.5,
+		"falloff_sharpness": 1.5
+	}
+}

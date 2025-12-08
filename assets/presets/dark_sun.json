@@ -1,0 +1,19 @@
+{
+	"name": "Dark Sun",
+	"description": "Post-apocalyptic desert world with harsh, extreme terrain",
+	"params": {
+		"elevation": 80.0,
+		"frequency": 0.008,
+		"noise_type": "Cellular",
+		"enable_rivers": false,
+		"use_fractal": true,
+		"fractal_octaves": 4,
+		"fractal_lacunarity": 1.8,
+		"fractal_gain": 0.4
+	},
+	"randomness": {
+		"terrain": 0.2
+	},
+	"seed": 0
+}
+

@@ -1,0 +1,19 @@
+{
+	"name": "Eberron",
+	"description": "Steampunk-magical setting with dramatic terrain and high magic",
+	"params": {
+		"elevation": 200.0,
+		"frequency": 0.02,
+		"noise_type": "Simplex",
+		"enable_rivers": true,
+		"use_fractal": true,
+		"fractal_octaves": 6,
+		"fractal_lacunarity": 2.5,
+		"fractal_gain": 0.6
+	},
+	"randomness": {
+		"terrain": 0.5
+	},
+	"seed": 0
+}
+

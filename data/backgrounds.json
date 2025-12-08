@@ -1,0 +1,134 @@
+[
+	{
+		"id": "acolyte",
+		"name": "Acolyte",
+		"description": "You have spent your life in service to a temple, learning sacred rites and providing sacrifices to the divine.",
+		"skill_proficiencies": ["Insight", "Religion"],
+		"feature": "Shelter of the Faithful",
+		"feature_description": "You and your companions can expect free healing and care at temples of your faith. You are also respected by those who share your faith.",
+		"languages": 2,
+		"tools": [],
+		"inspiration": "You gain inspiration whenever you aid a fellow devotee of your faith or perform a significant religious rite."
+	},
+	{
+		"id": "charlatan",
+		"name": "Charlatan",
+		"description": "You're an expert in deception and manipulation, always ready with a scheme or con.",
+		"skill_proficiencies": ["Deception", "Sleight of Hand"],
+		"feature": "False Identity",
+		"feature_description": "You have created a second identity that includes documentation, established acquaintances, and disguises.",
+		"languages": 0,
+		"tools": ["Disguise Kit", "Forgery Kit"],
+		"inspiration": "You gain inspiration whenever you successfully deceive someone with lasting consequences."
+	},
+	{
+		"id": "criminal",
+		"name": "Criminal",
+		"description": "You are an experienced criminal with a history of breaking the law.",
+		"skill_proficiencies": ["Deception", "Stealth"],
+		"feature": "Criminal Contact",
+		"feature_description": "You have a reliable contact who acts as your liaison to a network of criminals.",
+		"languages": 0,
+		"tools": ["Thieves' Tools", "Gaming Set"],
+		"inspiration": "You gain inspiration whenever you pull off a successful heist or evade the law."
+	},
+	{
+		"id": "entertainer",
+		"name": "Entertainer",
+		"description": "You thrive in front of an audience, skilled in performance and captivating crowds.",
+		"skill_proficiencies": ["Acrobatics", "Performance"],
+		"feature": "By Popular Demand",
+		"feature_description": "You can always find a place to perform and receive free lodging in return.",
+		"languages": 0,
+		"tools": ["Disguise Kit", "Musical Instrument"],
+		"inspiration": "You gain inspiration whenever your performance moves an audience to tears or applause."
+	},
+	{
+		"id": "folk_hero",
+		"name": "Folk Hero",
+		"description": "You're a champion of the common people, known for heroic deeds.",
+		"skill_proficiencies": ["Animal Handling", "Survival"],
+		"feature": "Rustic Hospitality",
+		"feature_description": "Common folk will shelter and aid you as long as you defend them.",
+		"languages": 0,
+		"tools": ["Artisan's Tools", "Vehicles (Land)"],
+		"inspiration": "You gain inspiration whenever you defend common folk from oppression or danger."
+	},
+	{
+		"id": "guild_artisan",
+		"name": "Guild Artisan",
+		"description": "You are a member of a guild, skilled in a particular craft or trade.",
+		"skill_proficiencies": ["Insight", "Persuasion"],
+		"feature": "Guild Membership",
+		"feature_description": "Your guild provides lodging, legal aid, and influence in your field.",
+		"languages": 1,
+		"tools": ["Artisan's Tools"],
+		"inspiration": "You gain inspiration whenever you create a masterpiece or uphold your guild's reputation."
+	},
+	{
+		"id": "hermit",
+		"name": "Hermit",
+		"description": "You lived in seclusion, seeking spiritual enlightenment or hidden knowledge.",
+		"skill_proficiencies": ["Medicine", "Religion"],
+		"feature": "Discovery",
+		"feature_description": "You uncovered a great philosophical truth or ancient secret.",
+		"languages": 1,
+		"tools": [],
+		"inspiration": "You gain inspiration whenever you act on your philosophical beliefs or share hidden knowledge."
+	},
+	{
+		"id": "noble",
+		"name": "Noble",
+		"description": "You were born into privilege and authority, trained to lead.",
+		"skill_proficiencies": ["History", "Persuasion"],
+		"feature": "Position of Privilege",
+		"feature_description": "People of high society recognize your status and defer to you.",
+		"languages": 1,
+		"tools": [],
+		"inspiration": "You gain inspiration whenever you use your status to aid others or uphold honor."
+	},
+	{
+		"id": "outlander",
+		"name": "Outlander",
+		"description": "You grew up in the wilds, far from civilization, surviving by your wits.",
+		"skill_proficiencies": ["Athletics", "Survival"],
+		"feature": "Wanderer",
+		"feature_description": "You have an excellent memory for maps and geography, and can always find food and water.",
+		"languages": 1,
+		"tools": ["Musical Instrument"],
+		"inspiration": "You gain inspiration whenever you survive a life-threatening situation in the wild."
+	},
+	{
+		"id": "sage",
+		"name": "Sage",
+		"description": "You spent years learning the lore of the multiverse.",
+		"skill_proficiencies": ["Arcana", "History"],
+		"feature": "Researcher",
+		"feature_description": "When you don't know a piece of lore, you often know where and from whom it can be obtained.",
+		"languages": 2,
+		"tools": [],
+		"inspiration": "You gain inspiration whenever you uncover lost knowledge or solve an ancient mystery."
+	},
+	{
+		"id": "soldier",
+		"name": "Soldier",
+		"description": "You served in a military force, learning discipline and combat.",
+		"skill_proficiencies": ["Athletics", "Intimidation"],
+		"feature": "Military Rank",
+		"feature_description": "Soldiers recognize your authority and will offer aid or information.",
+		"languages": 0,
+		"tools": ["Gaming Set", "Vehicles (Land)"],
+		"inspiration": "You gain inspiration whenever you show leadership in battle or protect your comrades."
+	},
+	{
+		"id": "urchin",
+		"name": "Urchin",
+		"description": "You grew up on the streets, surviving by cunning and speed.",
+		"skill_proficiencies": ["Sleight of Hand", "Stealth"],
+		"feature": "City Secrets",
+		"feature_description": "You know the secret patterns and flow of cities and can find passages others would miss.",
+		"languages": 0,
+		"tools": ["Disguise Kit", "Thieves' Tools"],
+		"inspiration": "You gain inspiration whenever you help the downtrodden or escape a dangerous urban situation."
+	}
+]

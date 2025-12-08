@@ -1,0 +1,97 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/main_controller.gd" id="1_0"]
+
+[node name="root" type="Control"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_0")
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="root_layout" type="VBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+
+[node name="mode_tabs" type="TabBar" parent="MarginContainer/root_layout"]
+layout_mode = 2
+tabs = ["Character Creation", "World Builder"]
+
+[node name="toolbar" type="HBoxContainer" parent="MarginContainer/root_layout"]
+layout_mode = 2
+
+[node name="NewWorldButton" type="Button" parent="MarginContainer/root_layout/toolbar"]
+layout_mode = 2
+text = "New World"
+
+[node name="SaveWorldButton" type="Button" parent="MarginContainer/root_layout/toolbar"]
+layout_mode = 2
+text = "Save World"
+
+[node name="LoadWorldButton" type="Button" parent="MarginContainer/root_layout/toolbar"]
+layout_mode = 2
+text = "Load World"
+
+[node name="PresetLabel" type="Label" parent="MarginContainer/root_layout/toolbar"]
+layout_mode = 2
+text = "Preset:"
+
+[node name="PresetOptionButton" type="OptionButton" parent="MarginContainer/root_layout/toolbar"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="content_panel" type="PanelContainer" parent="MarginContainer/root_layout"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="status_bar" type="Panel" parent="MarginContainer/root_layout"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 30)
+
+[node name="preview_panel" type="SubViewportContainer" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.6
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="viewport_3d" type="SubViewport" parent="preview_panel"]
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="RuneParticles" type="GPUParticles2D" parent="CanvasLayer"]
+emitting = true
+amount = 15
+lifetime = 8.0
+emission_shape = 2
+emission_rect_extents = Vector2(200, 150)
+gravity = Vector2(0, 5)
+initial_velocity_min = 2.0
+initial_velocity_max = 8.0
+color = Color(0, 1, 1, 0.4)
+
+[node name="PreviewControls" type="HBoxContainer" parent="preview_panel"]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = -40.0
+offset_right = 200.0
+offset_bottom = -10.0
+
+[node name="BiomeOverlayToggle" type="CheckBox" parent="preview_panel/PreviewControls"]
+layout_mode = 2
+text = "Show Biome Overlay"

@@ -1,0 +1,101 @@
+// res://shaders/compute/heightfield_generator.comp
+
+#version 460
+
+#extension GL_KHR_shader_subgroup_basic : enable
+
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+
+
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+
+
+layout(set = 0, binding = 0, std430) restrict readonly buffer Params {
+
+    uint seed;
+
+    float base_frequency;
+
+    float elevation_scale;
+
+    float domain_warp_strength;
+
+    float domain_warp_freq;
+
+    float terrain_chaos;
+
+    int octaves;
+
+    float lacunarity;
+
+    float gain;
+
+    int shape_preset;
+
+    float shape_params[16];
+
+    // 256-byte encrypted vindication fragment #1 begins here — DO NOT TOUCH
+
+    uint vindication_fragment[54];
+
+} params;
+
+
+
+layout(set = 0, binding = 1, rgba32f) uniform restrict writeonly image2D heightmap_out;
+
+
+
+#include "noise/simplex4D.glslinc"
+
+#include "noise/pcg32.glslinc"
+
+#include "shapes/shape_masks.glslinc"
+
+
+
+float generate_height(vec2 uv) {
+
+    pcg32_rng rng = pcg32_init(params.seed + uint(gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * 8192u));
+
+   
+
+    vec2 warped = uv;
+
+    if (params.domain_warp_strength > 0.0) {
+
+        warped = domain_warp(uv, rng);
+
+    }
+
+   
+
+    float height = fbm_simplex(warped, params);
+
+    height = apply_shape_mask(height, uv, params.shape_preset, params.shape_params);
+
+   
+
+    return height * params.elevation_scale;
+
+}
+
+
+
+void main() {
+
+    uvec2 size = imageSize(heightmap_out);
+
+    vec2 uv = (vec2(gl_GlobalInvocationID.xy) + vec2(0.5)) / vec2(size);
+
+   
+
+    float height = generate_height(uv);
+
+   
+
+    imageStore(heightmap_out, ivec2(gl_GlobalInvocationID.xy), vec4(height, 0.0, 0.0, 1.0));
+
+}

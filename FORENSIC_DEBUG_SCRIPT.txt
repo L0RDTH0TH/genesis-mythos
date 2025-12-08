@@ -1,0 +1,109 @@
+FORENSIC DEBUG SCRIPT - COPY THIS INTO RaceTab.gd
+
+Add this function to RaceTab.gd and call it after _populate_list() completes:
+
+```gdscript
+func _forensic_debug_complete() -> void:
+	"""Complete forensic debug of RaceGrid visibility"""
+	print("\n" + "="*80)
+	print("FORENSIC DEBUG - RACE GRID COLUMNS VISIBILITY")
+	print("="*80)
+	
+	if not race_grid:
+		print("[ERROR] RaceGrid is null!")
+		return
+	
+	# QUESTION 1
+	print("\nQUESTION 1: EXACT NODE")
+	print("Full path: RaceTab/MainPanel/UnifiedScroll/RaceGrid")
+	print("Node type: %s" % race_grid.get_class())
+	print("Node name: %s" % race_grid.name)
+	
+	# QUESTION 2
+	print("\nQUESTION 2: RUNTIME GEOMETRY")
+	print("global_position: %s" % race_grid.global_position)
+	print("position: %s" % race_grid.position)
+	print("size: %s" % race_grid.size)
+	print("custom_minimum_size: %s" % race_grid.custom_minimum_size)
+	
+	# QUESTION 3
+	print("\nQUESTION 3: PARENT CHAIN GEOMETRY")
+	var parent: Node = race_grid.get_parent()
+	var level: int = 1
+	while parent:
+		if parent is Control:
+			var ctrl: Control = parent as Control
+			print("Level %d - %s (%s): size = %s" % [level, parent.name, parent.get_class(), ctrl.size])
+		parent = parent.get_parent()
+		level += 1
+		if level > 15:
+			break
+	
+	# QUESTION 4
+	print("\nQUESTION 4: LAYOUT & SIZING FLAGS")
+	print("RaceGrid size_flags_h: %d, v: %d" % [race_grid.size_flags_horizontal, race_grid.size_flags_vertical])
+	print("RaceGrid anchors_preset: %d, layout_mode: %d" % [race_grid.anchors_preset, race_grid.layout_mode])
+	if unified_scroll:
+		print("UnifiedScroll size_flags_h: %d, v: %d" % [unified_scroll.size_flags_horizontal, unified_scroll.size_flags_vertical])
+	
+	# QUESTION 5
+	print("\nQUESTION 5: GRIDCONTAINER VALUES")
+	print("columns: %d" % race_grid.columns)
+	print("custom_minimum_size: %s" % race_grid.custom_minimum_size)
+	print("child count: %d" % race_grid.get_child_count())
+	
+	# QUESTION 6
+	print("\nQUESTION 6: CHILD NODES")
+	var children: Array = race_grid.get_children()
+	print("Direct children: %d" % children.size())
+	if children.size() > 0:
+		var first: Control = children[0] as Control
+		if first:
+			print("First child size: %s, visible: %s" % [first.size, first.visible])
+			print("First child modulate: %s, self_modulate: %s" % [first.modulate, first.self_modulate])
+	
+	# QUESTION 7
+	print("\nQUESTION 7: VISIBILITY CHAIN")
+	var node: Node = race_grid
+	var vis_level: int = 0
+	while node:
+		if node is CanvasItem:
+			print("Level %d - %s: visible = %s" % [vis_level, node.name, (node as CanvasItem).visible])
+		node = node.get_parent()
+		vis_level += 1
+		if vis_level > 15:
+			break
+	
+	# QUESTION 8 - Theme overrides
+	print("\nQUESTION 8: THEME OVERRIDES")
+	# (Manual check needed in Remote tab)
+	
+	# QUESTION 9
+	print("\nQUESTION 9: CLIPPING")
+	var check: Control = race_grid
+	while check:
+		print("%s: clip_contents = %s" % [check.name, check.clip_contents])
+		check = check.get_parent() as Control
+		if not check:
+			break
+	
+	# QUESTION 10 - Manual size test
+	print("\nQUESTION 10: MANUAL SIZE TEST")
+	var orig_size: Vector2 = race_grid.size
+	print("Original size: %s" % orig_size)
+	race_grid.size = Vector2(800, 600)
+	print("Set to Vector2(800, 600), actual: %s" % race_grid.size)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	print("After 2 frames: %s" % race_grid.size)
+	
+	# QUESTION 11 - Red modulate test
+	print("\nQUESTION 11: RED MODULATE TEST")
+	race_grid.modulate = Color(1, 0, 0, 1)
+	print("Set modulate to RED - check screen for red rectangle!")
+	
+	print("\n" + "="*80)
+	print("FORENSIC DEBUG COMPLETE")
+	print("="*80)
+```
+

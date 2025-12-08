@@ -1,0 +1,83 @@
+// Shape masks — all 5 SDF presets + tectonic ridges
+
+float sdf_circle(vec2 p, vec2 center, float radius) {
+    return length(p - center) - radius;
+}
+
+float sdf_box(vec2 p, vec2 center, vec2 size) {
+    vec2 d = abs(p - center) - size;
+    return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
+}
+
+float apply_shape_mask(float height, vec2 uv, int preset, float shape_params[16]) {
+    vec2 center = vec2(0.5, 0.5);
+    float mask = 1.0;
+    
+    if (preset == 0) { // Square / None
+        return height;
+    } else if (preset == 1) { // Continent - radial falloff
+        float radius_factor = shape_params[0] > 0.0 ? shape_params[0] : 0.8;
+        float falloff = shape_params[1] > 0.0 ? shape_params[1] : 2.0;
+        float dist = length(uv - center);
+        float max_dist = 0.707; // sqrt(0.5^2 + 0.5^2)
+        float normalized_dist = dist / (max_dist * radius_factor);
+        mask = pow(1.0 - clamp(normalized_dist, 0.0, 1.0), falloff);
+    } else if (preset == 2) { // Island Chain - multi radial
+        int num_centers = int(shape_params[0]) > 0 ? int(shape_params[0]) : 3;
+        float radius_factor_min = shape_params[1] > 0.0 ? shape_params[1] : 0.2;
+        float radius_factor_max = shape_params[2] > 0.0 ? shape_params[2] : 0.4;
+        float falloff = shape_params[3] > 0.0 ? shape_params[3] : 3.0;
+        float max_dist = 0.707;
+        float min_mask = 1.0;
+        
+        for (int i = 0; i < num_centers && i < 8; i++) {
+            float angle = float(i) * 6.28318 / float(num_centers);
+            float radius = mix(radius_factor_min, radius_factor_max, fract(sin(float(i) * 12.9898) * 43758.5453));
+            vec2 island_center = center + vec2(cos(angle), sin(angle)) * 0.3;
+            float dist = length(uv - island_center);
+            float normalized_dist = dist / (max_dist * radius);
+            float island_mask = pow(1.0 - clamp(normalized_dist, 0.0, 1.0), falloff);
+            min_mask = min(min_mask, island_mask);
+        }
+        mask = min_mask;
+    } else if (preset == 3) { // Coastline - linear gradient
+        int direction = int(shape_params[0]);
+        float start_pos = shape_params[1];
+        float falloff_width = shape_params[2] > 0.0 ? shape_params[2] : 0.3;
+        float normalized_pos = direction == 0 ? uv.x : uv.y;
+        float dist_from_start = abs(normalized_pos - start_pos);
+        mask = 1.0 - clamp(dist_from_start / falloff_width, 0.0, 1.0);
+    } else if (preset == 4) { // Trench - inverted radial
+        int num_centers = int(shape_params[0]) > 0 ? int(shape_params[0]) : 2;
+        float radius_factor = shape_params[1] > 0.0 ? shape_params[1] : 0.5;
+        float falloff = shape_params[2] > 0.0 ? shape_params[2] : 1.5;
+        float max_dist = 0.707;
+        float max_mask = 0.0;
+        
+        for (int i = 0; i < num_centers && i < 4; i++) {
+            float angle = float(i) * 6.28318 / float(num_centers);
+            vec2 trench_center = center + vec2(cos(angle), sin(angle)) * 0.2;
+            float dist = length(uv - trench_center);
+            float normalized_dist = dist / (max_dist * radius_factor);
+            float trench_mask = pow(clamp(normalized_dist, 0.0, 1.0), falloff);
+            max_mask = max(max_mask, trench_mask);
+        }
+        mask = 1.0 - max_mask;
+    } else if (preset == 5) { // Tectonic ridges
+        float ridge_frequency = shape_params[0] > 0.0 ? shape_params[0] : 8.0;
+        float ridge_amplitude = shape_params[1] > 0.0 ? shape_params[1] : 0.1;
+        float ridge_sharpness = shape_params[2] > 0.0 ? shape_params[2] : 2.0;
+        
+        vec2 ridge_uv = uv * ridge_frequency;
+        float ridge_noise = sin(ridge_uv.x) * sin(ridge_uv.y);
+        float ridges = pow(abs(ridge_noise), ridge_sharpness) * ridge_amplitude;
+        height += ridges;
+        return height;
+    }
+    
+    if (mask < 0.1) {
+        return 0.0; // Sea level
+    }
+    
+    return height * mask;
+}

@@ -1,0 +1,119 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scripts/character/tabs/AppearanceTab.gd" id="1_0"]
+[ext_resource type="Theme" path="res://themes/bg3_theme.tres" id="2_0"]
+[ext_resource type="PackedScene" path="res://scenes/character/appearance/BodyTab.tscn" id="3_0"]
+[ext_resource type="PackedScene" path="res://scenes/character/appearance/HeadTab.tscn" id="4_0"]
+[ext_resource type="PackedScene" path="res://scenes/character/appearance/FaceTab.tscn" id="5_0"]
+[ext_resource type="PackedScene" path="res://scenes/character/appearance/HairTab.tscn" id="6_0"]
+[ext_resource type="PackedScene" path="res://scenes/character/CharacterPreview3D.tscn" id="7_0"]
+[ext_resource type="Script" path="res://ui/character_creation/tabs/appearance/SexSelector.gd" id="8_0"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1"]
+bg_color = Color(0.0784314, 0.0941176, 0.113725, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(1, 0.843137, 0, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[node name="AppearanceTab" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("2_0")
+script = ExtResource("1_0")
+
+[node name="MainSplit" type="HSplitContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 80.0
+offset_top = -80.0
+offset_right = -100.0
+offset_bottom = 100.0
+grow_horizontal = 2
+grow_vertical = 2
+split_offset = 783
+
+[node name="PreviewPanel" type="PanelContainer" parent="MainSplit"]
+layout_mode = 2
+size_flags_horizontal = 1
+theme_override_styles/panel = SubResource("StyleBoxFlat_1")
+
+[node name="SubViewportContainer" type="SubViewportContainer" parent="MainSplit/PreviewPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="CharacterPreview3D" parent="MainSplit/PreviewPanel/SubViewportContainer" instance=ExtResource("7_0")]
+size = Vector2(800, 1000)
+transparent_bg = true
+
+[node name="RightColumn" type="MarginContainer" parent="MainSplit"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/margin_left = 40
+theme_override_constants/margin_top = 40
+theme_override_constants/margin_right = 40
+theme_override_constants/margin_bottom = 40
+
+[node name="ContentVBox" type="VBoxContainer" parent="MainSplit/RightColumn"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 20
+
+[node name="TitleLabel" type="Label" parent="MainSplit/RightColumn/ContentVBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 56
+text = "APPEARANCE"
+horizontal_alignment = 1
+
+[node name="SexSelector" type="HBoxContainer" parent="MainSplit/RightColumn/ContentVBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+script = ExtResource("8_0")
+
+[node name="Label" type="Label" parent="MainSplit/RightColumn/ContentVBox/SexSelector"]
+layout_mode = 2
+size_flags_horizontal = 0
+text = "Sex"
+
+[node name="OptionButton" type="OptionButton" parent="MainSplit/RightColumn/ContentVBox/SexSelector"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="AppearanceTabs" type="TabContainer" parent="MainSplit/RightColumn/ContentVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+tab_alignment = 1
+
+[node name="Body" parent="MainSplit/RightColumn/ContentVBox/AppearanceTabs" instance=ExtResource("3_0")]
+
+[node name="Head" parent="MainSplit/RightColumn/ContentVBox/AppearanceTabs" instance=ExtResource("4_0")]
+
+[node name="Face" parent="MainSplit/RightColumn/ContentVBox/AppearanceTabs" instance=ExtResource("5_0")]
+
+[node name="Hair" parent="MainSplit/RightColumn/ContentVBox/AppearanceTabs" instance=ExtResource("6_0")]
+
+[node name="NextButton" type="Button" parent="MainSplit/RightColumn/ContentVBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 120)
+disabled = true
+text = "Continue →"

@@ -1,0 +1,37 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Theme" path="res://themes/bg3_theme.tres" id="1_0"]
+[ext_resource type="Script" path="res://scripts/ui/progress_dialog.gd" id="1_1"]
+
+[node name="ProgressDialog" type="Window"]
+title = "Forging the World…"
+size = Vector2i(400, 120)
+theme = ExtResource("1_0")
+mode = 4
+visible = false
+transparent = false
+borderless = false
+script = ExtResource("1_1")
+
+[node name="StatusLabel" type="Label" parent="."]
+layout_mode = 0
+anchors_preset = 0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 380.0
+offset_bottom = 50.0
+text = "Generating terrain mesh..."
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ProgressBar" type="ProgressBar" parent="."]
+layout_mode = 0
+anchors_preset = 0
+offset_left = 20.0
+offset_top = 60.0
+offset_right = 380.0
+offset_bottom = 80.0
+min_value = 0.0
+max_value = 1.0
+value = 0.0
+show_percentage = false

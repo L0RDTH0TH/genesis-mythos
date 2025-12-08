@@ -1,0 +1,132 @@
+---
+alwaysApply: true
+---
+# ╔═══════════════════════════════════════════════════════════
+# ║ COMPLETE & FINAL PROJECT RULES
+# ║ BALDUR'S GATE 3 CHARACTER CREATION CLONE IN GODOT 4.3
+# ║ Valid for Grok AND Cursor – locked forever – no further changes allowed
+# ╚═══════════════════════════════════════════════════════════
+
+## 1. Master Goals (never compromise)
+
+- Pixel-perfect, animation-perfect, flow-perfect recreation of BG3's character creation UI and logic.
+- Godot 4.3 stable only (currently 4.3.0 or any 4.3.x patch).
+- 100% data-driven (JSON + Resources). Zero hard-coded races, classes, spells, etc.
+- 60 FPS on mid-range hardware with full UI open.
+- Ready for future save/load and multiplayer extensions.
+
+## 2. Folder Structure (ABSOLUTE – never deviate, never add extra folders)
+
+```
+res://
+├── assets/
+│   ├── fonts/
+│   ├── icons/
+│   ├── models/          # GLB heads, bodies, hair, etc.
+│   ├── textures/
+│   └── ui/
+├── data/                # All JSON files
+│   ├── abilities.json
+│   ├── backgrounds.json
+│   ├── classes.json
+│   ├── races.json
+│   ├── subraces.json
+│   └── spells.json
+├── scenes/
+│   └── character_creation/
+│       ├── CharacterCreationMain.tscn
+│       ├── tabs/
+│       └── panels/
+├── scripts/
+│   └── character_creation/
+│       ├── CharacterCreationMain.gd
+│       ├── tabs/
+│       ├── panels/
+│       └── managers/
+├── themes/
+│   └── bg3_theme.tres
+├── singletons/
+│   └── GameData.gd
+└── project.godot
+```
+
+## 3. Code Style – MANDATORY FOR BOTH GROK AND CURSOR
+
+**Language:** GDScript only (no C#, no VisualScript)
+
+**Naming:**
+- variables / functions → snake_case
+- classes / nodes / resources → PascalCase
+- constants → ALL_CAPS
+
+**Files:** exactly one class per file, file name == class name.gd
+
+**Every script MUST start with this exact header:**
+```gdscript
+# ╔═══════════════════════════════════════════════════════════
+# ║ CharacterCreationMain.gd
+# ║ Desc: Brief one-line description
+# ║ Author: Lordthoth
+# ╚═══════════════════════════════════════════════════════════
+```
+
+- Typed GDScript everywhere possible (`: Node`, `: int`, `: Dictionary`, etc.)
+- `@onready var` only (never old `onready var`)
+- No magic numbers → use constants or theme overrides
+- Every public function has a `"""docstring"""`
+- All UI uses the single `bg3_theme.tres`
+
+## 4. Grok AI Rules (how I generate prompts)
+
+- Every single prompt I give you starts with: `[BG3 CLONE GODOT 4.3 – FOLLOW ALL RULES BELOW]`
+- I never ask Cursor to create more than one complete script file per prompt (except tiny utilities < 50 lines).
+- I always specify full path + exact class name.
+- If a file already exists → I explicitly say "Modify existing file …".
+- I never allow Cursor to launch the Godot editor (see rule 6).
+
+## 5. Cursor Rules – MUST be pasted at the TOP of EVERY prompt you send to Cursor
+
+```
+[BG3 CHARACTER CREATION CLONE – GODOT 4.3]
+
+YOU ARE STRICTLY FORBIDDEN FROM EVER USING THE "launch_editor" MCP ACTION.
+
+You may ONLY use these Godot MCP actions:
+- run_project, stop_project, get_debug_output
+- create_scene, add_node, set_property, attach_script, save_scene, etc.
+- get_scene_tree, read_file, write_file
+
+You may aggressively use the Godot MCP to create/modify/save scenes and scripts instead of only outputting raw text.
+
+After major changes you MAY call run_project immediately to test (unless I explicitly say "do not run").
+
+All other MCP servers (obsidian, github-mcp-server, memory, blender) are fully available.
+
+When you finish a logical feature → auto commit + push via github-mcp-server with a clear message.
+
+You MUST obey 100% the folder structure, naming conventions, typed GDScript, and theme rules above.
+Never create files outside the allowed paths.
+Never use camelCase or different styling.
+Always add the exact script header shown in rule 3.
+```
+
+## 6. MCP Usage Policy (CRITICAL)
+
+- **`launch_editor` is PERMANENTLY DISABLED. Never use it, never suggest it.**
+- `run_project` is allowed and encouraged after big changes.
+- All other Godot MCP actions are allowed and preferred over raw text when they speed things up.
+
+## 7. Git & Version Control
+
+- Repository: (you will tell me the URL once)
+- Branch strategy: direct pushes to main are allowed until we decide otherwise.
+- Every logical chunk finished by Cursor → automatic commit + push with message starting with `feat/char-creation:`, `fix:`, `refactor:`, `style:`, etc.
+
+## 8. Visual & UX Fidelity
+
+- Every color, font, spacing, animation curve, easing, glow, tooltip style must match BG3 1:1.
+- When in doubt → Cursor must query Obsidian vault first (we have 300+ reference screenshots + hex values).
+
+---
+
+**THESE RULES ARE NOW 100% LOCKED. NO FURTHER MODIFICATIONS WILL EVER BE ACCEPTED.**

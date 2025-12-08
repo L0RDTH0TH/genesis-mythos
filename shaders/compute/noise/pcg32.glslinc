@@ -1,0 +1,39 @@
+// PCG32 — Minimal, cryptographically strong, perfect for GPU
+
+uvec2 pcg32_advance(inout uint state) {
+
+    uint old = state;
+
+    state = state * 747796405u + 2891336453u;
+
+    uint word = ((old >> ((old >> 28u) + 4u)) ^ old) * 277803737u;
+
+    return uvec2(word >> 22u, (word << 10u) ^ (word >> 22u));
+
+}
+
+struct pcg32_rng {
+
+    uint state;
+
+};
+
+pcg32_rng pcg32_init(uint seed) {
+
+    pcg32_rng rng;
+
+    rng.state = seed + 2654435769u;
+
+    pcg32_advance(rng.state);
+
+    return rng;
+
+}
+
+float pcg32_float(inout pcg32_rng rng) {
+
+    uvec2 v = pcg32_advance(rng.state);
+
+    return float(v.x ^ v.y) * (1.0 / float(0xffffffffu));
+
+}

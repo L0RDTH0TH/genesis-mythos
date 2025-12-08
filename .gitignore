@@ -1,0 +1,71 @@
+# Godot 4.3
+.import/
+export.cfg
+export_presets.cfg
+*.import
+
+# Godot-specific files
+.godot/
+*.godot
+project.godot.bak
+
+# Build outputs
+builds/
+export/
+
+# User-specific files
+user://
+*.tmp
+*.log
+
+# OS-specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.bak
+*.cache
+
+# Test outputs
+test_outputs/
+test_results/
+
+# Logs
+logs/
+*.log
+
+# Backup files
+*.backup
+*.old
+
+# Python (if any tools use it)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+
+# Node modules (if any tools use npm)
+node_modules/
+package-lock.json
+
+# Keep important files
+!.gitignore
+!README.md
+!PROJECT_RULES.md

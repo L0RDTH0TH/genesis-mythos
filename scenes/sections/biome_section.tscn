@@ -1,0 +1,61 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/sections/base_section.tscn" id="1_0"]
+[ext_resource type="Script" path="res://scripts/ui/biome_section.gd" id="2_0"]
+
+[node name="biome_section" instance=ExtResource("1_0")]
+script = ExtResource("2_0")
+
+[node name="MarginContainer" parent="." index="0"]
+[node name="VBoxContainer" parent="MarginContainer" index="0"]
+[node name="HBoxContainer" parent="MarginContainer/VBoxContainer" index="0"]
+[node name="Button" parent="MarginContainer/VBoxContainer/HBoxContainer" index="0"]
+[node name="Label" parent="MarginContainer/VBoxContainer/HBoxContainer" index="1"]
+text = "Biomes & Climate"
+
+[node name="content" parent="MarginContainer/VBoxContainer" index="1"]
+
+[node name="HumidityContainer" type="HBoxContainer" parent="MarginContainer/VBoxContainer/content"]
+layout_mode = 2
+
+[node name="HumidityLabel" type="Label" parent="MarginContainer/VBoxContainer/content/HumidityContainer"]
+layout_mode = 2
+text = "Humidity:"
+
+[node name="HumiditySlider" type="HSlider" parent="MarginContainer/VBoxContainer/content/HumidityContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.0
+max_value = 100.0
+value = 50.0
+step = 1.0
+
+[node name="HumiditySpinBox" type="SpinBox" parent="MarginContainer/VBoxContainer/content/HumidityContainer"]
+layout_mode = 2
+min_value = 0.0
+max_value = 100.0
+value = 50.0
+step = 1.0
+
+[node name="TemperatureContainer" type="HBoxContainer" parent="MarginContainer/VBoxContainer/content"]
+layout_mode = 2
+
+[node name="TemperatureLabel" type="Label" parent="MarginContainer/VBoxContainer/content/TemperatureContainer"]
+layout_mode = 2
+text = "Temperature:"
+
+[node name="TemperatureSlider" type="HSlider" parent="MarginContainer/VBoxContainer/content/TemperatureContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = -50.0
+max_value = 50.0
+value = 0.0
+step = 1.0
+
+[node name="TemperatureSpinBox" type="SpinBox" parent="MarginContainer/VBoxContainer/content/TemperatureContainer"]
+layout_mode = 2
+min_value = -50.0
+max_value = 50.0
+value = 0.0
+step = 1.0
+
