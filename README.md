@@ -1,10 +1,10 @@
 # ╔═══════════════════════════════════════════════════════════
-# ║ BG3 Character Creation Clone
-# ║ Baldur's Gate 3 Character Creation System for Godot 4.3
+# ║ Genesis Mythos
+# ║ D&D 5e Character Creation & World Generation System for Godot 4.3
 # ║ Author: Lordthoth
 # ╚═══════════════════════════════════════════════════════════
 
-A 100% faithful recreation of Baldur's Gate 3's character creation system in Godot 4.3, featuring pixel-perfect UI replication, data-driven architecture, and full character customization.
+Genesis Mythos is a comprehensive D&D 5e character creation and world generation system built in Godot 4.3. Featuring pixel-perfect UI design, data-driven architecture, and full character customization with procedural world generation.
 
 ## Table of Contents
 
@@ -26,7 +26,7 @@ This project is a complete recreation of Baldur's Gate 3's character creation sy
 ### Core Principles
 
 - **100% Data-Driven**: All game data comes from JSON files or Resources
-- **Pixel-Perfect UI**: Faithful recreation of BG3's visual design
+- **Pixel-Perfect UI**: Professional D&D 5e character creation interface
 - **Performance**: 60 FPS target on mid-range hardware
 - **Extensible**: Easy to add new races, classes, backgrounds, etc.
 - **Type-Safe**: Typed GDScript throughout for better error detection
@@ -673,6 +673,6 @@ Manages level-of-detail for performance.
 
 ---
 
-**Project by Grok + Cursor + Lordthoth**
+**Genesis Mythos - Project by Grok + Cursor + Lordthoth**
 
 *For complete project rules and conventions, see `.cursor/rules/project-rules.mdc`*
