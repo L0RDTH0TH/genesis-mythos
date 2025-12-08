@@ -66,6 +66,10 @@ env/
 node_modules/
 package-lock.json
 
+# Large model files (exceed GitHub's 100MB limit)
+# These are modified/processed versions - originals are smaller
+assets/models/character_bases/*-modified.glb
+
 # Keep important files
 !.gitignore
 !README.md
