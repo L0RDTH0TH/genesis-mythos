@@ -1,6 +1,16 @@
-[gd_scene load_steps=2 format=3 uid="uid://world_root"]
+[gd_scene load_steps=4 format=3 uid="uid://world_root"]
 
 [ext_resource type="Environment" path="res://assets/environments/eryndor_base.tres" id="1_eryndor_env"]
+[ext_resource type="PrismMesh" path="res://assets/meshes/hex_pillar.tres" id="2_hex_mesh"]
+[ext_resource type="Script" path="res://core/procedural/hex_grid_manager.gd" id="3_hex_manager"]
+
+[sub_resource type="MultiMesh" id="MultiMesh_1"]
+transform_format = 1
+use_colors = false
+use_custom_data = true
+instance_count = 1048576
+visible_instance_count = 0
+mesh = ExtResource("2_hex_mesh")
 
 [node name="WorldRoot" type="Node3D"]
 
@@ -23,3 +33,11 @@ directional_shadow_max_distance = 1000.0
 environment = ExtResource("1_eryndor_env")
 
 [node name="ProceduralWorld" type="Node3D" parent="."]
+
+[node name="HexTerrain" type="MultiMeshInstance3D" parent="ProceduralWorld"]
+multimesh = SubResource("MultiMesh_1")
+
+[node name="HexGridManager" type="Node" parent="ProceduralWorld"]
+hex_size = 50.0
+visible_radius_chunks = 32.0
+script = ExtResource("3_hex_manager")
