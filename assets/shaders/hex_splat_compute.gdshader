@@ -29,12 +29,77 @@ vec3 axial_to_world(vec2 axial) {
     return vec3(x, 0.0, z);
 }
 
-// Simple layered noise placeholder (full 7-layer GPU noise in Phase 4)
+// ──────────────────────────────────────────────────────────────
+// Eryndor 4.0 Final – 7-Layer Continental Noise Stack (GPU)
+// This is the crown jewel. Do not touch unless you want to burn.
+// ──────────────────────────────────────────────────────────────
+float hash11(float p) {
+    p = fract(p * 0.1031);
+    p *= p + 33.33;
+    p *= p + p;
+    return fract(p);
+}
+
+float noise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+   
+    float a = hash11(dot(i + vec2(0.,0.), vec2(1.,1.)));
+    float b = hash11(dot(i + vec2(1.,0.), vec2(1.,1.)));
+    float c = hash11(dot(i + vec2(0.,1.), vec2(1.,1.)));
+    float d = hash11(dot(i + vec2(1.,1.), vec2(1.,1.)));
+   
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+const mat2 m2 = mat2(0.8, -0.6, 0.6, 0.8);
+
+float fbm(vec2 p, int octaves) {
+    float amp = 0.5;
+    float tot = 0.0;
+    for (int i = 0; i < octaves; i++) {
+        tot += amp * noise(p);
+        p = m2 * p * 2.02;
+        amp *= 0.51;
+    }
+    return tot;
+}
+
+float continent_shape(vec2 pos) {
+    float continental = fbm(pos * 0.00008, 6);
+    continental = continental * 2.2 - 0.7;
+    continental = smoothstep(0.0, 1.0, continental);
+    continental = pow(continental, 2.2);
+    return continental;
+}
+
 float get_height(vec2 world_pos) {
-    float n = sin(world_pos.x * 0.002 + float(params.seed)) * 0.5 + 0.5;
-    n += sin(world_pos.y * 0.003) * 0.3;
-    n = n * 0.5 + 0.5;
-    return (n - 0.5) * HEX_HEIGHT * 2.0;
+    vec2 p = world_pos * 0.0005; // Continental scale
+   
+    // Layer 1 – Continents
+    float continents = continent_shape(p);
+   
+    // Layer 2 – Mountain ranges (ridged)
+    float mountains = abs(fbm(p * 2.3 + vec2(12.0, 7) * 2.0 - 1.0));
+    mountains = pow(mountains, 3.0) * continents;
+   
+    // Layer 3 – Erosion / valleys
+    float erosion = fbm(p * 8.0 + mountains * 3.0, 5);
+   
+    // Layer 4 – Detail
+    float detail = fbm(p * 32.0, 4);
+   
+    // Final height
+    float h = continents * 0.3;
+    h += mountains * 18.0;
+    h -= erosion * 2.5;
+    h += detail * 0.8;
+   
+    // Ocean floor below 0
+    h = h - 4.0;
+   
+    return h * 20.0; // final world height scale
 }
 
 void main() {
