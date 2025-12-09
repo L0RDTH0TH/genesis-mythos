@@ -185,18 +185,21 @@ res://
 
 ### World Creation System
 
-- Procedural world generation
-- Biome system
-- Terrain generation
+- **[NEW] Data-Driven Biomes** - Biome-blended world generation using BiomeDefinition resources
+- Three-phase generation pipeline: Seed → Regions → Chunks
+- Region-seeded placement system using RegionSeed.json
+- Smooth biome blending at region boundaries
+- Procedural terrain generation with biome-specific noise parameters
 - Climate and civilization settings
-- Resource distribution
+- Resource distribution per biome
 - Magic system configuration
 
 ### Technical Features
 
-- **Data-Driven Architecture**: All content loaded from JSON
+- **Data-Driven Architecture**: All content loaded from JSON and Resources
+- **[NEW] Data-Driven Biomes**: BiomeDefinition.tres resources for extensible biome system
 - **Centralized Logging**: Configurable logging system with file output
-- **Performance Optimized**: LOD system, efficient rendering
+- **Performance Optimized**: LOD system, efficient rendering, threaded generation
 - **Type-Safe Code**: Full GDScript typing
 - **Modular Design**: Reusable components and systems
 
