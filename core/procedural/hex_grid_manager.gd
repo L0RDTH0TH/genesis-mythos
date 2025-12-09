@@ -7,7 +7,7 @@
 extends Node
 
 @export var hex_size: float = 50.0
-@export var visible_radius_chunks: float = 32.0
+@export var visible_radius_chunks: float = 18.0
 
 @onready var multi_mesh_instance: MultiMeshInstance3D = get_node("/root/WorldRoot/ProceduralWorld/HexTerrain")
 
@@ -115,10 +115,16 @@ func axial_to_world(axial: Vector2) -> Vector3:
 	return Vector3(x, 0.0, z)
 
 func get_height_cpu(world_pos: Vector2) -> float:
+	# Match terrain shader height ranges: -80 (deep ocean) to 400 (snow peaks)
+	# Scale to match continental terrain system (20x multiplier)
 	var n = sin(world_pos.x * 0.002 + float(params.world_seed)) * 0.5 + 0.5
 	n += sin(world_pos.y * 0.003) * 0.3
 	n = n * 0.5 + 0.5
-	return (n - 0.5) * HEX_HEIGHT * 2.0
+	# Scale to continental range: -80 to 400
+	# Normalize to -1 to 1, then map to -80 to 400
+	var normalized = (n - 0.5) * 2.0  # -1 to 1
+	var height = normalized * 240.0 + 160.0  # Maps -1→-80, 1→400
+	return height
 
 func world_to_axial(world: Vector3) -> Vector2:
 	var q = (SQRT_3/3.0 * world.x - 1.0/3.0 * world.z) / hex_size

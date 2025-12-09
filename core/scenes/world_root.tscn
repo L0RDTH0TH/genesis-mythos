@@ -1,10 +1,10 @@
-[gd_scene load_steps=7 format=3 uid="uid://world_root"]
+ are the sp[gd_scene load_steps=6 format=3 uid="uid://world_root"]
 
 [ext_resource type="Environment" path="res://assets/environments/eryndor_base.tres" id="1_eryndor_env"]
 [ext_resource type="PrismMesh" path="res://assets/meshes/hex_pillar.tres" id="2_hex_mesh"]
 [ext_resource type="Script" path="res://core/procedural/hex_grid_manager.gd" id="3_hex_manager"]
 [ext_resource type="ShaderMaterial" path="res://assets/materials/hex_terrain_material.tres" id="4_hex_material"]
-[ext_resource type="Script" path="res://core/scenes/world_root_camera.gd" id="5_camera_script"]
+[ext_resource type="Script" path="res://core/utils/creative_fly_camera.gd" id="5_camera_script"]
 
 [sub_resource type="MultiMesh" id="MultiMesh_1"]
 transform_format = 1
@@ -45,22 +45,5 @@ multimesh = SubResource("MultiMesh_1")
 
 [node name="HexGridManager" type="Node" parent="ProceduralWorld"]
 hex_size = 50.0
-visible_radius_chunks = 32.0
+visible_radius_chunks = 18.0
 script = ExtResource("3_hex_manager")
-
-[sub_resource type="PlaneMesh" id="PlaneMesh_1"]
-size = Vector2(200000, 200000)
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_1"]
-albedo_color = Color(0.043, 0.094, 0.184, 1)
-transparency = 1
-alpha = 0.82
-roughness = 0.0
-metallic = 0.0
-cull_mode = 2
-fixed_size = true
-render_priority = -10
-
-[node name="WaterPlane" type="MeshInstance3D" parent="ProceduralWorld"]
-mesh = SubResource("PlaneMesh_1")
-material_override = SubResource("StandardMaterial3D_1")
