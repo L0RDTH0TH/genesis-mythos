@@ -1,3 +1,6 @@
 [gd_resource type="ShaderMaterial" format=3]
 
 [resource]
+shader = ExtResource("1_hex_terrain_shader")
+
+[ext_resource type="Shader" path="res://assets/shaders/hex_terrain.gdshader" id="1_hex_terrain_shader"]
