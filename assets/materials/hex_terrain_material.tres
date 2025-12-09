@@ -1,9 +1,6 @@
 [gd_resource type="ShaderMaterial" format=3]
 
-[resource]
-shader = SubResource("hex_terrain_shader")
-
-[sub_resource type="Shader" id="hex_terrain_shader"]
+[sub_resource type="Shader" id="Shader_1"]
 code = "shader_type spatial;
 
 render_mode blend_mix, depth_draw_opaque, cull_back, diffuse_burley, specular_schlick_ggx;
@@ -25,3 +22,6 @@ void fragment() {
     SPECULAR = 0.5;
 }
 "
+
+[resource]
+shader = SubResource("Shader_1")
