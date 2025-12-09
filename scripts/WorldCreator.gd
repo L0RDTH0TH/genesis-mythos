@@ -47,6 +47,7 @@ const ExportUtils = preload("res://scripts/utils/export_utils.gd")
 
 func _ready() -> void:
 	"""Initialize World Creator UI and setup."""
+	print("[WorldCreator] WorldCreator loaded")
 	# Initialize world first
 	if not world:
 		world = DEFAULT_WORLD.duplicate()

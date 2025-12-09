@@ -1,8 +1,13 @@
 [application]
+
 config/name="Eryndor 4.0 Final"
-run/main_scene="res://core/scenes/world_root.tscn"
+run/main_scene="res://scenes/MainMenu.tscn"
 config/features=PackedStringArray("4.3", "Forward Plus")
 config/use_hidden_project_data_directory=false
+
+[engine]
+
+godot_version="4.3.stable"
 
 [autoload]
 Eryndor="*res://core/singletons/eryndor.gd"
