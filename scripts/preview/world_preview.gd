@@ -9,6 +9,8 @@ extends Node3D
 const LODManager = preload("res://scripts/world_creation/LODManager.gd")
 # Phase 5: Biome Texture Manager
 const BiomeTextureManager = preload("res://scripts/world_creation/BiomeTextureManager.gd")
+# Phase 4: WorldGenerator for threaded preview
+const WorldGenerator = preload("res://scripts/world_creation/WorldGenerator.gd")
 
 @onready var camera: Camera3D = $Camera3D
 @onready var terrain_mesh_instance: MeshInstance3D = $terrain_mesh
@@ -23,6 +25,12 @@ var poi_points_instance: MultiMeshInstance3D = null  # Phase 3: POI markers
 # Phase 4: LOD & Chunks
 var chunk_nodes: Dictionary = {}  # Chunk key -> MeshInstance3D
 var chunks_container: Node3D = null  # Container for chunk meshes
+
+# Phase 4: Threaded preview generation
+var preview_thread: Thread = null
+var preview_timer: Timer = null
+var is_generating_preview: bool = false
+var pending_world_data = null  # WorldData to generate preview for
 
 var biome_overlay_enabled: bool = false
 var world_data = null  # WorldData - type annotation removed for @tool compatibility
@@ -44,6 +52,7 @@ func _ready() -> void:
 	"""Initialize camera position and create node points instance."""
 	_update_camera_position()
 	_setup_node_points()
+	_setup_preview_timer()
 
 func _input(event: InputEvent) -> void:
 	"""Handle input events for camera control."""
@@ -376,6 +385,188 @@ func set_world_data(data) -> void:
 		if world_data.chunk_generated.is_connected(_on_chunk_generated):
 			world_data.chunk_generated.disconnect(_on_chunk_generated)
 		world_data.chunk_generated.connect(_on_chunk_generated)
+	
+	# Phase 4: Queue threaded preview update
+	queue_preview_update()
+
+func _setup_preview_timer() -> void:
+	"""Setup debounce timer for preview updates."""
+	preview_timer = Timer.new()
+	preview_timer.wait_time = 0.5
+	preview_timer.one_shot = true
+	preview_timer.timeout.connect(_on_preview_timer_timeout)
+	add_child(preview_timer)
+
+func queue_preview_update() -> void:
+	"""Queue a preview update with debounce."""
+	if not preview_timer:
+		return
+	if preview_timer.is_stopped():
+		preview_timer.start()
+	else:
+		preview_timer.start()  # Restart timer
+
+func _on_preview_timer_timeout() -> void:
+	"""Trigger threaded preview generation after debounce."""
+	if world_data and not is_generating_preview:
+		update_preview_threaded()
+
+func update_preview_threaded() -> void:
+	"""Update preview using threaded generation (Phase 4).
+	
+	Generates a low-resolution preview in a separate thread to avoid UI freezes.
+	"""
+	if is_generating_preview:
+		return
+	
+	if preview_thread and preview_thread.is_alive():
+		# Thread already running, skip
+		return
+	
+	is_generating_preview = true
+	pending_world_data = world_data.duplicate() if world_data else null
+	
+	# Start fade-out animation
+	if terrain_mesh_instance:
+		var tween: Tween = create_tween()
+		tween.tween_property(terrain_mesh_instance, "modulate:a", 0.3, 0.2)
+	
+	# Start threaded generation
+	preview_thread = Thread.new()
+	var error: Error = preview_thread.start(_generate_preview_threaded)
+	if error != OK:
+		push_error("world_preview: Failed to start preview thread: %d" % error)
+		is_generating_preview = false
+		pending_world_data = null
+
+func _generate_preview_threaded() -> void:
+	"""Generate preview in thread (Phase 4).
+	
+	Creates a scaled-down version of the world for fast preview.
+	"""
+	if not pending_world_data:
+		call_deferred("_on_preview_generation_complete", null)
+		return
+	
+	# Scale down for performance (1/10th resolution)
+	var preview_data = pending_world_data.duplicate()
+	
+	# Scale down size preset (use smaller size for preview)
+	var size_preset: int = preview_data.get("size_preset", 2)
+	var preview_size_preset: int = max(0, size_preset - 2)  # Scale down by 2 levels
+	
+	# Create preview world data with scaled parameters
+	var preview_params: Dictionary = preview_data.get("params", {}).duplicate()
+	preview_params["preview_mode"] = true
+	preview_params["chunk_size"] = 32  # Smaller chunks for preview
+	
+	# Generate preview size (scaled down)
+	var preview_size: Vector2i = Vector2i(256, 256)  # Fixed low-res for preview
+	match preview_size_preset:
+		0: preview_size = Vector2i(64, 64)
+		1: preview_size = Vector2i(128, 128)
+		2: preview_size = Vector2i(256, 256)
+		3: preview_size = Vector2i(256, 256)
+		4: preview_size = Vector2i(256, 256)
+	
+	# Get generation parameters
+	var seed_value: int = preview_data.get("seed", 12345)
+	var frequency: float = preview_params.get("frequency", 0.01)
+	var elevation_scale: float = preview_params.get("elevation_scale", 30.0)
+	var domain_warp_strength: float = preview_params.get("domain_warp_strength", 0.0)
+	var domain_warp_freq: float = preview_params.get("domain_warp_frequency", 0.005)
+	var terrain_chaos: float = preview_params.get("terrain_chaos", 50.0)
+	
+	# Generate heightmap using CPU (thread-safe)
+	var heightmap: Image = _generate_heightmap_cpu(preview_size, seed_value, frequency, elevation_scale, domain_warp_strength, domain_warp_freq, terrain_chaos)
+	
+	# Convert heightmap to mesh (simplified for preview)
+	var preview_mesh: Mesh = _heightmap_to_mesh(heightmap)
+	
+	# Return mesh via call_deferred
+	call_deferred("_on_preview_generation_complete", preview_mesh)
+
+func _generate_heightmap_cpu_fallback(size: Vector2i, seed_value: int) -> Image:
+	"""Fallback CPU heightmap generation if GPU fails."""
+	var noise: FastNoiseLite = FastNoiseLite.new()
+	noise.seed = seed_value
+	noise.frequency = 0.01
+	noise.fractal_octaves = 4
+	noise.fractal_lacunarity = 2.0
+	noise.fractal_gain = 0.5
+	
+	var img: Image = Image.create(size.x, size.y, false, Image.FORMAT_RF)
+	for x in size.x:
+		for y in size.y:
+			var n: float = noise.get_noise_2d(x, y)
+			n = (n + 1.0) * 0.5  # Normalize to 0-1
+			img.set_pixel(x, y, Color(n, n, n, 1.0))
+	
+	return img
+
+func _heightmap_to_mesh(heightmap: Image) -> Mesh:
+	"""Convert heightmap image to mesh for preview."""
+	if not heightmap:
+		return null
+	
+	var st: SurfaceTool = SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	
+	var size: Vector2i = heightmap.get_size()
+	var scale: float = 10.0  # World scale
+	var height_scale: float = 30.0
+	
+	# Center the mesh at origin
+	var offset_x: float = -(size.x * scale) * 0.5
+	var offset_z: float = -(size.y * scale) * 0.5
+	
+	# Generate vertices from heightmap
+	for y in range(size.y - 1):
+		for x in range(size.x - 1):
+			# Get heights
+			var h00: float = heightmap.get_pixel(x, y).r * height_scale
+			var h10: float = heightmap.get_pixel(x + 1, y).r * height_scale
+			var h01: float = heightmap.get_pixel(x, y + 1).r * height_scale
+			var h11: float = heightmap.get_pixel(x + 1, y + 1).r * height_scale
+			
+			# Convert to world coordinates (centered)
+			var v00: Vector3 = Vector3(offset_x + x * scale, h00, offset_z + y * scale)
+			var v10: Vector3 = Vector3(offset_x + (x + 1) * scale, h10, offset_z + y * scale)
+			var v01: Vector3 = Vector3(offset_x + x * scale, h01, offset_z + (y + 1) * scale)
+			var v11: Vector3 = Vector3(offset_x + (x + 1) * scale, h11, offset_z + (y + 1) * scale)
+			
+			# Create two triangles per quad
+			# Triangle 1: v00, v10, v01
+			st.add_vertex(v00)
+			st.add_vertex(v10)
+			st.add_vertex(v01)
+			
+			# Triangle 2: v10, v11, v01
+			st.add_vertex(v10)
+			st.add_vertex(v11)
+			st.add_vertex(v01)
+	
+	st.generate_normals()
+	st.generate_tangents()
+	return st.commit()
+
+func _on_preview_generation_complete(preview_mesh: Mesh) -> void:
+	"""Handle completion of threaded preview generation (Phase 4)."""
+	is_generating_preview = false
+	
+	if preview_thread:
+		preview_thread.wait_to_finish()
+		preview_thread = null
+	
+	if preview_mesh and terrain_mesh_instance:
+		# Update mesh
+		update_mesh(preview_mesh)
+		
+		# Fade-in animation
+		var tween: Tween = create_tween()
+		tween.tween_property(terrain_mesh_instance, "modulate:a", 1.0, 0.5)
+	
+	pending_world_data = null
 
 func toggle_biome_overlay(enabled: bool) -> void:
 	"""Toggle biome overlay visibility."""
