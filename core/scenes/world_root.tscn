@@ -1,4 +1,4 @@
- are the sp[gd_scene load_steps=6 format=3 uid="uid://world_root"]
+[gd_scene load_steps=6 format=3 uid="uid://world_root"]
 
 [ext_resource type="Environment" path="res://assets/environments/eryndor_base.tres" id="1_eryndor_env"]
 [ext_resource type="PrismMesh" path="res://assets/meshes/hex_pillar.tres" id="2_hex_mesh"]
