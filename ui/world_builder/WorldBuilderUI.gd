@@ -1114,8 +1114,8 @@ func _show_icon_type_selection_dialog() -> void:
 		var first_icon_id: String = str(first_icon.get("icon_id", "")) if first_icon.has("icon_id") else ""
 		for icon: Dictionary in icons:
 			if icon.get("id", "") == first_icon_id:
-			icon_data = icon
-			break
+				icon_data = icon
+				break
 	
 	if icon_data.is_empty():
 		current_icon_group_index += 1
@@ -1124,7 +1124,8 @@ func _show_icon_type_selection_dialog() -> void:
 	
 	# Create pop-up dialog
 	var dialog: AcceptDialog = AcceptDialog.new()
-	dialog.title = "Select Type for " + first_icon.icon_id.capitalize()
+	var first_icon_id_str: String = str(first_icon.get("icon_id", "")) if first_icon.has("icon_id") else "icon"
+	dialog.title = "Select Type for " + first_icon_id_str.capitalize()
 	dialog.size = Vector2(600, 400)
 	
 	var vbox: VBoxContainer = VBoxContainer.new()
@@ -1134,7 +1135,8 @@ func _show_icon_type_selection_dialog() -> void:
 	# Show icon at top
 	var icon_preview: ColorRect = ColorRect.new()
 	icon_preview.custom_minimum_size = Vector2(64, 64)
-	icon_preview.color = first_icon.icon_color
+	var icon_color_val = first_icon.get("icon_color") if first_icon.has("icon_color") else Color.WHITE
+	icon_preview.color = icon_color_val
 	vbox.add_child(icon_preview)
 	
 	# Type selection buttons
@@ -1160,8 +1162,8 @@ func _on_type_selected(type_name: String, group: Array, dialog: AcceptDialog) ->
 	"""Handle type selection for icon group."""
 	# Set type for all icons in group
 	for icon in group:
-		if icon and icon.has_method("set_icon_data"):
-			icon.icon_type = type_name
+		if icon and icon.has("icon_type"):
+			icon.set("icon_type", type_name)
 	
 	dialog.queue_free()
 	
