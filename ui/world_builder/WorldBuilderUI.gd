@@ -6,6 +6,9 @@
 
 extends Control
 
+## Preload IconNode class to ensure it's available
+const IconNode = preload("res://ui/world_builder/IconNode.gd")
+
 ## Reference to terrain manager
 var terrain_manager = null  # Terrain3DManager - type hint removed to avoid parser error
 
