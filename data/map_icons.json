@@ -1,0 +1,40 @@
+{
+  "icons": [
+    {
+      "id": "forest",
+      "prompt": "simple pixel art icon of a green forest tree cluster",
+      "types": ["jungle", "pine", "redwood"],
+      "color": [0.2, 0.6, 0.2, 1.0]
+    },
+    {
+      "id": "mountain",
+      "prompt": "simple pixel art icon of a rocky mountain peak",
+      "types": ["snowy", "volcanic", "rocky"],
+      "color": [0.5, 0.5, 0.5, 1.0]
+    },
+    {
+      "id": "city",
+      "prompt": "simple pixel art icon of a medieval city with buildings",
+      "types": ["small_town", "large_city", "fortress"],
+      "color": [0.7, 0.6, 0.4, 1.0]
+    },
+    {
+      "id": "water",
+      "prompt": "simple pixel art icon of a body of water",
+      "types": ["lake", "river", "ocean"],
+      "color": [0.2, 0.4, 0.8, 1.0]
+    },
+    {
+      "id": "desert",
+      "prompt": "simple pixel art icon of desert dunes",
+      "types": ["sandy", "rocky", "oasis"],
+      "color": [0.9, 0.8, 0.6, 1.0]
+    },
+    {
+      "id": "swamp",
+      "prompt": "simple pixel art icon of a swamp with trees",
+      "types": ["marsh", "bog", "mangrove"],
+      "color": [0.3, 0.4, 0.2, 1.0]
+    }
+  ]
+}

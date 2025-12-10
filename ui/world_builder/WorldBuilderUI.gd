@@ -1,6 +1,6 @@
 # ╔═══════════════════════════════════════════════════════════
 # ║ WorldBuilderUI.gd
-# ║ Desc: Complete data-driven world building UI with tabs
+# ║ Desc: Step-by-step wizard-style world building UI
 # ║ Author: Lordthoth
 # ╚═══════════════════════════════════════════════════════════
 
@@ -9,36 +9,68 @@ extends Control
 ## Reference to terrain manager
 var terrain_manager = null  # Terrain3DManager - type hint removed to avoid parser error
 
-## UI configuration loaded from JSON
-var ui_config: Dictionary = {}
+## Current step index (0-8)
+var current_step: int = 0
 
-## Path to UI configuration JSON
+## Step definitions
+const STEPS: Array[String] = [
+	"Seed & Size",
+	"2D Map Maker",
+	"Terrain",
+	"Climate",
+	"Biomes",
+	"Structures & Civilizations",
+	"Environment",
+	"Resources & Magic",
+	"Export"
+]
+
+## Step data storage
+var step_data: Dictionary = {}
+
+## Map icons data
+var map_icons_data: Dictionary = {}
+
+## Placed icons on 2D map
+var placed_icons: Array[IconNode] = []
+
+## Icon groups after clustering
+var icon_groups: Array[Array] = []
+
+## Current icon being processed for type selection
+var current_icon_group_index: int = 0
+
+## References to UI nodes
+@onready var navigation_panel: Panel = $MainContainer/LeftNavigation
+@onready var content_area: Control = $MainContainer/ContentArea
+@onready var step_labels: Array[Label] = []
+@onready var next_button: Button = $MainContainer/ButtonContainer/NextButton
+@onready var back_button: Button = $MainContainer/ButtonContainer/BackButton
+
+## Paths
+const MAP_ICONS_PATH: String = "res://data/map_icons.json"
 const UI_CONFIG_PATH: String = "res://data/config/world_builder_ui.json"
 
-## Reference to TabContainer
-@onready var tab_container: TabContainer = $BackgroundPanel/TabContainer
-
-## Store references to dynamically created controls
+## Control references
 var control_references: Dictionary = {}
-
-## Current parameter values
-var current_params: Dictionary = {}
 
 
 func _ready() -> void:
-	_load_ui_config()
+	_load_map_icons()
 	_apply_theme()
 	_ensure_visibility()
-	_build_ui_from_config()
-	_setup_ui_connections()
-	print("WorldBuilderUI: Ready and visible")
+	_setup_navigation()
+	_setup_step_content()
+	_setup_buttons()
+	_update_step_display()
+	print("WorldBuilderUI: Wizard-style UI ready")
 
 
-func _load_ui_config() -> void:
-	"""Load UI configuration from JSON file."""
-	var file: FileAccess = FileAccess.open(UI_CONFIG_PATH, FileAccess.READ)
+func _load_map_icons() -> void:
+	"""Load map icons configuration from JSON."""
+	var file: FileAccess = FileAccess.open(MAP_ICONS_PATH, FileAccess.READ)
 	if file == null:
-		push_error("WorldBuilderUI: Failed to load UI config from " + UI_CONFIG_PATH)
+		push_error("WorldBuilderUI: Failed to load map icons from " + MAP_ICONS_PATH)
 		return
 	
 	var json_string: String = file.get_as_text()
@@ -47,13 +79,11 @@ func _load_ui_config() -> void:
 	var json: JSON = JSON.new()
 	var parse_result: Error = json.parse(json_string)
 	if parse_result != OK:
-		push_error("WorldBuilderUI: Failed to parse UI config JSON: " + json.get_error_message())
+		push_error("WorldBuilderUI: Failed to parse map icons JSON: " + json.get_error_message())
 		return
 	
-	ui_config = json.data
-	if not ui_config.has("tabs"):
-		push_error("WorldBuilderUI: UI config missing 'tabs' key")
-		return
+	map_icons_data = json.data
+	print("WorldBuilderUI: Loaded ", map_icons_data.get("icons", []).size(), " map icon definitions")
 
 
 func _apply_theme() -> void:
@@ -61,455 +91,474 @@ func _apply_theme() -> void:
 	var theme: Theme = load("res://themes/bg3_theme.tres")
 	if theme != null:
 		self.theme = theme
-		if tab_container != null:
-			tab_container.theme = theme
 
 
 func _ensure_visibility() -> void:
 	"""Ensure UI elements are visible with proper styling."""
-	# Ensure root Control is visible and fully opaque
 	self.visible = true
 	self.mouse_filter = Control.MOUSE_FILTER_PASS
-	self.modulate = Color(1, 1, 1, 1)  # Full opacity
-	
-	# Get background panel and ensure it's visible
-	var background_panel: Panel = $BackgroundPanel
-	if background_panel != null:
-		background_panel.visible = true
-		background_panel.modulate = Color(1, 1, 1, 1)
-		# Apply a visible background style with high contrast
-		var style_box: StyleBoxFlat = StyleBoxFlat.new()
-		style_box.bg_color = Color(0.15, 0.12, 0.1, 0.95)  # Dark brown with high opacity
-		style_box.border_width_left = 3
-		style_box.border_width_top = 3
-		style_box.border_width_right = 3
-		style_box.border_width_bottom = 3
-		style_box.border_color = Color(0.85, 0.7, 0.4, 1.0)  # Gold border
-		style_box.corner_radius_top_left = 8
-		style_box.corner_radius_top_right = 8
-		style_box.corner_radius_bottom_right = 8
-		style_box.corner_radius_bottom_left = 8
-		background_panel.add_theme_stylebox_override("panel", style_box)
-		print("WorldBuilderUI: Background panel styled and visible")
-	
-	print("WorldBuilderUI: UI instantiated and visible (opacity: ", self.modulate.a, ")")
+	self.modulate = Color(1, 1, 1, 1)
 
 
-func _build_ui_from_config() -> void:
-	"""Build UI elements dynamically from JSON configuration."""
-	if not ui_config.has("tabs"):
+func _setup_navigation() -> void:
+	"""Setup left navigation panel with step labels."""
+	if navigation_panel == null:
 		return
 	
-	var tabs: Dictionary = ui_config["tabs"]
+	var nav_container: VBoxContainer = VBoxContainer.new()
+	nav_container.name = "NavContainer"
+	nav_container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	nav_container.add_theme_constant_override("separation", 10)
+	navigation_panel.add_child(nav_container)
 	
-	for tab_name: String in tabs:
-		var tab_index: int = _get_tab_index_by_name(tab_name)
-		if tab_index == -1:
-			push_warning("WorldBuilderUI: Tab '" + tab_name + "' not found in TabContainer")
-			continue
-		
-		var tab_content: VBoxContainer = tab_container.get_child(tab_index) as VBoxContainer
-		if tab_content == null:
-			continue
-		
-		var tab_config: Dictionary = tabs[tab_name]
-		if not tab_config.has("elements"):
-			continue
-		
-		var elements: Array = tab_config["elements"]
-		for element_config: Dictionary in elements:
-			_create_ui_element(tab_content, element_config, tab_name)
+	# Create step labels
+	for i in range(STEPS.size()):
+		var step_label: Label = Label.new()
+		step_label.name = "Step" + str(i + 1) + "Label"
+		step_label.text = str(i + 1) + ". " + STEPS[i]
+		step_label.custom_minimum_size = Vector2(0, 40)
+		step_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		step_label.add_theme_constant_override("margin_left", 10)
+		step_label.add_theme_constant_override("margin_right", 10)
+		step_labels.append(step_label)
+		nav_container.add_child(step_label)
 
 
-func _get_tab_index_by_name(tab_name: String) -> int:
-	"""Get tab index by name."""
-	if tab_container == null:
-		return -1
-	
-	for i in range(tab_container.get_tab_count()):
-		if tab_container.get_tab_title(i) == tab_name:
-			return i
-	
-	return -1
-
-
-func _create_ui_element(parent: VBoxContainer, config: Dictionary, tab_name: String) -> void:
-	"""Create a single UI element from configuration."""
-	var element_type: String = config.get("type", "")
-	var element_name: String = config.get("name", "")
-	var element_label: String = config.get("label", element_name)
-	
-	if element_name.is_empty():
-		push_warning("WorldBuilderUI: Element missing 'name' field")
+func _setup_step_content() -> void:
+	"""Setup content panels for each step."""
+	if content_area == null:
 		return
 	
-	# Create container for label and control
-	var container: HBoxContainer = HBoxContainer.new()
-	container.name = element_name + "Container"
-	parent.add_child(container)
+	# Create container for step content
+	var step_container: VBoxContainer = VBoxContainer.new()
+	step_container.name = "StepContainer"
+	step_container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	content_area.add_child(step_container)
 	
-	# Create label
+	# Initialize step data
+	for step_name: String in STEPS:
+		step_data[step_name] = {}
+	
+	# Create step 1: Seed & Size
+	_create_step_seed_size(step_container)
+	
+	# Create step 2: 2D Map Maker
+	_create_step_map_maker(step_container)
+	
+	# Create remaining steps (3-9) as placeholders
+	for i in range(2, STEPS.size()):
+		_create_step_placeholder(step_container, i)
+
+
+func _create_step_seed_size(parent: VBoxContainer) -> void:
+	"""Create Step 1: Seed & Size content."""
+	var step_panel: Panel = Panel.new()
+	step_panel.name = "StepSeedSize"
+	step_panel.visible = (current_step == 0)
+	parent.add_child(step_panel)
+	
+	var container: VBoxContainer = VBoxContainer.new()
+	container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	container.add_theme_constant_override("separation", 10)
+	step_panel.add_child(container)
+	
+	# Seed input
+	var seed_container: HBoxContainer = HBoxContainer.new()
+	var seed_label: Label = Label.new()
+	seed_label.text = "Seed:"
+	seed_label.custom_minimum_size = Vector2(150, 0)
+	seed_container.add_child(seed_label)
+	
+	var seed_spinbox: SpinBox = SpinBox.new()
+	seed_spinbox.name = "seed"
+	seed_spinbox.min_value = 0
+	seed_spinbox.max_value = 999999
+	seed_spinbox.value = 12345
+	seed_spinbox.value_changed.connect(func(v): step_data["Seed & Size"]["seed"] = int(v))
+	seed_container.add_child(seed_spinbox)
+	container.add_child(seed_container)
+	control_references["Seed & Size/seed"] = seed_spinbox
+	step_data["Seed & Size"]["seed"] = 12345
+	
+	# Size inputs
+	var size_label: Label = Label.new()
+	size_label.text = "World Size:"
+	container.add_child(size_label)
+	
+	var size_container: HBoxContainer = HBoxContainer.new()
+	var width_label: Label = Label.new()
+	width_label.text = "Width:"
+	width_label.custom_minimum_size = Vector2(100, 0)
+	size_container.add_child(width_label)
+	
+	var width_spinbox: SpinBox = SpinBox.new()
+	width_spinbox.name = "width"
+	width_spinbox.min_value = 100
+	width_spinbox.max_value = 10000
+	width_spinbox.value = 1000
+	width_spinbox.value_changed.connect(func(v): step_data["Seed & Size"]["width"] = int(v))
+	size_container.add_child(width_spinbox)
+	
+	var height_label: Label = Label.new()
+	height_label.text = "Height:"
+	height_label.custom_minimum_size = Vector2(100, 0)
+	size_container.add_child(height_label)
+	
+	var height_spinbox: SpinBox = SpinBox.new()
+	height_spinbox.name = "height"
+	height_spinbox.min_value = 100
+	height_spinbox.max_value = 10000
+	height_spinbox.value = 1000
+	height_spinbox.value_changed.connect(func(v): step_data["Seed & Size"]["height"] = int(v))
+	size_container.add_child(height_spinbox)
+	container.add_child(size_container)
+	control_references["Seed & Size/width"] = width_spinbox
+	control_references["Seed & Size/height"] = height_spinbox
+	step_data["Seed & Size"]["width"] = 1000
+	step_data["Seed & Size"]["height"] = 1000
+
+
+func _create_step_map_maker(parent: VBoxContainer) -> void:
+	"""Create Step 2: 2D Map Maker content."""
+	var step_panel: Panel = Panel.new()
+	step_panel.name = "StepMapMaker"
+	step_panel.visible = (current_step == 1)
+	parent.add_child(step_panel)
+	
+	var container: VBoxContainer = VBoxContainer.new()
+	container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	container.add_theme_constant_override("separation", 10)
+	step_panel.add_child(container)
+	
+	# Toolbar for icon selection
+	var toolbar: HBoxContainer = HBoxContainer.new()
+	toolbar.name = "IconToolbar"
+	container.add_child(toolbar)
+	
+	# Create buttons for each icon type
+	var icons: Array = map_icons_data.get("icons", [])
+	for icon_data: Dictionary in icons:
+		var icon_button: Button = Button.new()
+		icon_button.text = icon_data.get("id", "unknown")
+		var icon_color_array: Array = icon_data.get("color", [0.5, 0.5, 0.5, 1.0])
+		var icon_color: Color = Color(icon_color_array[0], icon_color_array[1], icon_color_array[2], icon_color_array[3])
+		icon_button.pressed.connect(func(): _on_icon_toolbar_selected(icon_data.get("id", "")))
+		toolbar.add_child(icon_button)
+	
+	# Map canvas (using Control with custom drawing)
+	var canvas_container: Panel = Panel.new()
+	canvas_container.name = "MapCanvas"
+	canvas_container.custom_minimum_size = Vector2(600, 400)
+	canvas_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	container.add_child(canvas_container)
+	
+	# Create a Control container for icons (will use Control-based icons)
+	var icon_container: Control = Control.new()
+	icon_container.name = "IconContainer"
+	icon_container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	icon_container.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Let clicks pass through
+	canvas_container.add_child(icon_container)
+	
+	# Make canvas clickable
+	canvas_container.gui_input.connect(_on_canvas_clicked)
+
+
+func _create_step_placeholder(parent: VBoxContainer, step_index: int) -> void:
+	"""Create placeholder content for steps 3-9."""
+	var step_panel: Panel = Panel.new()
+	step_panel.name = "Step" + str(step_index + 1)
+	step_panel.visible = (current_step == step_index)
+	parent.add_child(step_panel)
+	
+	var container: VBoxContainer = VBoxContainer.new()
+	container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	step_panel.add_child(container)
+	
 	var label: Label = Label.new()
-	label.name = element_name + "Label"
-	label.text = element_label + ":"
-	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	label.custom_minimum_size = Vector2(150, 0)
+	label.text = STEPS[step_index] + " - Coming Soon"
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	container.add_child(label)
+
+
+func _setup_buttons() -> void:
+	"""Setup Next/Back navigation buttons."""
+	if next_button != null:
+		next_button.pressed.connect(_on_next_pressed)
+	if back_button != null:
+		back_button.pressed.connect(_on_back_pressed)
+		back_button.disabled = (current_step == 0)
+
+
+func _update_step_display() -> void:
+	"""Update UI to show current step."""
+	# Update step labels highlighting
+	for i in range(step_labels.size()):
+		if i == current_step:
+			# Highlight current step in gold
+			step_labels[i].add_theme_color_override("font_color", Color(1, 0.843137, 0, 1))
+		else:
+			step_labels[i].remove_theme_color_override("font_color")
 	
-	# Create control based on type
-	var control: Control = null
-	match element_type:
-		"Slider":
-			control = _create_slider(config, element_name)
-		"SpinBox":
-			control = _create_spinbox(config, element_name)
-		"OptionButton":
-			control = _create_option_button(config, element_name)
-		"Button":
-			control = _create_button(config, element_name)
-		"ItemList":
-			control = _create_item_list(config, element_name)
-		"ColorPicker":
-			control = _create_color_picker(config, element_name)
-		"LineEdit":
-			control = _create_line_edit(config, element_name)
-		_:
-			push_warning("WorldBuilderUI: Unknown element type: " + element_type)
-			return
+	# Show/hide step content panels
+	var step_container: VBoxContainer = content_area.get_node_or_null("StepContainer")
+	if step_container != null:
+		for i in range(step_container.get_child_count()):
+			var child: Node = step_container.get_child(i)
+			child.visible = (i == current_step)
 	
-	if control != null:
-		control.name = element_name
-		control.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		container.add_child(control)
+	# Update button states
+	if back_button != null:
+		back_button.disabled = (current_step == 0)
+	if next_button != null:
+		next_button.disabled = (current_step == STEPS.size() - 1)
+
+
+func _on_next_pressed() -> void:
+	"""Handle Next button press."""
+	if current_step < STEPS.size() - 1:
+		# Check if we're leaving step 2 (Map Maker) - trigger 3D conversion
+		if current_step == 1:
+			_start_3d_conversion()
+		else:
+			current_step += 1
+			_update_step_display()
+
+
+func _on_back_pressed() -> void:
+	"""Handle Back button press."""
+	if current_step > 0:
+		current_step -= 1
+		_update_step_display()
+
+
+func _on_icon_toolbar_selected(icon_id: String) -> void:
+	"""Handle icon selection from toolbar."""
+	step_data["2D Map Maker"]["selected_icon"] = icon_id
+	print("WorldBuilderUI: Selected icon: ", icon_id)
+
+
+func _on_canvas_clicked(event: InputEvent) -> void:
+	"""Handle clicks on map canvas to place icons."""
+	if not event is InputEventMouseButton:
+		return
+	
+	var mouse_event: InputEventMouseButton = event as InputEventMouseButton
+	if not mouse_event.pressed or mouse_event.button_index != MOUSE_BUTTON_LEFT:
+		return
+	
+	var step_container: VBoxContainer = content_area.get_node_or_null("StepContainer")
+	if step_container == null:
+		return
+	
+	var step_panel: Panel = step_container.get_node_or_null("StepMapMaker")
+	if step_panel == null:
+		return
+	
+	var canvas: Panel = step_panel.get_node_or_null("MapCanvas")
+	if canvas == null:
+		return
+	
+	var icon_container: Control = canvas.get_node_or_null("IconContainer")
+	if icon_container == null:
+		return
+	
+	var selected_icon_id: String = step_data.get("2D Map Maker", {}).get("selected_icon", "")
+	if selected_icon_id.is_empty():
+		return
+	
+	# Find icon data
+	var icon_data: Dictionary = {}
+	var icons: Array = map_icons_data.get("icons", [])
+	for icon: Dictionary in icons:
+		if icon.get("id", "") == selected_icon_id:
+			icon_data = icon
+			break
+	
+	if icon_data.is_empty():
+		return
+	
+	# Get click position relative to canvas
+	var click_pos: Vector2 = mouse_event.position
+	
+	# Create icon visual (using Control-based approach for compatibility)
+	var icon_visual: Control = Control.new()
+	icon_visual.name = "Icon_" + str(placed_icons.size())
+	icon_visual.position = click_pos
+	icon_visual.custom_minimum_size = Vector2(32, 32)
+	icon_visual.size = Vector2(32, 32)
+	
+	# Create colored rectangle as icon
+	var icon_rect: ColorRect = ColorRect.new()
+	icon_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var icon_color_array: Array = icon_data.get("color", [0.5, 0.5, 0.5, 1.0])
+	var icon_color: Color = Color(icon_color_array[0], icon_color_array[1], icon_color_array[2], icon_color_array[3])
+	icon_rect.color = icon_color
+	icon_visual.add_child(icon_rect)
+	
+	# Create icon node data structure (simplified for Control-based approach)
+	var icon_node: IconNode = IconNode.new()
+	icon_node.set_icon_data(selected_icon_id, icon_color)
+	icon_node.position = click_pos
+	icon_node.map_position = click_pos
+	
+	# Store reference to visual
+	icon_node.sprite = icon_visual
+	
+	icon_container.add_child(icon_visual)
+	placed_icons.append(icon_node)
+	
+	print("WorldBuilderUI: Placed icon ", selected_icon_id, " at ", click_pos)
+
+
+func _start_3d_conversion() -> void:
+	"""Start 3D conversion process after step 2."""
+	print("WorldBuilderUI: Starting 3D conversion process...")
+	
+	# Cluster icons by proximity
+	icon_groups = _cluster_icons(placed_icons, 50.0)
+	
+	# Process first group/icon
+	current_icon_group_index = 0
+	_show_icon_type_selection_dialog()
+
+
+func _cluster_icons(icons: Array[IconNode], distance_threshold: float) -> Array[Array]:
+	"""Cluster icons by proximity using DBSCAN-like algorithm."""
+	var groups: Array[Array] = []
+	var processed: Array[bool] = []
+	processed.resize(icons.size())
+	
+	for i in range(icons.size()):
+		if processed[i]:
+			continue
 		
-		# Store reference with full path
-		var full_path: String = tab_name + "/" + element_name
-		control_references[full_path] = control
+		var group: Array[IconNode] = [icons[i]]
+		processed[i] = true
 		
-		# Store default value
-		var default_value: Variant = config.get("default", null)
-		if default_value != null:
-			current_params[element_name] = default_value
-			
-			# Set initial value on control
-			if control is HSlider:
-				control.value = default_value
-			elif control is SpinBox:
-				control.value = default_value
-			elif control is OptionButton:
-				control.selected = default_value
-			elif control is LineEdit:
-				control.text = str(default_value)
-			elif control is ColorPickerButton:
-				var color_array: Array = default_value
-				if color_array.size() >= 4:
-					control.color = Color(color_array[0], color_array[1], color_array[2], color_array[3])
-		
-		# Create value label for sliders
-		if control is HSlider:
-			var value_label: Label = Label.new()
-			value_label.name = element_name + "Value"
-			value_label.custom_minimum_size = Vector2(80, 0)
-			value_label.size_flags_horizontal = 0
-			var format_string: String = config.get("format", "%.2f")
-			value_label.text = format_string % default_value
-			container.add_child(value_label)
-			control_references[tab_name + "/" + element_name + "Value"] = value_label
-
-
-func _create_slider(config: Dictionary, name: String) -> HSlider:
-	"""Create a slider control."""
-	var slider: HSlider = HSlider.new()
-	slider.min_value = config.get("min", 0.0)
-	slider.max_value = config.get("max", 100.0)
-	slider.step = config.get("step", 0.01)
-	slider.value = config.get("default", slider.min_value)
-	return slider
-
-
-func _create_spinbox(config: Dictionary, name: String) -> SpinBox:
-	"""Create a spinbox control."""
-	var spinbox: SpinBox = SpinBox.new()
-	spinbox.min_value = config.get("min", 0)
-	spinbox.max_value = config.get("max", 100)
-	spinbox.step = config.get("step", 1)
-	spinbox.value = config.get("default", spinbox.min_value)
-	return spinbox
-
-
-func _create_option_button(config: Dictionary, name: String) -> OptionButton:
-	"""Create an option button control."""
-	var option_button: OptionButton = OptionButton.new()
-	var options: Array = config.get("options", [])
-	for option: String in options:
-		option_button.add_item(option)
-	option_button.selected = config.get("default", 0)
-	return option_button
-
-
-func _create_button(config: Dictionary, name: String) -> Button:
-	"""Create a button control."""
-	var button: Button = Button.new()
-	button.text = config.get("label", name)
-	return button
-
-
-func _create_item_list(config: Dictionary, name: String) -> ItemList:
-	"""Create an item list control."""
-	var item_list: ItemList = ItemList.new()
-	item_list.custom_minimum_size = Vector2(0, 200)
-	var items: Array = config.get("items", [])
-	for item: String in items:
-		item_list.add_item(item)
-	item_list.select(config.get("default_selection", 0))
-	return item_list
-
-
-func _create_color_picker(config: Dictionary, name: String) -> ColorPickerButton:
-	"""Create a color picker button control."""
-	var color_picker: ColorPickerButton = ColorPickerButton.new()
-	var default_color: Array = config.get("default", [0.5, 0.5, 0.5, 1.0])
-	if default_color.size() >= 4:
-		color_picker.color = Color(default_color[0], default_color[1], default_color[2], default_color[3])
-	return color_picker
-
-
-func _create_line_edit(config: Dictionary, name: String) -> LineEdit:
-	"""Create a line edit control."""
-	var line_edit: LineEdit = LineEdit.new()
-	line_edit.placeholder_text = config.get("placeholder", "")
-	line_edit.text = str(config.get("default", ""))
-	return line_edit
-
-
-func _setup_ui_connections() -> void:
-	"""Connect all UI element signals to handlers."""
-	for full_path: String in control_references:
-		var control: Control = control_references[full_path]
-		var parts: Array = full_path.split("/")
-		var tab_name: String = parts[0]
-		var element_name: String = parts[1]
-		
-		if control is HSlider:
-			control.value_changed.connect(func(value): _on_slider_changed(tab_name, element_name, value))
-		elif control is SpinBox:
-			control.value_changed.connect(func(value): _on_spinbox_changed(tab_name, element_name, value))
-		elif control is OptionButton:
-			control.item_selected.connect(func(index): _on_option_selected(tab_name, element_name, index))
-		elif control is Button:
-			var action: String = ui_config.get("tabs", {}).get(tab_name, {}).get("elements", [])
-			for element_config: Dictionary in ui_config.get("tabs", {}).get(tab_name, {}).get("elements", []):
-				if element_config.get("name") == element_name:
-					var button_action: String = element_config.get("action", "")
-					control.pressed.connect(func(): _on_button_pressed(tab_name, element_name, button_action))
-					break
-		elif control is ItemList:
-			control.item_selected.connect(func(index): _on_item_selected(tab_name, element_name, index))
-		elif control is ColorPickerButton:
-			control.color_changed.connect(func(color): _on_color_changed(tab_name, element_name, color))
-
-
-func _on_slider_changed(tab_name: String, element_name: String, value: float) -> void:
-	"""Handle slider value change."""
-	current_params[element_name] = value
-	
-	# Update value label if it exists
-	var value_label_path: String = tab_name + "/" + element_name + "Value"
-	if control_references.has(value_label_path):
-		var value_label: Label = control_references[value_label_path] as Label
-		if value_label != null:
-			# Get format from config
-			var format_string: String = "%.2f"
-			for element_config: Dictionary in ui_config.get("tabs", {}).get(tab_name, {}).get("elements", []):
-				if element_config.get("name") == element_name:
-					format_string = element_config.get("format", "%.2f")
-					break
-			value_label.text = format_string % value
-	
-	# Apply real-time updates for terrain tab
-	if tab_name == "Terrain" and terrain_manager != null:
-		match element_name:
-			"height_scale":
-				terrain_manager.scale_heights(value / 20.0)  # Normalize to reasonable scale
-	
-	# Apply real-time updates for environment tab
-	if tab_name == "Environment" and terrain_manager != null:
-		var time_of_day: float = current_params.get("time_of_day", 12.0)
-		var fog_density: float = current_params.get("fog_density", 0.1)
-		var wind_strength: float = current_params.get("wind_strength", 1.0)
-		var weather_index: int = current_params.get("weather_type", 0)
-		var weather_names: Array = ["clear", "rain", "snow", "fog", "storm"]
-		var weather: String = weather_names[weather_index] if weather_index < weather_names.size() else "clear"
-		var sky_color: Color = current_params.get("sky_color", Color(0.5, 0.7, 1.0, 1.0))
-		var ambient_light: Color = current_params.get("ambient_light", Color(0.3, 0.3, 0.3, 1.0))
-		
-		terrain_manager.update_environment(time_of_day, fog_density, wind_strength, weather, sky_color, ambient_light)
-
-
-func _on_spinbox_changed(tab_name: String, element_name: String, value: float) -> void:
-	"""Handle spinbox value change."""
-	current_params[element_name] = int(value)
-
-
-func _on_option_selected(tab_name: String, element_name: String, index: int) -> void:
-	"""Handle option button selection."""
-	current_params[element_name] = index
-
-
-func _on_item_selected(tab_name: String, element_name: String, index: int) -> void:
-	"""Handle item list selection."""
-	current_params[element_name] = index
-
-
-func _on_color_changed(tab_name: String, element_name: String, color: Color) -> void:
-	"""Handle color picker change."""
-	current_params[element_name] = color
-
-
-func _on_button_pressed(tab_name: String, element_name: String, action: String) -> void:
-	"""Handle button press."""
-	match action:
-		"regenerate":
-			_regenerate_terrain()
-		"apply_biome":
-			_apply_biome_map()
-		"place_structure":
-			_place_structure()
-		"remove_structures":
-			_remove_all_structures()
-		"save_config":
-			_save_world_config()
-		"export_heightmap":
-			_export_heightmap()
-		"reset_all":
-			_reset_all()
-
-
-func _regenerate_terrain() -> void:
-	"""Regenerate terrain with current parameters."""
-	if terrain_manager == null:
-		push_warning("WorldBuilderUI: No terrain manager assigned")
-		return
-	
-	var seed_value: int = current_params.get("seed", 12345)
-	var frequency: float = current_params.get("noise_frequency", 0.0005)
-	var height_scale: float = current_params.get("height_scale", 20.0)
-	
-	terrain_manager.generate_from_noise(
-		seed_value,
-		frequency,
-		0.0,
-		150.0 * (height_scale / 20.0)
-	)
-
-
-func _apply_biome_map() -> void:
-	"""Apply biome map to terrain."""
-	if terrain_manager == null:
-		push_warning("WorldBuilderUI: No terrain manager assigned")
-		return
-	
-	var biome_index: int = current_params.get("available_biomes", 0)
-	var biome_names: Array = ["forest", "desert", "mountain", "plains", "swamp", "tundra", "volcanic", "ocean"]
-	var biome_type: String = biome_names[biome_index] if biome_index < biome_names.size() else "forest"
-	var blending: float = current_params.get("biome_blending", 0.5)
-	var color: Color = current_params.get("biome_color", Color.WHITE)
-	
-	terrain_manager.apply_biome_map(biome_type, blending, color)
-
-
-func _place_structure() -> void:
-	"""Place selected structure on terrain."""
-	if terrain_manager == null:
-		push_warning("WorldBuilderUI: No terrain manager assigned")
-		return
-	
-	var structure_index: int = current_params.get("placeable_structures", 0)
-	var structure_names: Array = ["tree", "rock", "building", "crystal", "ruin", "shrine"]
-	var structure_type: String = structure_names[structure_index] if structure_index < structure_names.size() else "tree"
-	var density: float = current_params.get("density", 0.3)
-	
-	# Place at center of terrain for now (can be enhanced with click-to-place)
-	var terrain_center: Vector3 = Vector3(0.0, 0.0, 0.0)
-	if terrain_manager.terrain != null:
-		terrain_center.y = terrain_manager.get_height_at(terrain_center)
-	
-	terrain_manager.place_structure(structure_type, terrain_center, 1.0)
-
-
-func _remove_all_structures() -> void:
-	"""Remove all placed structures."""
-	if terrain_manager == null:
-		push_warning("WorldBuilderUI: No terrain manager assigned")
-		return
-	
-	terrain_manager.remove_all_structures()
-
-
-func _save_world_config() -> void:
-	"""Save current world configuration to JSON."""
-	var world_name: String = current_params.get("world_name", "MyWorld")
-	var save_path: String = "user://worlds/" + world_name + ".json"
-	
-	# Create directory if it doesn't exist
-	DirAccess.make_dir_recursive_absolute("user://worlds/")
-	
-	var file: FileAccess = FileAccess.open(save_path, FileAccess.WRITE)
-	if file == null:
-		push_error("WorldBuilderUI: Failed to save world config to " + save_path)
-		return
-	
-	var save_data: Dictionary = {
-		"world_name": world_name,
-		"parameters": current_params.duplicate(),
-		"timestamp": Time.get_datetime_string_from_system()
-	}
-	
-	file.store_string(JSON.stringify(save_data, "\t"))
-	file.close()
-	
-	print("WorldBuilderUI: Saved world config to " + save_path)
-
-
-func _export_heightmap() -> void:
-	"""Export terrain heightmap as PNG."""
-	if terrain_manager == null or terrain_manager.terrain == null:
-		push_warning("WorldBuilderUI: No terrain available for export")
-		return
-	
-	# TODO: Implement heightmap export
-	push_warning("WorldBuilderUI: Heightmap export not yet implemented")
-
-
-func _reset_all() -> void:
-	"""Reset all parameters to defaults."""
-	# Reload defaults from config
-	for tab_name: String in ui_config.get("tabs", {}):
-		var elements: Array = ui_config["tabs"][tab_name].get("elements", [])
-		for element_config: Dictionary in elements:
-			var element_name: String = element_config.get("name", "")
-			if element_name.is_empty():
+		# Find all nearby icons of the same type
+		for j in range(i + 1, icons.size()):
+			if processed[j]:
 				continue
 			
-			var default_value: Variant = element_config.get("default", null)
-			if default_value != null:
-				current_params[element_name] = default_value
-				
-				var full_path: String = tab_name + "/" + element_name
-				if control_references.has(full_path):
-					var control: Control = control_references[full_path]
-					if control is HSlider:
-						control.value = default_value
-					elif control is SpinBox:
-						control.value = default_value
-					elif control is OptionButton:
-						control.selected = default_value
-					elif control is LineEdit:
-						control.text = str(default_value)
-					elif control is ColorPickerButton:
-						var color_array: Array = default_value
-						if color_array.size() >= 4:
-							control.color = Color(color_array[0], color_array[1], color_array[2], color_array[3])
+			if icons[i].icon_id == icons[j].icon_id:
+				var distance: float = icons[i].get_distance_to(icons[j])
+				if distance <= distance_threshold:
+					group.append(icons[j])
+					processed[j] = true
+		
+		groups.append(group)
+	
+	print("WorldBuilderUI: Clustered ", icons.size(), " icons into ", groups.size(), " groups")
+	return groups
+
+
+func _show_icon_type_selection_dialog() -> void:
+	"""Show pop-up dialog for icon type selection."""
+	if current_icon_group_index >= icon_groups.size():
+		# All groups processed, proceed to next step
+		current_step += 1
+		_update_step_display()
+		_generate_3d_world()
+		return
+	
+	var group: Array = icon_groups[current_icon_group_index]
+	var first_icon: IconNode = group[0] if group.size() > 0 else null
+	if first_icon == null:
+		current_icon_group_index += 1
+		_show_icon_type_selection_dialog()
+		return
+	
+	# Find icon data
+	var icon_data: Dictionary = {}
+	var icons: Array = map_icons_data.get("icons", [])
+	for icon: Dictionary in icons:
+		if icon.get("id", "") == first_icon.icon_id:
+			icon_data = icon
+			break
+	
+	if icon_data.is_empty():
+		current_icon_group_index += 1
+		_show_icon_type_selection_dialog()
+		return
+	
+	# Create pop-up dialog
+	var dialog: AcceptDialog = AcceptDialog.new()
+	dialog.title = "Select Type for " + first_icon.icon_id.capitalize()
+	dialog.size = Vector2(600, 400)
+	
+	var vbox: VBoxContainer = VBoxContainer.new()
+	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	dialog.add_child(vbox)
+	
+	# Show icon at top
+	var icon_preview: ColorRect = ColorRect.new()
+	icon_preview.custom_minimum_size = Vector2(64, 64)
+	icon_preview.color = first_icon.icon_color
+	vbox.add_child(icon_preview)
+	
+	# Type selection buttons
+	var scroll: ScrollContainer = ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(0, 200)
+	var hbox: HBoxContainer = HBoxContainer.new()
+	scroll.add_child(hbox)
+	vbox.add_child(scroll)
+	
+	var types: Array = icon_data.get("types", [])
+	for type_name: String in types:
+		var type_button: Button = Button.new()
+		type_button.text = type_name.capitalize()
+		type_button.custom_minimum_size = Vector2(150, 100)
+		type_button.pressed.connect(func(): _on_type_selected(type_name, group, dialog))
+		hbox.add_child(type_button)
+	
+	add_child(dialog)
+	dialog.popup_centered()
+
+
+func _on_type_selected(type_name: String, group: Array, dialog: AcceptDialog) -> void:
+	"""Handle type selection for icon group."""
+	# Set type for all icons in group
+	for icon: IconNode in group:
+		icon.icon_type = type_name
+	
+	dialog.queue_free()
+	
+	# Process next group
+	current_icon_group_index += 1
+	_show_icon_type_selection_dialog()
+
+
+func _generate_3d_world() -> void:
+	"""Generate 3D world based on selected icon types."""
+	print("WorldBuilderUI: Generating 3D world from 2D map...")
+	
+	if terrain_manager == null:
+		push_warning("WorldBuilderUI: No terrain manager assigned")
+		return
+	
+	# Use seed from step 1
+	var seed_value: int = step_data.get("Seed & Size", {}).get("seed", 12345)
+	
+	# Generate terrain
+	if terrain_manager.has_method("generate_from_noise"):
+		terrain_manager.generate_from_noise(seed_value, 0.0005, 0.0, 150.0)
+	
+	# Place structures based on icons
+	for icon: IconNode in placed_icons:
+		if icon.icon_type.is_empty():
+			continue
+		
+		# Convert 2D position to 3D (simplified for now)
+		var world_pos: Vector3 = Vector3(icon.map_position.x, 0.0, icon.map_position.y)
+		if terrain_manager.has_method("get_height_at"):
+			world_pos.y = terrain_manager.get_height_at(world_pos)
+		
+		# Place structure based on icon type
+		if terrain_manager.has_method("place_structure"):
+			terrain_manager.place_structure(icon.icon_id + "_" + icon.icon_type, world_pos, 1.0)
+	
+	print("WorldBuilderUI: 3D world generation complete")
 
 
 func set_terrain_manager(manager) -> void:  # manager: Terrain3DManager - type hint removed
@@ -517,8 +566,10 @@ func set_terrain_manager(manager) -> void:  # manager: Terrain3DManager - type h
 	terrain_manager = manager
 	
 	if terrain_manager != null:
-		terrain_manager.terrain_generated.connect(_on_terrain_generated)
-		terrain_manager.terrain_updated.connect(_on_terrain_updated)
+		if terrain_manager.has_method("terrain_generated"):
+			terrain_manager.terrain_generated.connect(_on_terrain_generated)
+		if terrain_manager.has_method("terrain_updated"):
+			terrain_manager.terrain_updated.connect(_on_terrain_updated)
 
 
 func _on_terrain_generated(_terrain) -> void:  # _terrain: Terrain3D - type hint removed

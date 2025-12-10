@@ -37,11 +37,11 @@ theme_override_colors/font_color = Color(1, 0.843137, 0, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.5)
 theme_override_constants/shadow_offset_x = 2
 theme_override_constants/shadow_offset_y = 2
-text = "World Builder - DM Tools"
+text = "World Builder - Step by Step"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="TabContainer" type="TabContainer" parent="BackgroundPanel"]
+[node name="MainContainer" type="HSplitContainer" parent="BackgroundPanel"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -51,19 +51,39 @@ grow_vertical = 2
 offset_left = 10.0
 offset_top = 60.0
 offset_right = -10.0
+offset_bottom = -60.0
+split_offset = 200
+
+[node name="LeftNavigation" type="Panel" parent="BackgroundPanel/MainContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(200, 0)
+
+[node name="ContentArea" type="Control" parent="BackgroundPanel/MainContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ButtonContainer" type="HBoxContainer" parent="BackgroundPanel"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -150.0
+offset_top = -50.0
+offset_right = 150.0
 offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 0
 
-[node name="Terrain" type="VBoxContainer" parent="BackgroundPanel/TabContainer"]
+[node name="BackButton" type="Button" parent="BackgroundPanel/ButtonContainer"]
 layout_mode = 2
+text = "Back"
 
-[node name="Biomes" type="VBoxContainer" parent="BackgroundPanel/TabContainer"]
+[node name="Spacer" type="Control" parent="BackgroundPanel/ButtonContainer"]
 layout_mode = 2
+custom_minimum_size = Vector2(20, 0)
 
-[node name="Structures" type="VBoxContainer" parent="BackgroundPanel/TabContainer"]
+[node name="NextButton" type="Button" parent="BackgroundPanel/ButtonContainer"]
 layout_mode = 2
-
-[node name="Environment" type="VBoxContainer" parent="BackgroundPanel/TabContainer"]
-layout_mode = 2
-
-[node name="Export" type="VBoxContainer" parent="BackgroundPanel/TabContainer"]
-layout_mode = 2
+text = "Next"
