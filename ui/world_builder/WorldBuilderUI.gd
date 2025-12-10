@@ -148,8 +148,11 @@ func _setup_step_content() -> void:
 	# Create step 3: Terrain
 	_create_step_terrain(step_container)
 	
-	# Create remaining steps (4-9) as placeholders
-	for i in range(3, STEPS.size()):
+	# Create step 4: Climate
+	_create_step_climate(step_container)
+	
+	# Create remaining steps (5-9) as placeholders
+	for i in range(4, STEPS.size()):
 		_create_step_placeholder(step_container, i)
 
 
@@ -460,8 +463,166 @@ func _create_step_terrain(parent: VBoxContainer) -> void:
 	control_references["Terrain/regenerate_terrain"] = regenerate_button
 
 
+func _create_step_climate(parent: VBoxContainer) -> void:
+	"""Create Step 4: Climate content."""
+	var step_panel: Panel = Panel.new()
+	step_panel.name = "StepClimate"
+	step_panel.visible = (current_step == 3)
+	parent.add_child(step_panel)
+	
+	var container: VBoxContainer = VBoxContainer.new()
+	container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	container.add_theme_constant_override("separation", 10)
+	step_panel.add_child(container)
+	
+	# Temperature map intensity
+	var temp_container: HBoxContainer = HBoxContainer.new()
+	var temp_label: Label = Label.new()
+	temp_label.text = "Temperature Intensity:"
+	temp_label.custom_minimum_size = Vector2(200, 0)
+	temp_container.add_child(temp_label)
+	
+	var temp_slider: HSlider = HSlider.new()
+	temp_slider.name = "temperature_intensity"
+	temp_slider.min_value = 0.0
+	temp_slider.max_value = 1.0
+	temp_slider.step = 0.01
+	temp_slider.value = 0.5
+	temp_slider.value_changed.connect(func(v): _on_climate_param_changed("temperature_intensity", v))
+	temp_container.add_child(temp_slider)
+	
+	var temp_value_label: Label = Label.new()
+	temp_value_label.name = "temperature_intensity_value"
+	temp_value_label.custom_minimum_size = Vector2(80, 0)
+	temp_value_label.text = "0.50"
+	temp_container.add_child(temp_value_label)
+	container.add_child(temp_container)
+	control_references["Climate/temperature_intensity"] = temp_slider
+	control_references["Climate/temperature_intensity_value"] = temp_value_label
+	step_data["Climate"] = {}
+	step_data["Climate"]["temperature_intensity"] = 0.5
+	
+	# Rainfall map intensity
+	var rain_container: HBoxContainer = HBoxContainer.new()
+	var rain_label: Label = Label.new()
+	rain_label.text = "Rainfall Intensity:"
+	rain_label.custom_minimum_size = Vector2(200, 0)
+	rain_container.add_child(rain_label)
+	
+	var rain_slider: HSlider = HSlider.new()
+	rain_slider.name = "rainfall_intensity"
+	rain_slider.min_value = 0.0
+	rain_slider.max_value = 1.0
+	rain_slider.step = 0.01
+	rain_slider.value = 0.5
+	rain_slider.value_changed.connect(func(v): _on_climate_param_changed("rainfall_intensity", v))
+	rain_container.add_child(rain_slider)
+	
+	var rain_value_label: Label = Label.new()
+	rain_value_label.name = "rainfall_intensity_value"
+	rain_value_label.custom_minimum_size = Vector2(80, 0)
+	rain_value_label.text = "0.50"
+	rain_container.add_child(rain_value_label)
+	container.add_child(rain_container)
+	control_references["Climate/rainfall_intensity"] = rain_slider
+	control_references["Climate/rainfall_intensity_value"] = rain_value_label
+	step_data["Climate"]["rainfall_intensity"] = 0.5
+	
+	# Wind strength
+	var wind_strength_container: HBoxContainer = HBoxContainer.new()
+	var wind_strength_label: Label = Label.new()
+	wind_strength_label.text = "Wind Strength:"
+	wind_strength_label.custom_minimum_size = Vector2(200, 0)
+	wind_strength_container.add_child(wind_strength_label)
+	
+	var wind_strength_slider: HSlider = HSlider.new()
+	wind_strength_slider.name = "wind_strength"
+	wind_strength_slider.min_value = 0.0
+	wind_strength_slider.max_value = 10.0
+	wind_strength_slider.step = 0.1
+	wind_strength_slider.value = 1.0
+	wind_strength_slider.value_changed.connect(func(v): _on_climate_param_changed("wind_strength", v))
+	wind_strength_container.add_child(wind_strength_slider)
+	
+	var wind_strength_value_label: Label = Label.new()
+	wind_strength_value_label.name = "wind_strength_value"
+	wind_strength_value_label.custom_minimum_size = Vector2(80, 0)
+	wind_strength_value_label.text = "1.0"
+	wind_strength_container.add_child(wind_strength_value_label)
+	container.add_child(wind_strength_container)
+	control_references["Climate/wind_strength"] = wind_strength_slider
+	control_references["Climate/wind_strength_value"] = wind_strength_value_label
+	step_data["Climate"]["wind_strength"] = 1.0
+	
+	# Wind direction
+	var wind_dir_container: HBoxContainer = HBoxContainer.new()
+	var wind_dir_label: Label = Label.new()
+	wind_dir_label.text = "Wind Direction:"
+	wind_dir_label.custom_minimum_size = Vector2(200, 0)
+	wind_dir_container.add_child(wind_dir_label)
+	
+	var wind_dir_x_label: Label = Label.new()
+	wind_dir_x_label.text = "X:"
+	wind_dir_x_label.custom_minimum_size = Vector2(30, 0)
+	wind_dir_container.add_child(wind_dir_x_label)
+	
+	var wind_dir_x_spinbox: SpinBox = SpinBox.new()
+	wind_dir_x_spinbox.name = "wind_direction_x"
+	wind_dir_x_spinbox.min_value = -1.0
+	wind_dir_x_spinbox.max_value = 1.0
+	wind_dir_x_spinbox.step = 0.1
+	wind_dir_x_spinbox.value = 1.0
+	wind_dir_x_spinbox.value_changed.connect(func(v): _on_climate_param_changed("wind_direction_x", v))
+	wind_dir_container.add_child(wind_dir_x_spinbox)
+	
+	var wind_dir_y_label: Label = Label.new()
+	wind_dir_y_label.text = "Y:"
+	wind_dir_y_label.custom_minimum_size = Vector2(30, 0)
+	wind_dir_container.add_child(wind_dir_y_label)
+	
+	var wind_dir_y_spinbox: SpinBox = SpinBox.new()
+	wind_dir_y_spinbox.name = "wind_direction_y"
+	wind_dir_y_spinbox.min_value = -1.0
+	wind_dir_y_spinbox.max_value = 1.0
+	wind_dir_y_spinbox.step = 0.1
+	wind_dir_y_spinbox.value = 0.0
+	wind_dir_y_spinbox.value_changed.connect(func(v): _on_climate_param_changed("wind_direction_y", v))
+	wind_dir_container.add_child(wind_dir_y_spinbox)
+	container.add_child(wind_dir_container)
+	control_references["Climate/wind_direction_x"] = wind_dir_x_spinbox
+	control_references["Climate/wind_direction_y"] = wind_dir_y_spinbox
+	step_data["Climate"]["wind_direction_x"] = 1.0
+	step_data["Climate"]["wind_direction_y"] = 0.0
+	
+	# Time of Day
+	var time_container: HBoxContainer = HBoxContainer.new()
+	var time_label: Label = Label.new()
+	time_label.text = "Time of Day:"
+	time_label.custom_minimum_size = Vector2(200, 0)
+	time_container.add_child(time_label)
+	
+	var time_slider: HSlider = HSlider.new()
+	time_slider.name = "time_of_day"
+	time_slider.min_value = 0.0
+	time_slider.max_value = 24.0
+	time_slider.step = 0.1
+	time_slider.value = 12.0
+	time_slider.value_changed.connect(func(v): _on_climate_param_changed("time_of_day", v))
+	time_container.add_child(time_slider)
+	
+	var time_value_label: Label = Label.new()
+	time_value_label.name = "time_of_day_value"
+	time_value_label.custom_minimum_size = Vector2(80, 0)
+	time_value_label.text = "12.0"
+	time_container.add_child(time_value_label)
+	container.add_child(time_container)
+	control_references["Climate/time_of_day"] = time_slider
+	control_references["Climate/time_of_day_value"] = time_value_label
+	step_data["Climate"]["time_of_day"] = 12.0
+
+
 func _create_step_placeholder(parent: VBoxContainer, step_index: int) -> void:
-	"""Create placeholder content for steps 4-9."""
+	"""Create placeholder content for steps 5-9."""
 	var step_panel: Panel = Panel.new()
 	step_panel.name = "Step" + str(step_index + 1)
 	step_panel.visible = (current_step == step_index)
