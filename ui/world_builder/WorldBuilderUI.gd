@@ -41,7 +41,7 @@ var biomes_data: Dictionary = {}
 var civilizations_data: Dictionary = {}
 
 ## Placed icons on 2D map
-var placed_icons: Array[IconNode] = []
+var placed_icons: Array = []  # Array[IconNode] - using untyped for compatibility
 
 ## Icon groups after clustering
 var icon_groups: Array[Array] = []
