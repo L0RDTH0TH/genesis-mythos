@@ -1036,7 +1036,7 @@ func _on_canvas_clicked(event: InputEvent) -> void:
 	icon_visual.add_child(icon_rect)
 	
 	# Create icon node data structure (simplified for Control-based approach)
-	var icon_node: IconNode = IconNode.new()
+	var icon_node = IconNode.new()
 	icon_node.set_icon_data(selected_icon_id, icon_color)
 	icon_node.position = click_pos
 	icon_node.map_position = click_pos
@@ -1102,7 +1102,7 @@ func _show_icon_type_selection_dialog() -> void:
 		return
 	
 	var group: Array = icon_groups[current_icon_group_index]
-	var first_icon: IconNode = group[0] if group.size() > 0 else null
+	var first_icon = group[0] if group.size() > 0 else null
 	if first_icon == null:
 		current_icon_group_index += 1
 		_show_icon_type_selection_dialog()
@@ -1158,8 +1158,9 @@ func _show_icon_type_selection_dialog() -> void:
 func _on_type_selected(type_name: String, group: Array, dialog: AcceptDialog) -> void:
 	"""Handle type selection for icon group."""
 	# Set type for all icons in group
-	for icon: IconNode in group:
-		icon.icon_type = type_name
+	for icon in group:
+		if icon and icon.has_method("set_icon_data"):
+			icon.icon_type = type_name
 	
 	dialog.queue_free()
 	
@@ -1184,18 +1185,21 @@ func _generate_3d_world() -> void:
 		terrain_manager.generate_from_noise(seed_value, 0.0005, 0.0, 150.0)
 	
 	# Place structures based on icons
-	for icon: IconNode in placed_icons:
-		if icon.icon_type.is_empty():
+	for icon in placed_icons:
+		if not icon.has("icon_type") or icon.get("icon_type", "").is_empty():
 			continue
 		
 		# Convert 2D position to 3D (simplified for now)
-		var world_pos: Vector3 = Vector3(icon.map_position.x, 0.0, icon.map_position.y)
+		var icon_pos: Vector2 = icon.get("map_position", Vector2.ZERO) if icon is Dictionary else icon.map_position
+		var world_pos: Vector3 = Vector3(icon_pos.x, 0.0, icon_pos.y)
 		if terrain_manager.has_method("get_height_at"):
 			world_pos.y = terrain_manager.get_height_at(world_pos)
 		
 		# Place structure based on icon type
 		if terrain_manager.has_method("place_structure"):
-			terrain_manager.place_structure(icon.icon_id + "_" + icon.icon_type, world_pos, 1.0)
+			var icon_id: String = icon.get("icon_id", "") if icon is Dictionary else icon.icon_id
+			var icon_type: String = icon.get("icon_type", "") if icon is Dictionary else icon.icon_type
+			terrain_manager.place_structure(icon_id + "_" + icon_type, world_pos, 1.0)
 	
 	print("WorldBuilderUI: 3D world generation complete")
 
@@ -1669,9 +1673,10 @@ func _on_process_cities_pressed() -> void:
 	print("WorldBuilderUI: Processing cities from map...")
 	
 	# Find all city icons from Step 2
-	var city_icons: Array[IconNode] = []
-	for icon: IconNode in placed_icons:
-		if icon.icon_id == "city":
+	var city_icons: Array = []
+	for icon in placed_icons:
+		var icon_id: String = icon.get("icon_id", "") if icon is Dictionary else icon.icon_id
+		if icon_id == "city":
 			city_icons.append(icon)
 	
 	if city_icons.is_empty():
@@ -1680,10 +1685,11 @@ func _on_process_cities_pressed() -> void:
 	
 	# Store city data
 	var cities: Array = []
-	for icon: IconNode in city_icons:
+	for icon in city_icons:
+		var icon_pos: Vector2 = icon.get("map_position", Vector2.ZERO) if icon is Dictionary else icon.map_position
 		cities.append({
 			"icon": icon,
-			"position": icon.map_position,
+			"position": icon_pos,
 			"name": "",
 			"civilization": ""
 		})
