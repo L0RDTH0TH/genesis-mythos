@@ -1,9 +1,0 @@
-{
-	"strength": {"short": "STR", "full": "Strength"},
-	"dexterity": {"short": "DEX", "full": "Dexterity"},
-	"constitution": {"short": "CON", "full": "Constitution"},
-	"intelligence": {"short": "INT", "full": "Intelligence"},
-	"wisdom": {"short": "WIS", "full": "Wisdom"},
-	"charisma": {"short": "CHA", "full": "Charisma"}
-}
-

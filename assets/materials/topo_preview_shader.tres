@@ -1,6 +1,0 @@
-[gd_resource type="ShaderMaterial" script_class="ShaderMaterial" load_steps=2 format=3]
-
-[ext_resource type="Shader" path="res://assets/shaders/topo_preview.gdshader" id="1"]
-
-[resource]
-shader = ExtResource("1")

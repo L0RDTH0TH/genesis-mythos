@@ -1,9 +1,0 @@
-[gd_resource type="PrismMesh" format=3]
-
-[resource]
-left_to_right = 1.0
-top_to_bottom = 0.1
-size = Vector3(1.732, 2.0, 1.0)
-subdivide_width = 0
-subdivide_height = 0
-subdivide_depth = 0
