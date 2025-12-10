@@ -1,17 +1,11 @@
 # ╔═══════════════════════════════════════════════════════════
 # ║ WorldRoot.gd
-# ║ Desc: Main world root scene - entry point for Eryndor 4.0 Final
+# ║ Desc: Main scene root – orchestrates all managers at startup
 # ║ Author: Lordthoth
 # ╚═══════════════════════════════════════════════════════════
-
 extends Node3D
 
-## Preload terrain classes
-const Terrain3DManager = preload("res://core/world_generation/Terrain3DManager.gd")
-const TerrainGenerationConfig = preload("res://core/world_generation/TerrainGenerationConfig.gd")
-
-## Terrain3D manager instance
-var terrain_manager: Terrain3DManager = null
+@onready var terrain_manager: Node3D = $Terrain3DManager
 
 ## World builder UI instance
 var world_builder_ui = null
@@ -22,7 +16,6 @@ const TERRAIN_CONFIG_PATH: String = "res://data/config/terrain_generation.json"
 
 func _remove_splash_screen() -> void:
 	"""Search for and remove any splash screen labels."""
-	# Search recursively for any Label with "Baldur" or "Character Creation" text
 	var labels: Array[Node] = []
 	_find_labels_recursive(self, labels)
 	
@@ -86,47 +79,16 @@ func _ensure_lighting_and_camera() -> void:
 func _ready() -> void:
 	_remove_splash_screen()
 	_ensure_lighting_and_camera()
-	_initialize_terrain_system()
+	# Terrain3DManager now creates and configures the terrain itself in its own _ready()
+	# Nothing else needed here unless you want to trigger procedural generation later
 	_setup_world_builder_ui()
 	print("WorldRoot: Setup complete - splash removed, terrain visible, UI added")
 
 
-func _initialize_terrain_system() -> void:
-	# Create terrain manager using preloaded class
-	var manager: Terrain3DManager = Terrain3DManager.new()
-	terrain_manager = manager
-	
-	# Initialize terrain (creates Terrain3D node programmatically)
-	var data_directory: String = "user://terrain3d/"
-	# Use call() to avoid static analysis issues with class_name resolution
-	var terrain = manager.call("initialize_terrain", self, data_directory)
-	
-	# Load config from JSON using preloaded class
-	var config: Dictionary = TerrainGenerationConfig.load_from_json(TERRAIN_CONFIG_PATH)
-	
-	if not config.is_empty():
-		# Apply terrain settings from config
-		var terrain_settings: Dictionary = TerrainGenerationConfig.get_terrain_settings(config)
-		terrain.region_size = terrain_settings.get("region_size", 1024)
-		terrain.mesh_size = terrain_settings.get("mesh_size", 64)
-		terrain.vertex_spacing = terrain_settings.get("vertex_spacing", 1.0)
-		
-		# Generate initial terrain from config
-		var noise_config: Dictionary = TerrainGenerationConfig.get_noise_config(config)
-		var height_config: Dictionary = TerrainGenerationConfig.get_height_config(config)
-		
-		terrain_manager.generate_from_noise(
-			noise_config.get("seed", 0),
-			noise_config.get("frequency", 0.0005),
-			height_config.get("min", 0.0),
-			height_config.get("max", 150.0)
-		)
-	else:
-		# Fallback: generate with default parameters
-		terrain_manager.generate_from_noise(12345, 0.0005, 0.0, 150.0)
-	
-	# Enable dynamic collision for player movement
-	terrain_manager.enable_dynamic_collision(true)
+# Optional: expose for later procedural calls
+func regenerate_world() -> void:
+	if terrain_manager and terrain_manager.has_method("generate_initial_terrain"):
+		terrain_manager.generate_initial_terrain()
 
 
 func _setup_world_builder_ui() -> void:
@@ -168,8 +130,9 @@ func _setup_world_builder_ui() -> void:
 		push_warning("WorldRoot: Failed to load bg3_theme.tres")
 	
 	# Connect UI to terrain manager
-	world_builder_ui.set_terrain_manager(terrain_manager)
-	print("WorldRoot: Terrain manager connected to WorldBuilderUI")
+	if terrain_manager:
+		world_builder_ui.set_terrain_manager(terrain_manager)
+		print("WorldRoot: Terrain manager connected to WorldBuilderUI")
 	
 	# Position UI - make it larger and more visible (80% width, 80% height)
 	world_builder_ui.anchor_left = 0.0
@@ -185,10 +148,3 @@ func _setup_world_builder_ui() -> void:
 	
 	print("WorldRoot: WorldBuilderUI positioned and made visible")
 	print("WorldRoot: UI size: ", world_builder_ui.size, " position: ", world_builder_ui.position)
-
-
-func _exit_tree() -> void:
-	# Cleanup terrain manager
-	if terrain_manager != null:
-		terrain_manager.cleanup()
-		terrain_manager = null

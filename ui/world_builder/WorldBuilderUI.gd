@@ -7,7 +7,7 @@
 extends Control
 
 ## Reference to terrain manager
-var terrain_manager: Terrain3DManager = null
+var terrain_manager = null  # Terrain3DManager - type hint removed to avoid parser error
 
 ## UI configuration loaded from JSON
 var ui_config: Dictionary = {}
@@ -512,7 +512,7 @@ func _reset_all() -> void:
 							control.color = Color(color_array[0], color_array[1], color_array[2], color_array[3])
 
 
-func set_terrain_manager(manager: Terrain3DManager) -> void:
+func set_terrain_manager(manager) -> void:  # manager: Terrain3DManager - type hint removed
 	"""Set the terrain manager reference."""
 	terrain_manager = manager
 	
@@ -521,7 +521,7 @@ func set_terrain_manager(manager: Terrain3DManager) -> void:
 		terrain_manager.terrain_updated.connect(_on_terrain_updated)
 
 
-func _on_terrain_generated(_terrain: Terrain3D) -> void:
+func _on_terrain_generated(_terrain) -> void:  # _terrain: Terrain3D - type hint removed
 	"""Handle terrain generation complete signal."""
 	pass
 
