@@ -29,6 +29,15 @@ func initialize_terrain(parent: Node, data_directory: String = "user://terrain3d
 	new_terrain.mesh_size = 64
 	new_terrain.vertex_spacing = 1.0
 	
+	# Ensure terrain has a visible material
+	if new_terrain.material == null:
+		var default_material: StandardMaterial3D = StandardMaterial3D.new()
+		default_material.albedo_color = Color(0.4, 0.5, 0.3, 1.0)  # Greenish terrain color
+		default_material.roughness = 0.8
+		default_material.metallic = 0.0
+		new_terrain.material = default_material
+		print("Terrain3DManager: Applied default StandardMaterial3D for visibility")
+	
 	parent.add_child(new_terrain, true)
 	terrain = new_terrain
 	

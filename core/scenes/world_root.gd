@@ -20,9 +20,75 @@ var world_builder_ui = null
 const TERRAIN_CONFIG_PATH: String = "res://data/config/terrain_generation.json"
 
 
+func _remove_splash_screen() -> void:
+	"""Search for and remove any splash screen labels."""
+	# Search recursively for any Label with "Baldur" or "Character Creation" text
+	var labels: Array[Node] = []
+	_find_labels_recursive(self, labels)
+	
+	for label: Label in labels:
+		if label.text.contains("Baldur") or label.text.contains("Character Creation"):
+			print("WorldRoot: Removing splash label: ", label.text)
+			label.queue_free()
+
+
+func _find_labels_recursive(node: Node, labels: Array) -> void:
+	"""Recursively find all Label nodes."""
+	if node is Label:
+		labels.append(node)
+	
+	for child: Node in node.get_children():
+		_find_labels_recursive(child, labels)
+
+
+func _ensure_lighting_and_camera() -> void:
+	"""Ensure proper lighting and camera setup for visibility."""
+	# Check if camera exists and is current
+	var camera: Camera3D = get_node_or_null("MainCamera")
+	if camera == null:
+		push_warning("WorldRoot: MainCamera not found, creating one")
+		camera = Camera3D.new()
+		camera.name = "MainCamera"
+		camera.transform.origin = Vector3(0, 10, 20)
+		camera.look_at(Vector3.ZERO, Vector3.UP)
+		camera.current = true
+		camera.fov = 70.0
+		camera.near = 0.05
+		camera.far = 5000.0
+		add_child(camera, true)
+		print("WorldRoot: Created MainCamera at ", camera.transform.origin)
+	else:
+		if not camera.current:
+			camera.current = true
+			print("WorldRoot: Set MainCamera as current")
+	
+	# Check if light exists
+	var light: DirectionalLight3D = get_node_or_null("DirectionalLight3D")
+	if light == null:
+		push_warning("WorldRoot: DirectionalLight3D not found, creating one")
+		light = DirectionalLight3D.new()
+		light.name = "DirectionalLight3D"
+		light.transform.basis = Basis.from_euler(Vector3(deg_to_rad(-45), deg_to_rad(45), 0))
+		light.light_color = Color(1, 0.863, 0.706, 1)
+		light.light_energy = 12.0
+		light.shadow_enabled = true
+		add_child(light, true)
+		print("WorldRoot: Created DirectionalLight3D")
+	else:
+		# Ensure light is properly configured
+		if light.light_energy < 1.0:
+			light.light_energy = 12.0
+		if not light.shadow_enabled:
+			light.shadow_enabled = true
+		print("WorldRoot: DirectionalLight3D verified (energy: ", light.light_energy, ")")
+
+
 func _ready() -> void:
+	_remove_splash_screen()
+	_ensure_lighting_and_camera()
 	_initialize_terrain_system()
 	_setup_world_builder_ui()
+	print("WorldRoot: Setup complete - splash removed, terrain visible, UI added")
 
 
 func _initialize_terrain_system() -> void:

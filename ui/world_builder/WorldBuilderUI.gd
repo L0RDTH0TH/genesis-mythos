@@ -67,15 +67,17 @@ func _apply_theme() -> void:
 
 func _ensure_visibility() -> void:
 	"""Ensure UI elements are visible with proper styling."""
-	# Ensure root Control is visible
+	# Ensure root Control is visible and fully opaque
 	self.visible = true
 	self.mouse_filter = Control.MOUSE_FILTER_PASS
+	self.modulate = Color(1, 1, 1, 1)  # Full opacity
 	
 	# Get background panel and ensure it's visible
 	var background_panel: Panel = $BackgroundPanel
 	if background_panel != null:
 		background_panel.visible = true
-		# Apply a visible background style
+		background_panel.modulate = Color(1, 1, 1, 1)
+		# Apply a visible background style with high contrast
 		var style_box: StyleBoxFlat = StyleBoxFlat.new()
 		style_box.bg_color = Color(0.15, 0.12, 0.1, 0.95)  # Dark brown with high opacity
 		style_box.border_width_left = 3
@@ -89,6 +91,8 @@ func _ensure_visibility() -> void:
 		style_box.corner_radius_bottom_left = 8
 		background_panel.add_theme_stylebox_override("panel", style_box)
 		print("WorldBuilderUI: Background panel styled and visible")
+	
+	print("WorldBuilderUI: UI instantiated and visible (opacity: ", self.modulate.a, ")")
 
 
 func _build_ui_from_config() -> void:
