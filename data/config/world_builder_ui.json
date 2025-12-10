@@ -1,0 +1,248 @@
+{
+  "tabs": {
+    "Terrain": {
+      "elements": [
+        {
+          "type": "Slider",
+          "name": "height_scale",
+          "label": "Height Scale",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 20.0,
+          "step": 0.1,
+          "format": "%.2f"
+        },
+        {
+          "type": "Slider",
+          "name": "noise_frequency",
+          "label": "Noise Frequency",
+          "min": 0.001,
+          "max": 0.1,
+          "default": 0.0005,
+          "step": 0.0001,
+          "format": "%.6f"
+        },
+        {
+          "type": "Slider",
+          "name": "octaves",
+          "label": "Octaves",
+          "min": 1.0,
+          "max": 8.0,
+          "default": 4.0,
+          "step": 1.0,
+          "format": "%.0f"
+        },
+        {
+          "type": "Slider",
+          "name": "persistence",
+          "label": "Persistence",
+          "min": 0.0,
+          "max": 1.0,
+          "default": 0.5,
+          "step": 0.01,
+          "format": "%.2f"
+        },
+        {
+          "type": "Slider",
+          "name": "lacunarity",
+          "label": "Lacunarity",
+          "min": 1.0,
+          "max": 4.0,
+          "default": 2.0,
+          "step": 0.1,
+          "format": "%.2f"
+        },
+        {
+          "type": "SpinBox",
+          "name": "seed",
+          "label": "Seed",
+          "min": 0,
+          "max": 999999,
+          "default": 12345,
+          "step": 1
+        },
+        {
+          "type": "OptionButton",
+          "name": "noise_type",
+          "label": "Noise Type",
+          "options": ["Simplex", "Simplex Smooth", "Perlin", "Value", "Value Cubic", "Cellular"],
+          "default": 2
+        },
+        {
+          "type": "Button",
+          "name": "regenerate_terrain",
+          "label": "Regenerate Terrain",
+          "action": "regenerate"
+        }
+      ]
+    },
+    "Biomes": {
+      "elements": [
+        {
+          "type": "ItemList",
+          "name": "available_biomes",
+          "label": "Available Biomes",
+          "items": ["forest", "desert", "mountain", "plains", "swamp", "tundra", "volcanic", "ocean"],
+          "default_selection": 0
+        },
+        {
+          "type": "Slider",
+          "name": "biome_blending",
+          "label": "Biome Blending",
+          "min": 0.0,
+          "max": 1.0,
+          "default": 0.5,
+          "step": 0.01,
+          "format": "%.2f"
+        },
+        {
+          "type": "Slider",
+          "name": "texture_roughness",
+          "label": "Texture Roughness",
+          "min": 0.0,
+          "max": 1.0,
+          "default": 0.5,
+          "step": 0.01,
+          "format": "%.2f"
+        },
+        {
+          "type": "ColorPicker",
+          "name": "biome_color",
+          "label": "Biome Color Overlay",
+          "default": [0.5, 0.5, 0.5, 1.0]
+        },
+        {
+          "type": "Button",
+          "name": "apply_biome_map",
+          "label": "Apply Biome Map",
+          "action": "apply_biome"
+        }
+      ]
+    },
+    "Structures": {
+      "elements": [
+        {
+          "type": "ItemList",
+          "name": "placeable_structures",
+          "label": "Placeable Structures",
+          "items": ["tree", "rock", "building", "crystal", "ruin", "shrine"],
+          "default_selection": 0
+        },
+        {
+          "type": "Slider",
+          "name": "density",
+          "label": "Structure Density",
+          "min": 0.0,
+          "max": 1.0,
+          "default": 0.3,
+          "step": 0.01,
+          "format": "%.2f"
+        },
+        {
+          "type": "Slider",
+          "name": "scale_variation",
+          "label": "Scale Variation",
+          "min": 0.0,
+          "max": 1.0,
+          "default": 0.2,
+          "step": 0.01,
+          "format": "%.2f"
+        },
+        {
+          "type": "Button",
+          "name": "place_selected",
+          "label": "Place Selected",
+          "action": "place_structure"
+        },
+        {
+          "type": "Button",
+          "name": "remove_all",
+          "label": "Remove All Structures",
+          "action": "remove_structures"
+        }
+      ]
+    },
+    "Environment": {
+      "elements": [
+        {
+          "type": "Slider",
+          "name": "time_of_day",
+          "label": "Time of Day",
+          "min": 0.0,
+          "max": 24.0,
+          "default": 12.0,
+          "step": 0.1,
+          "format": "%.1f"
+        },
+        {
+          "type": "Slider",
+          "name": "fog_density",
+          "label": "Fog Density",
+          "min": 0.0,
+          "max": 1.0,
+          "default": 0.1,
+          "step": 0.01,
+          "format": "%.2f"
+        },
+        {
+          "type": "Slider",
+          "name": "wind_strength",
+          "label": "Wind Strength",
+          "min": 0.0,
+          "max": 10.0,
+          "default": 1.0,
+          "step": 0.1,
+          "format": "%.1f"
+        },
+        {
+          "type": "OptionButton",
+          "name": "weather_type",
+          "label": "Weather Type",
+          "options": ["clear", "rain", "snow", "fog", "storm"],
+          "default": 0
+        },
+        {
+          "type": "ColorPicker",
+          "name": "sky_color",
+          "label": "Sky Color",
+          "default": [0.5, 0.7, 1.0, 1.0]
+        },
+        {
+          "type": "ColorPicker",
+          "name": "ambient_light",
+          "label": "Ambient Light",
+          "default": [0.3, 0.3, 0.3, 1.0]
+        }
+      ]
+    },
+    "Export": {
+      "elements": [
+        {
+          "type": "LineEdit",
+          "name": "world_name",
+          "label": "World Name",
+          "placeholder": "Enter world name...",
+          "default": "MyWorld"
+        },
+        {
+          "type": "Button",
+          "name": "save_world_config",
+          "label": "Save World Config",
+          "action": "save_config"
+        },
+        {
+          "type": "Button",
+          "name": "export_heightmap",
+          "label": "Export Heightmap",
+          "action": "export_heightmap"
+        },
+        {
+          "type": "Button",
+          "name": "reset_all",
+          "label": "Reset All",
+          "action": "reset_all"
+        }
+      ]
+    }
+  }
+}

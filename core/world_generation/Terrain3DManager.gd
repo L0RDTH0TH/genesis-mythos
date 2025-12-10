@@ -141,6 +141,82 @@ func enable_dynamic_collision(enabled: bool = true) -> void:
 		terrain.collision.mode = Terrain3DCollision.STATIC
 
 
+## Apply biome map to terrain (stub for future implementation)
+func apply_biome_map(biome_type: String, blending: float, color: Color) -> void:
+	if terrain == null:
+		push_error("Terrain3DManager: No terrain initialized")
+		return
+	
+	# TODO: Implement biome map application using Terrain3D control maps
+	push_warning("Terrain3DManager: Biome map application not yet implemented")
+	terrain_updated.emit()
+
+
+## Place structure on terrain (stub for future implementation)
+func place_structure(structure_type: String, position: Vector3, scale: float = 1.0) -> void:
+	if terrain == null:
+		push_error("Terrain3DManager: No terrain initialized")
+		return
+	
+	# TODO: Implement structure placement using Terrain3D instancer or manual node placement
+	push_warning("Terrain3DManager: Structure placement not yet implemented")
+
+
+## Remove all structures (stub for future implementation)
+func remove_all_structures() -> void:
+	if terrain == null:
+		push_error("Terrain3DManager: No terrain initialized")
+		return
+	
+	# TODO: Implement structure removal
+	push_warning("Terrain3DManager: Structure removal not yet implemented")
+
+
+## Update environment settings (stub for future implementation)
+func update_environment(time_of_day: float, fog_density: float, wind_strength: float, weather: String, sky_color: Color, ambient_light: Color) -> void:
+	if terrain == null:
+		push_error("Terrain3DManager: No terrain initialized")
+		return
+	
+	# TODO: Implement environment updates via WorldEnvironment node
+	push_warning("Terrain3DManager: Environment updates not yet implemented")
+
+
+## Export heightmap as PNG
+func export_heightmap(path: String) -> bool:
+	if terrain == null:
+		push_error("Terrain3DManager: No terrain initialized")
+		return false
+	
+	var terrain_data: Terrain3DData = terrain.data
+	var region_location: Vector2i = Vector2i(0, 0)
+	var region: Terrain3DRegion = terrain_data.get_region(region_location)
+	
+	if region == null:
+		push_warning("Terrain3DManager: Region not found at " + str(region_location))
+		return false
+	
+	var height_map: Image = region.get_height_map()
+	if height_map == null:
+		push_error("Terrain3DManager: Failed to get height map")
+		return false
+	
+	# Convert to RGB format for PNG export
+	var export_image: Image = Image.create(height_map.get_width(), height_map.get_height(), false, Image.FORMAT_RGB8)
+	for x in height_map.get_width():
+		for y in height_map.get_height():
+			var height_value: float = height_map.get_pixel(x, y).r
+			export_image.set_pixel(x, y, Color(height_value, height_value, height_value, 1.0))
+	
+	var error: Error = export_image.save_png(path)
+	if error != OK:
+		push_error("Terrain3DManager: Failed to save heightmap to " + path)
+		return false
+	
+	print("Terrain3DManager: Exported heightmap to " + path)
+	return true
+
+
 ## Cleanup terrain
 func cleanup() -> void:
 	if terrain != null and is_instance_valid(terrain):
