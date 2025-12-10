@@ -51,6 +51,7 @@ var current_icon_group_index: int = 0
 const MAP_ICONS_PATH: String = "res://data/map_icons.json"
 const UI_CONFIG_PATH: String = "res://data/config/world_builder_ui.json"
 const BIOMES_PATH: String = "res://data/biomes.json"
+const CIVILIZATIONS_PATH: String = "res://data/civilizations.json"
 
 ## Control references
 var control_references: Dictionary = {}
@@ -59,6 +60,7 @@ var control_references: Dictionary = {}
 func _ready() -> void:
 	_load_map_icons()
 	_load_biomes()
+	_load_civilizations()
 	_apply_theme()
 	_ensure_visibility()
 	_setup_navigation()
@@ -156,8 +158,11 @@ func _setup_step_content() -> void:
 	# Create step 5: Biomes
 	_create_step_biomes(step_container)
 	
-	# Create remaining steps (6-9) as placeholders
-	for i in range(5, STEPS.size()):
+	# Create step 6: Structures & Civilizations
+	_create_step_structures(step_container)
+	
+	# Create remaining steps (7-9) as placeholders
+	for i in range(6, STEPS.size()):
 		_create_step_placeholder(step_container, i)
 
 
@@ -1261,3 +1266,149 @@ func _show_biome_overlay() -> void:
 	"""Show biome overlay on 2D map."""
 	print("WorldBuilderUI: Showing biome overlay on 2D map")
 	# TODO: Implement visual overlay on map canvas
+
+
+func _on_process_cities_pressed() -> void:
+	"""Process city icons from Step 2 and show civilization selection dialogs."""
+	print("WorldBuilderUI: Processing cities from map...")
+	
+	# Find all city icons from Step 2
+	var city_icons: Array[IconNode] = []
+	for icon: IconNode in placed_icons:
+		if icon.icon_id == "city":
+			city_icons.append(icon)
+	
+	if city_icons.is_empty():
+		print("WorldBuilderUI: No city icons found on map")
+		return
+	
+	# Store city data
+	var cities: Array = []
+	for icon: IconNode in city_icons:
+		cities.append({
+			"icon": icon,
+			"position": icon.map_position,
+			"name": "",
+			"civilization": ""
+		})
+	
+	step_data["Structures & Civilizations"]["cities"] = cities
+	
+	# Show civilization selection for first city
+	if cities.size() > 0:
+		_show_civilization_selection_dialog(0)
+
+
+func _show_civilization_selection_dialog(city_index: int) -> void:
+	"""Show civilization selection dialog for a city."""
+	var cities: Array = step_data.get("Structures & Civilizations", {}).get("cities", [])
+	if city_index >= cities.size():
+		# All cities processed
+		_update_city_list()
+		return
+	
+	var city_data: Dictionary = cities[city_index]
+	
+	# Create dialog
+	var dialog: AcceptDialog = AcceptDialog.new()
+	dialog.title = "Select Civilization for City " + str(city_index + 1)
+	dialog.size = Vector2(500, 400)
+	
+	var vbox: VBoxContainer = VBoxContainer.new()
+	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	vbox.add_theme_constant_override("separation", 10)
+	dialog.add_child(vbox)
+	
+	# City name input
+	var name_label: Label = Label.new()
+	name_label.text = "City Name:"
+	vbox.add_child(name_label)
+	
+	var name_edit: LineEdit = LineEdit.new()
+	name_edit.name = "city_name"
+	name_edit.placeholder_text = "Enter city name or click Generate"
+	name_edit.text = city_data.get("name", "")
+	vbox.add_child(name_edit)
+	
+	# Generate name button
+	var generate_name_button: Button = Button.new()
+	generate_name_button.text = "Generate Random Name"
+	generate_name_button.pressed.connect(func(): _on_generate_city_name(name_edit, city_index))
+	vbox.add_child(generate_name_button)
+	
+	# Civilization selection
+	var civ_label: Label = Label.new()
+	civ_label.text = "Civilization:"
+	vbox.add_child(civ_label)
+	
+	var civ_list: ItemList = ItemList.new()
+	civ_list.custom_minimum_size = Vector2(0, 200)
+	var civilizations: Array = civilizations_data.get("civilizations", [])
+	for civ: Dictionary in civilizations:
+		civ_list.add_item(civ.get("name", "Unknown"))
+	civ_list.item_selected.connect(func(idx): _on_civilization_selected(idx, city_index, dialog, name_edit))
+	vbox.add_child(civ_list)
+	
+	add_child(dialog)
+	dialog.popup_centered()
+
+
+func _on_generate_city_name(name_edit: LineEdit, city_index: int) -> void:
+	"""Generate a random city name."""
+	var name_prefixes: Array = ["North", "South", "East", "West", "New", "Old", "Great", "Little"]
+	var name_suffixes: Array = ["port", "haven", "burg", "ton", "ford", "bridge", "hill", "vale"]
+	
+	var prefix: String = name_prefixes[randi() % name_prefixes.size()]
+	var suffix: String = name_suffixes[randi() % name_suffixes.size()]
+	var generated_name: String = prefix + suffix.capitalize()
+	
+	name_edit.text = generated_name
+	var cities: Array = step_data.get("Structures & Civilizations", {}).get("cities", [])
+	if city_index < cities.size():
+		cities[city_index]["name"] = generated_name
+
+
+func _on_civilization_selected(index: int, city_index: int, dialog: AcceptDialog, name_edit: LineEdit) -> void:
+	"""Handle civilization selection for a city."""
+	var civilizations: Array = civilizations_data.get("civilizations", [])
+	if index >= 0 and index < civilizations.size():
+		var civ_data: Dictionary = civilizations[index]
+		var cities: Array = step_data.get("Structures & Civilizations", {}).get("cities", [])
+		if city_index < cities.size():
+			cities[city_index]["civilization"] = civ_data.get("id", "")
+			cities[city_index]["name"] = name_edit.text if not name_edit.text.is_empty() else "City " + str(city_index + 1)
+			print("WorldBuilderUI: City ", city_index + 1, " assigned to ", civ_data.get("name", "Unknown"))
+	
+	dialog.queue_free()
+	
+	# Process next city
+	_show_civilization_selection_dialog(city_index + 1)
+
+
+func _on_city_selected(index: int) -> void:
+	"""Handle city selection from list."""
+	var cities: Array = step_data.get("Structures & Civilizations", {}).get("cities", [])
+	if index >= 0 and index < cities.size():
+		var city_data: Dictionary = cities[index]
+		print("WorldBuilderUI: Selected city: ", city_data.get("name", "Unknown"))
+
+
+func _update_city_list() -> void:
+	"""Update the city list display."""
+	var city_list: ItemList = control_references.get("Structures & Civilizations/city_list") as ItemList
+	if city_list == null:
+		return
+	
+	city_list.clear()
+	var cities: Array = step_data.get("Structures & Civilizations", {}).get("cities", [])
+	for city_data: Dictionary in cities:
+		var city_name: String = city_data.get("name", "Unnamed City")
+		var civ_id: String = city_data.get("civilization", "")
+		if not civ_id.is_empty():
+			# Find civilization name
+			var civilizations: Array = civilizations_data.get("civilizations", [])
+			for civ: Dictionary in civilizations:
+				if civ.get("id", "") == civ_id:
+					city_name += " (" + civ.get("name", "") + ")"
+					break
+		city_list.add_item(city_name)

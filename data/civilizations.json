@@ -1,0 +1,34 @@
+{
+  "civilizations": [
+    {
+      "id": "human_kingdom",
+      "name": "Human Kingdom",
+      "description": "A prosperous human settlement with stone walls and towers"
+    },
+    {
+      "id": "elven_enclave",
+      "name": "Elven Enclave",
+      "description": "An ancient elven city built among the trees"
+    },
+    {
+      "id": "dwarven_hold",
+      "name": "Dwarven Hold",
+      "description": "A fortified dwarven stronghold carved into the mountains"
+    },
+    {
+      "id": "orc_stronghold",
+      "name": "Orc Stronghold",
+      "description": "A brutal orcish fortress with dark stone walls"
+    },
+    {
+      "id": "gnomish_workshop",
+      "name": "Gnomish Workshop",
+      "description": "A bustling gnomish town full of mechanical wonders"
+    },
+    {
+      "id": "halfling_village",
+      "name": "Halfling Village",
+      "description": "A peaceful halfling settlement with cozy homes"
+    }
+  ]
+}
