@@ -145,8 +145,11 @@ func _setup_step_content() -> void:
 	# Create step 2: 2D Map Maker
 	_create_step_map_maker(step_container)
 	
-	# Create remaining steps (3-9) as placeholders
-	for i in range(2, STEPS.size()):
+	# Create step 3: Terrain
+	_create_step_terrain(step_container)
+	
+	# Create remaining steps (4-9) as placeholders
+	for i in range(3, STEPS.size()):
 		_create_step_placeholder(step_container, i)
 
 
@@ -174,7 +177,7 @@ func _create_step_seed_size(parent: VBoxContainer) -> void:
 	seed_spinbox.min_value = 0
 	seed_spinbox.max_value = 999999
 	seed_spinbox.value = 12345
-	seed_spinbox.value_changed.connect(func(v): step_data["Seed & Size"]["seed"] = int(v))
+	seed_spinbox.value_changed.connect(func(v): _on_seed_changed(int(v)))
 	seed_container.add_child(seed_spinbox)
 	container.add_child(seed_container)
 	control_references["Seed & Size/seed"] = seed_spinbox
@@ -263,8 +266,202 @@ func _create_step_map_maker(parent: VBoxContainer) -> void:
 	canvas_container.gui_input.connect(_on_canvas_clicked)
 
 
+func _create_step_terrain(parent: VBoxContainer) -> void:
+	"""Create Step 3: Terrain content with full controls."""
+	var step_panel: Panel = Panel.new()
+	step_panel.name = "StepTerrain"
+	step_panel.visible = (current_step == 2)
+	parent.add_child(step_panel)
+	
+	var container: VBoxContainer = VBoxContainer.new()
+	container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	container.add_theme_constant_override("separation", 10)
+	step_panel.add_child(container)
+	
+	# Seed field (read-only, auto-filled from Step 1)
+	var seed_container: HBoxContainer = HBoxContainer.new()
+	var seed_label: Label = Label.new()
+	seed_label.text = "Seed (from Step 1):"
+	seed_label.custom_minimum_size = Vector2(200, 0)
+	seed_container.add_child(seed_label)
+	
+	var seed_spinbox: SpinBox = SpinBox.new()
+	seed_spinbox.name = "seed"
+	seed_spinbox.editable = false  # Read-only
+	seed_spinbox.min_value = 0
+	seed_spinbox.max_value = 999999
+	seed_spinbox.value = step_data.get("Seed & Size", {}).get("seed", 12345)
+	seed_container.add_child(seed_spinbox)
+	container.add_child(seed_container)
+	control_references["Terrain/seed"] = seed_spinbox
+	step_data["Terrain"] = {}
+	step_data["Terrain"]["seed"] = step_data.get("Seed & Size", {}).get("seed", 12345)
+	
+	# Height Scale
+	var height_container: HBoxContainer = HBoxContainer.new()
+	var height_label: Label = Label.new()
+	height_label.text = "Height Scale:"
+	height_label.custom_minimum_size = Vector2(200, 0)
+	height_container.add_child(height_label)
+	
+	var height_slider: HSlider = HSlider.new()
+	height_slider.name = "height_scale"
+	height_slider.min_value = 0.0
+	height_slider.max_value = 100.0
+	height_slider.step = 0.1
+	height_slider.value = 20.0
+	height_slider.value_changed.connect(func(v): _on_terrain_param_changed("height_scale", v))
+	height_container.add_child(height_slider)
+	
+	var height_value_label: Label = Label.new()
+	height_value_label.name = "height_scale_value"
+	height_value_label.custom_minimum_size = Vector2(80, 0)
+	height_value_label.text = "20.00"
+	height_container.add_child(height_value_label)
+	container.add_child(height_container)
+	control_references["Terrain/height_scale"] = height_slider
+	control_references["Terrain/height_scale_value"] = height_value_label
+	step_data["Terrain"]["height_scale"] = 20.0
+	
+	# Noise Frequency
+	var freq_container: HBoxContainer = HBoxContainer.new()
+	var freq_label: Label = Label.new()
+	freq_label.text = "Noise Frequency:"
+	freq_label.custom_minimum_size = Vector2(200, 0)
+	freq_container.add_child(freq_label)
+	
+	var freq_slider: HSlider = HSlider.new()
+	freq_slider.name = "noise_frequency"
+	freq_slider.min_value = 0.001
+	freq_slider.max_value = 0.1
+	freq_slider.step = 0.0001
+	freq_slider.value = 0.0005
+	freq_slider.value_changed.connect(func(v): _on_terrain_param_changed("noise_frequency", v))
+	freq_container.add_child(freq_slider)
+	
+	var freq_value_label: Label = Label.new()
+	freq_value_label.name = "noise_frequency_value"
+	freq_value_label.custom_minimum_size = Vector2(80, 0)
+	freq_value_label.text = "0.000500"
+	freq_container.add_child(freq_value_label)
+	container.add_child(freq_container)
+	control_references["Terrain/noise_frequency"] = freq_slider
+	control_references["Terrain/noise_frequency_value"] = freq_value_label
+	step_data["Terrain"]["noise_frequency"] = 0.0005
+	
+	# Octaves
+	var octaves_container: HBoxContainer = HBoxContainer.new()
+	var octaves_label: Label = Label.new()
+	octaves_label.text = "Octaves:"
+	octaves_label.custom_minimum_size = Vector2(200, 0)
+	octaves_container.add_child(octaves_label)
+	
+	var octaves_slider: HSlider = HSlider.new()
+	octaves_slider.name = "octaves"
+	octaves_slider.min_value = 1.0
+	octaves_slider.max_value = 8.0
+	octaves_slider.step = 1.0
+	octaves_slider.value = 4.0
+	octaves_slider.value_changed.connect(func(v): _on_terrain_param_changed("octaves", v))
+	octaves_container.add_child(octaves_slider)
+	
+	var octaves_value_label: Label = Label.new()
+	octaves_value_label.name = "octaves_value"
+	octaves_value_label.custom_minimum_size = Vector2(80, 0)
+	octaves_value_label.text = "4"
+	octaves_container.add_child(octaves_value_label)
+	container.add_child(octaves_container)
+	control_references["Terrain/octaves"] = octaves_slider
+	control_references["Terrain/octaves_value"] = octaves_value_label
+	step_data["Terrain"]["octaves"] = 4.0
+	
+	# Persistence
+	var persistence_container: HBoxContainer = HBoxContainer.new()
+	var persistence_label: Label = Label.new()
+	persistence_label.text = "Persistence:"
+	persistence_label.custom_minimum_size = Vector2(200, 0)
+	persistence_container.add_child(persistence_label)
+	
+	var persistence_slider: HSlider = HSlider.new()
+	persistence_slider.name = "persistence"
+	persistence_slider.min_value = 0.0
+	persistence_slider.max_value = 1.0
+	persistence_slider.step = 0.01
+	persistence_slider.value = 0.5
+	persistence_slider.value_changed.connect(func(v): _on_terrain_param_changed("persistence", v))
+	persistence_container.add_child(persistence_slider)
+	
+	var persistence_value_label: Label = Label.new()
+	persistence_value_label.name = "persistence_value"
+	persistence_value_label.custom_minimum_size = Vector2(80, 0)
+	persistence_value_label.text = "0.50"
+	persistence_container.add_child(persistence_value_label)
+	container.add_child(persistence_container)
+	control_references["Terrain/persistence"] = persistence_slider
+	control_references["Terrain/persistence_value"] = persistence_value_label
+	step_data["Terrain"]["persistence"] = 0.5
+	
+	# Lacunarity
+	var lacunarity_container: HBoxContainer = HBoxContainer.new()
+	var lacunarity_label: Label = Label.new()
+	lacunarity_label.text = "Lacunarity:"
+	lacunarity_label.custom_minimum_size = Vector2(200, 0)
+	lacunarity_container.add_child(lacunarity_label)
+	
+	var lacunarity_slider: HSlider = HSlider.new()
+	lacunarity_slider.name = "lacunarity"
+	lacunarity_slider.min_value = 1.0
+	lacunarity_slider.max_value = 4.0
+	lacunarity_slider.step = 0.1
+	lacunarity_slider.value = 2.0
+	lacunarity_slider.value_changed.connect(func(v): _on_terrain_param_changed("lacunarity", v))
+	lacunarity_container.add_child(lacunarity_slider)
+	
+	var lacunarity_value_label: Label = Label.new()
+	lacunarity_value_label.name = "lacunarity_value"
+	lacunarity_value_label.custom_minimum_size = Vector2(80, 0)
+	lacunarity_value_label.text = "2.00"
+	lacunarity_container.add_child(lacunarity_value_label)
+	container.add_child(lacunarity_container)
+	control_references["Terrain/lacunarity"] = lacunarity_slider
+	control_references["Terrain/lacunarity_value"] = lacunarity_value_label
+	step_data["Terrain"]["lacunarity"] = 2.0
+	
+	# Noise Type
+	var noise_type_container: HBoxContainer = HBoxContainer.new()
+	var noise_type_label: Label = Label.new()
+	noise_type_label.text = "Noise Type:"
+	noise_type_label.custom_minimum_size = Vector2(200, 0)
+	noise_type_container.add_child(noise_type_label)
+	
+	var noise_type_option: OptionButton = OptionButton.new()
+	noise_type_option.name = "noise_type"
+	noise_type_option.add_item("Simplex")
+	noise_type_option.add_item("Simplex Smooth")
+	noise_type_option.add_item("Perlin")
+	noise_type_option.add_item("Value")
+	noise_type_option.add_item("Value Cubic")
+	noise_type_option.add_item("Cellular")
+	noise_type_option.selected = 2  # Default to Perlin
+	noise_type_option.item_selected.connect(func(idx): _on_terrain_param_changed("noise_type", idx))
+	noise_type_container.add_child(noise_type_option)
+	container.add_child(noise_type_container)
+	control_references["Terrain/noise_type"] = noise_type_option
+	step_data["Terrain"]["noise_type"] = 2
+	
+	# Regenerate Terrain button
+	var button_container: HBoxContainer = HBoxContainer.new()
+	var regenerate_button: Button = Button.new()
+	regenerate_button.name = "regenerate_terrain"
+	regenerate_button.text = "Regenerate Terrain"
+	regenerate_button.pressed.connect(_on_regenerate_terrain_pressed)
+	button_container.add_child(regenerate_button)
+	container.add_child(button_container)
+	control_references["Terrain/regenerate_terrain"] = regenerate_button
+
+
 func _create_step_placeholder(parent: VBoxContainer, step_index: int) -> void:
-	"""Create placeholder content for steps 3-9."""
+	"""Create placeholder content for steps 4-9."""
 	var step_panel: Panel = Panel.new()
 	step_panel.name = "Step" + str(step_index + 1)
 	step_panel.visible = (current_step == step_index)
@@ -312,6 +509,10 @@ func _update_step_display() -> void:
 		back_button.disabled = (current_step == 0)
 	if next_button != null:
 		next_button.disabled = (current_step == STEPS.size() - 1)
+	
+	# Update seed in Step 3 when entering terrain step
+	if current_step == 2:
+		_update_terrain_seed_from_step1()
 
 
 func _on_next_pressed() -> void:
@@ -330,6 +531,93 @@ func _on_back_pressed() -> void:
 	if current_step > 0:
 		current_step -= 1
 		_update_step_display()
+
+
+func _on_terrain_param_changed(param_name: String, value: Variant) -> void:
+	"""Handle terrain parameter changes with live updates."""
+	step_data["Terrain"][param_name] = value
+	
+	# Update value labels
+	match param_name:
+		"height_scale":
+			var label: Label = control_references.get("Terrain/height_scale_value") as Label
+			if label != null:
+				label.text = "%.2f" % value
+		"noise_frequency":
+			var label: Label = control_references.get("Terrain/noise_frequency_value") as Label
+			if label != null:
+				label.text = "%.6f" % value
+		"octaves":
+			var label: Label = control_references.get("Terrain/octaves_value") as Label
+			if label != null:
+				label.text = "%.0f" % value
+		"persistence":
+			var label: Label = control_references.get("Terrain/persistence_value") as Label
+			if label != null:
+				label.text = "%.2f" % value
+		"lacunarity":
+			var label: Label = control_references.get("Terrain/lacunarity_value") as Label
+			if label != null:
+				label.text = "%.2f" % value
+	
+	# Live terrain update (throttled to avoid performance issues)
+	call_deferred("_update_terrain_live")
+
+
+func _update_terrain_live() -> void:
+	"""Update terrain in real-time with current parameters."""
+	if terrain_manager == null:
+		return
+	
+	# Only update if we're on the terrain step
+	if current_step != 2:
+		return
+	
+	var terrain_params: Dictionary = step_data.get("Terrain", {})
+	if terrain_params.is_empty():
+		return
+	
+	# Get parameters
+	var seed_value: int = terrain_params.get("seed", 12345)
+	var frequency: float = terrain_params.get("noise_frequency", 0.0005)
+	var height_scale: float = terrain_params.get("height_scale", 20.0)
+	var min_height: float = 0.0
+	var max_height: float = 150.0 * (height_scale / 20.0)
+	
+	# Generate terrain
+	if terrain_manager.has_method("generate_from_noise"):
+		terrain_manager.generate_from_noise(seed_value, frequency, min_height, max_height)
+	else:
+		# Fallback: use generate_initial_terrain if available
+		if terrain_manager.has_method("generate_initial_terrain"):
+			terrain_manager.generate_initial_terrain()
+
+
+func _on_regenerate_terrain_pressed() -> void:
+	"""Handle Regenerate Terrain button press."""
+	_update_terrain_live()
+	print("WorldBuilderUI: Terrain regenerated")
+
+
+func _on_seed_changed(new_seed: int) -> void:
+	"""Handle seed change from Step 1."""
+	step_data["Seed & Size"]["seed"] = new_seed
+	# Update terrain step seed if it exists
+	if control_references.has("Terrain/seed"):
+		var terrain_seed: SpinBox = control_references["Terrain/seed"] as SpinBox
+		if terrain_seed != null:
+			terrain_seed.value = new_seed
+			step_data["Terrain"]["seed"] = new_seed
+
+
+func _update_terrain_seed_from_step1() -> void:
+	"""Update terrain step seed field from Step 1."""
+	var step1_seed: int = step_data.get("Seed & Size", {}).get("seed", 12345)
+	if control_references.has("Terrain/seed"):
+		var terrain_seed: SpinBox = control_references["Terrain/seed"] as SpinBox
+		if terrain_seed != null:
+			terrain_seed.value = step1_seed
+			step_data["Terrain"]["seed"] = step1_seed
 
 
 func _on_icon_toolbar_selected(icon_id: String) -> void:
