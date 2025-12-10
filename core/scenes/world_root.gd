@@ -64,6 +64,9 @@ func _initialize_terrain_system() -> void:
 
 
 func _setup_world_builder_ui() -> void:
+	"""Setup and display the world builder UI overlay."""
+	print("WorldRoot: Setting up WorldBuilderUI...")
+	
 	# Load and instance WorldBuilderUI scene
 	var ui_scene: PackedScene = load("res://ui/world_builder/WorldBuilderUI.tscn")
 	if ui_scene == null:
@@ -75,29 +78,47 @@ func _setup_world_builder_ui() -> void:
 		push_error("WorldRoot: Failed to instantiate WorldBuilderUI")
 		return
 	
+	print("WorldRoot: WorldBuilderUI instantiated successfully")
+	
 	# Verify it's the correct type
 	if not world_builder_ui.has_method("set_terrain_manager"):
 		push_error("WorldRoot: Instantiated node is not WorldBuilderUI")
 		return
 	
-	# Add UI to scene tree
-	add_child(world_builder_ui, true)
+	# Add UI to scene tree as a CanvasLayer child for proper overlay
+	var canvas_layer: CanvasLayer = CanvasLayer.new()
+	canvas_layer.name = "UICanvasLayer"
+	add_child(canvas_layer, true)
+	canvas_layer.add_child(world_builder_ui, true)
+	
+	print("WorldRoot: WorldBuilderUI added to scene tree")
 	
 	# Apply project theme
 	var theme: Theme = load("res://themes/bg3_theme.tres")
 	if theme != null:
 		world_builder_ui.theme = theme
+		print("WorldRoot: Theme applied to WorldBuilderUI")
+	else:
+		push_warning("WorldRoot: Failed to load bg3_theme.tres")
 	
 	# Connect UI to terrain manager
 	world_builder_ui.set_terrain_manager(terrain_manager)
+	print("WorldRoot: Terrain manager connected to WorldBuilderUI")
 	
-	# Position UI (optional: can be adjusted in editor)
+	# Position UI - make it larger and more visible (80% width, 80% height)
 	world_builder_ui.anchor_left = 0.0
 	world_builder_ui.anchor_top = 0.0
-	world_builder_ui.anchor_right = 0.4
-	world_builder_ui.anchor_bottom = 0.6
+	world_builder_ui.anchor_right = 0.8
+	world_builder_ui.anchor_bottom = 0.8
 	world_builder_ui.offset_left = 10.0
 	world_builder_ui.offset_top = 10.0
+	
+	# Ensure UI is visible
+	world_builder_ui.visible = true
+	world_builder_ui.mouse_filter = Control.MOUSE_FILTER_PASS
+	
+	print("WorldRoot: WorldBuilderUI positioned and made visible")
+	print("WorldRoot: UI size: ", world_builder_ui.size, " position: ", world_builder_ui.position)
 
 
 func _exit_tree() -> void:

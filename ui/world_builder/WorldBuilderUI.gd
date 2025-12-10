@@ -28,8 +28,10 @@ var current_params: Dictionary = {}
 func _ready() -> void:
 	_load_ui_config()
 	_apply_theme()
+	_ensure_visibility()
 	_build_ui_from_config()
 	_setup_ui_connections()
+	print("WorldBuilderUI: Ready and visible")
 
 
 func _load_ui_config() -> void:
@@ -61,6 +63,32 @@ func _apply_theme() -> void:
 		self.theme = theme
 		if tab_container != null:
 			tab_container.theme = theme
+
+
+func _ensure_visibility() -> void:
+	"""Ensure UI elements are visible with proper styling."""
+	# Ensure root Control is visible
+	self.visible = true
+	self.mouse_filter = Control.MOUSE_FILTER_PASS
+	
+	# Get background panel and ensure it's visible
+	var background_panel: Panel = $BackgroundPanel
+	if background_panel != null:
+		background_panel.visible = true
+		# Apply a visible background style
+		var style_box: StyleBoxFlat = StyleBoxFlat.new()
+		style_box.bg_color = Color(0.15, 0.12, 0.1, 0.95)  # Dark brown with high opacity
+		style_box.border_width_left = 3
+		style_box.border_width_top = 3
+		style_box.border_width_right = 3
+		style_box.border_width_bottom = 3
+		style_box.border_color = Color(0.85, 0.7, 0.4, 1.0)  # Gold border
+		style_box.corner_radius_top_left = 8
+		style_box.corner_radius_top_right = 8
+		style_box.corner_radius_bottom_right = 8
+		style_box.corner_radius_bottom_left = 8
+		background_panel.add_theme_stylebox_override("panel", style_box)
+		print("WorldBuilderUI: Background panel styled and visible")
 
 
 func _build_ui_from_config() -> void:
