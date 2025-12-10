@@ -31,6 +31,12 @@ var step_data: Dictionary = {}
 ## Map icons data
 var map_icons_data: Dictionary = {}
 
+## Biomes data
+var biomes_data: Dictionary = {}
+
+## Civilizations data
+var civilizations_data: Dictionary = {}
+
 ## Placed icons on 2D map
 var placed_icons: Array[IconNode] = []
 
@@ -88,6 +94,46 @@ func _load_map_icons() -> void:
 	
 	map_icons_data = json.data
 	print("WorldBuilderUI: Loaded ", map_icons_data.get("icons", []).size(), " map icon definitions")
+
+
+func _load_biomes() -> void:
+	"""Load biomes configuration from JSON."""
+	var file: FileAccess = FileAccess.open(BIOMES_PATH, FileAccess.READ)
+	if file == null:
+		push_error("WorldBuilderUI: Failed to load biomes from " + BIOMES_PATH)
+		return
+	
+	var json_string: String = file.get_as_text()
+	file.close()
+	
+	var json: JSON = JSON.new()
+	var parse_result: Error = json.parse(json_string)
+	if parse_result != OK:
+		push_error("WorldBuilderUI: Failed to parse biomes JSON: " + json.get_error_message())
+		return
+	
+	biomes_data = json.data
+	print("WorldBuilderUI: Loaded ", biomes_data.get("biomes", []).size(), " biome definitions")
+
+
+func _load_civilizations() -> void:
+	"""Load civilizations configuration from JSON."""
+	var file: FileAccess = FileAccess.open(CIVILIZATIONS_PATH, FileAccess.READ)
+	if file == null:
+		push_error("WorldBuilderUI: Failed to load civilizations from " + CIVILIZATIONS_PATH)
+		return
+	
+	var json_string: String = file.get_as_text()
+	file.close()
+	
+	var json: JSON = JSON.new()
+	var parse_result: Error = json.parse(json_string)
+	if parse_result != OK:
+		push_error("WorldBuilderUI: Failed to parse civilizations JSON: " + json.get_error_message())
+		return
+	
+	civilizations_data = json.data
+	print("WorldBuilderUI: Loaded ", civilizations_data.get("civilizations", []).size(), " civilization definitions")
 
 
 func _apply_theme() -> void:
@@ -713,6 +759,49 @@ func _create_step_biomes(parent: VBoxContainer) -> void:
 	button_container.add_child(generate_button)
 	container.add_child(button_container)
 	control_references["Biomes/generate_biomes"] = generate_button
+
+
+func _create_step_structures(parent: VBoxContainer) -> void:
+	"""Create Step 6: Structures & Civilizations content."""
+	var step_panel: Panel = Panel.new()
+	step_panel.name = "StepStructures"
+	step_panel.visible = (current_step == 5)
+	parent.add_child(step_panel)
+	
+	var container: VBoxContainer = VBoxContainer.new()
+	container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	container.add_theme_constant_override("separation", 10)
+	step_panel.add_child(container)
+	
+	# Info label
+	var info_label: Label = Label.new()
+	info_label.text = "City/Town/Village icons from Step 2 will be processed here.\nClick 'Process Cities' to assign civilizations."
+	info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	container.add_child(info_label)
+	
+	# Process cities button
+	var process_button: Button = Button.new()
+	process_button.name = "process_cities"
+	process_button.text = "Process Cities from Map"
+	process_button.pressed.connect(_on_process_cities_pressed)
+	container.add_child(process_button)
+	control_references["Structures & Civilizations/process_cities"] = process_button
+	
+	# City list (will be populated when processing)
+	var city_list_label: Label = Label.new()
+	city_list_label.text = "Cities:"
+	container.add_child(city_list_label)
+	
+	var city_list: ItemList = ItemList.new()
+	city_list.name = "city_list"
+	city_list.custom_minimum_size = Vector2(0, 200)
+	city_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	city_list.item_selected.connect(_on_city_selected)
+	container.add_child(city_list)
+	control_references["Structures & Civilizations/city_list"] = city_list
+	
+	step_data["Structures & Civilizations"] = {}
+	step_data["Structures & Civilizations"]["cities"] = []
 
 
 func _create_step_placeholder(parent: VBoxContainer, step_index: int) -> void:

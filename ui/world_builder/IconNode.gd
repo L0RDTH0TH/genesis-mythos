@@ -5,6 +5,7 @@
 # ╚═══════════════════════════════════════════════════════════
 
 extends Node2D
+class_name IconNode
 
 ## Icon ID from map_icons.json
 var icon_id: String = ""
