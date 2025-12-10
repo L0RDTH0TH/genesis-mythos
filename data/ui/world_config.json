@@ -38,11 +38,11 @@
 							"tooltip": "Select world size preset. Larger sizes take longer to generate but provide more detail.",
 							"default": 2,
 							"options": [
-								{"value": 1, "label": "Tiny (256×256)"},
+								{"value": 0, "label": "Tiny (256×256)"},
 								{"value": 1, "label": "Small (384×384)"},
 								{"value": 2, "label": "Medium (512×512)"},
 								{"value": 3, "label": "Large (768×768)"},
-								{"value": 3, "label": "Huge (1024×1024)"}
+								{"value": 4, "label": "Huge (1024×1024)"}
 							]
 						},
 						{
