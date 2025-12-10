@@ -768,6 +768,10 @@ func _update_step_display() -> void:
 	# Update seed in Step 3 when entering terrain step
 	if current_step == 2:
 		_update_terrain_seed_from_step1()
+	
+	# Update export summary when entering export step
+	if current_step == 8:
+		_update_export_summary()
 
 
 func _on_next_pressed() -> void:
@@ -1102,6 +1106,165 @@ func _generate_3d_world() -> void:
 			terrain_manager.place_structure(icon.icon_id + "_" + icon.icon_type, world_pos, 1.0)
 	
 	print("WorldBuilderUI: 3D world generation complete")
+
+
+func _create_step_environment(parent: VBoxContainer) -> void:
+	"""Create Step 7: Environment content."""
+	var step_panel: Panel = Panel.new()
+	step_panel.name = "StepEnvironment"
+	step_panel.visible = (current_step == 6)
+	parent.add_child(step_panel)
+	
+	var container: VBoxContainer = VBoxContainer.new()
+	container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	container.add_theme_constant_override("separation", 10)
+	step_panel.add_child(container)
+	
+	# Fog density
+	var fog_density_container: HBoxContainer = HBoxContainer.new()
+	var fog_density_label: Label = Label.new()
+	fog_density_label.text = "Fog Density:"
+	fog_density_label.custom_minimum_size = Vector2(200, 0)
+	fog_density_container.add_child(fog_density_label)
+	
+	var fog_density_slider: HSlider = HSlider.new()
+	fog_density_slider.name = "fog_density"
+	fog_density_slider.min_value = 0.0
+	fog_density_slider.max_value = 1.0
+	fog_density_slider.step = 0.01
+	fog_density_slider.value = 0.1
+	fog_density_slider.value_changed.connect(func(v): _on_environment_param_changed("fog_density", v))
+	fog_density_container.add_child(fog_density_slider)
+	
+	var fog_density_value_label: Label = Label.new()
+	fog_density_value_label.name = "fog_density_value"
+	fog_density_value_label.custom_minimum_size = Vector2(80, 0)
+	fog_density_value_label.text = "0.10"
+	fog_density_container.add_child(fog_density_value_label)
+	container.add_child(fog_density_container)
+	control_references["Environment/fog_density"] = fog_density_slider
+	control_references["Environment/fog_density_value"] = fog_density_value_label
+	step_data["Environment"] = {}
+	step_data["Environment"]["fog_density"] = 0.1
+	
+	# Fog color
+	var fog_color_container: HBoxContainer = HBoxContainer.new()
+	var fog_color_label: Label = Label.new()
+	fog_color_label.text = "Fog Color:"
+	fog_color_label.custom_minimum_size = Vector2(200, 0)
+	fog_color_container.add_child(fog_color_label)
+	
+	var fog_color_picker: ColorPickerButton = ColorPickerButton.new()
+	fog_color_picker.name = "fog_color"
+	fog_color_picker.color = Color(0.8, 0.8, 0.9, 1.0)
+	fog_color_picker.color_changed.connect(func(c): _on_environment_param_changed("fog_color", c))
+	fog_color_container.add_child(fog_color_picker)
+	container.add_child(fog_color_container)
+	control_references["Environment/fog_color"] = fog_color_picker
+	step_data["Environment"]["fog_color"] = Color(0.8, 0.8, 0.9, 1.0)
+	
+	# Sky type
+	var sky_type_container: HBoxContainer = HBoxContainer.new()
+	var sky_type_label: Label = Label.new()
+	sky_type_label.text = "Sky Type:"
+	sky_type_label.custom_minimum_size = Vector2(200, 0)
+	sky_type_container.add_child(sky_type_label)
+	
+	var sky_type_option: OptionButton = OptionButton.new()
+	sky_type_option.name = "sky_type"
+	sky_type_option.add_item("Procedural")
+	sky_type_option.add_item("HDRI")
+	sky_type_option.add_item("Custom Gradient")
+	sky_type_option.selected = 0
+	sky_type_option.item_selected.connect(func(idx): _on_environment_param_changed("sky_type", idx))
+	sky_type_container.add_child(sky_type_option)
+	container.add_child(sky_type_container)
+	control_references["Environment/sky_type"] = sky_type_option
+	step_data["Environment"]["sky_type"] = 0
+	
+	# Ambient light intensity
+	var ambient_intensity_container: HBoxContainer = HBoxContainer.new()
+	var ambient_intensity_label: Label = Label.new()
+	ambient_intensity_label.text = "Ambient Light Intensity:"
+	ambient_intensity_label.custom_minimum_size = Vector2(200, 0)
+	ambient_intensity_container.add_child(ambient_intensity_label)
+	
+	var ambient_intensity_slider: HSlider = HSlider.new()
+	ambient_intensity_slider.name = "ambient_intensity"
+	ambient_intensity_slider.min_value = 0.0
+	ambient_intensity_slider.max_value = 2.0
+	ambient_intensity_slider.step = 0.01
+	ambient_intensity_slider.value = 0.3
+	ambient_intensity_slider.value_changed.connect(func(v): _on_environment_param_changed("ambient_intensity", v))
+	ambient_intensity_container.add_child(ambient_intensity_slider)
+	
+	var ambient_intensity_value_label: Label = Label.new()
+	ambient_intensity_value_label.name = "ambient_intensity_value"
+	ambient_intensity_value_label.custom_minimum_size = Vector2(80, 0)
+	ambient_intensity_value_label.text = "0.30"
+	ambient_intensity_container.add_child(ambient_intensity_value_label)
+	container.add_child(ambient_intensity_container)
+	control_references["Environment/ambient_intensity"] = ambient_intensity_slider
+	control_references["Environment/ambient_intensity_value"] = ambient_intensity_value_label
+	step_data["Environment"]["ambient_intensity"] = 0.3
+	
+	# Ambient light color
+	var ambient_color_container: HBoxContainer = HBoxContainer.new()
+	var ambient_color_label: Label = Label.new()
+	ambient_color_label.text = "Ambient Light Color:"
+	ambient_color_label.custom_minimum_size = Vector2(200, 0)
+	ambient_color_container.add_child(ambient_color_label)
+	
+	var ambient_color_picker: ColorPickerButton = ColorPickerButton.new()
+	ambient_color_picker.name = "ambient_color"
+	ambient_color_picker.color = Color(0.3, 0.3, 0.3, 1.0)
+	ambient_color_picker.color_changed.connect(func(c): _on_environment_param_changed("ambient_color", c))
+	ambient_color_container.add_child(ambient_color_picker)
+	container.add_child(ambient_color_container)
+	control_references["Environment/ambient_color"] = ambient_color_picker
+	step_data["Environment"]["ambient_color"] = Color(0.3, 0.3, 0.3, 1.0)
+	
+	# Water level
+	var water_level_container: HBoxContainer = HBoxContainer.new()
+	var water_level_label: Label = Label.new()
+	water_level_label.text = "Water Level:"
+	water_level_label.custom_minimum_size = Vector2(200, 0)
+	water_level_container.add_child(water_level_label)
+	
+	var water_level_slider: HSlider = HSlider.new()
+	water_level_slider.name = "water_level"
+	water_level_slider.min_value = -50.0
+	water_level_slider.max_value = 50.0
+	water_level_slider.step = 0.1
+	water_level_slider.value = 0.0
+	water_level_slider.value_changed.connect(func(v): _on_environment_param_changed("water_level", v))
+	water_level_container.add_child(water_level_slider)
+	
+	var water_level_value_label: Label = Label.new()
+	water_level_value_label.name = "water_level_value"
+	water_level_value_label.custom_minimum_size = Vector2(80, 0)
+	water_level_value_label.text = "0.0"
+	water_level_container.add_child(water_level_value_label)
+	container.add_child(water_level_container)
+	control_references["Environment/water_level"] = water_level_slider
+	control_references["Environment/water_level_value"] = water_level_value_label
+	step_data["Environment"]["water_level"] = 0.0
+	
+	# Ocean shader toggle
+	var ocean_shader_container: HBoxContainer = HBoxContainer.new()
+	var ocean_shader_label: Label = Label.new()
+	ocean_shader_label.text = "Enable Ocean Shader:"
+	ocean_shader_label.custom_minimum_size = Vector2(200, 0)
+	ocean_shader_container.add_child(ocean_shader_label)
+	
+	var ocean_shader_checkbox: CheckBox = CheckBox.new()
+	ocean_shader_checkbox.name = "ocean_shader"
+	ocean_shader_checkbox.button_pressed = true
+	ocean_shader_checkbox.toggled.connect(func(pressed): _on_environment_param_changed("ocean_shader", pressed))
+	ocean_shader_container.add_child(ocean_shader_checkbox)
+	container.add_child(ocean_shader_container)
+	control_references["Environment/ocean_shader"] = ocean_shader_checkbox
+	step_data["Environment"]["ocean_shader"] = true
 
 
 func _create_step_resources(parent: VBoxContainer) -> void:
@@ -1603,3 +1766,78 @@ func _update_environment_live() -> void:
 	# Update environment if terrain manager supports it
 	if terrain_manager.has_method("update_environment"):
 		terrain_manager.update_environment(time_of_day, fog_density, 1.0, "clear", Color(0.5, 0.7, 1.0, 1.0), ambient_color * ambient_intensity)
+
+
+func _update_export_summary() -> void:
+	"""Update export summary panel with world data."""
+	var summary_text: RichTextLabel = control_references.get("Export/summary_text") as RichTextLabel
+	if summary_text == null:
+		return
+	
+	var summary: String = "[b]World Summary[/b]\n\n"
+	summary += "Seed: " + str(step_data.get("Seed & Size", {}).get("seed", 12345)) + "\n"
+	summary += "Size: " + str(step_data.get("Seed & Size", {}).get("width", 1000)) + "x" + str(step_data.get("Seed & Size", {}).get("height", 1000)) + "\n"
+	summary += "Icons Placed: " + str(placed_icons.size()) + "\n"
+	summary += "Cities: " + str(step_data.get("Structures & Civilizations", {}).get("cities", []).size()) + "\n"
+	summary_text.text = summary
+
+
+func _on_save_world_config_pressed() -> void:
+	"""Save world configuration to .world resource."""
+	var world_name: String = step_data.get("Export", {}).get("world_name", "MyWorld")
+	var save_path: String = "user://worlds/" + world_name + ".json"
+	
+	DirAccess.make_dir_recursive_absolute("user://worlds/")
+	
+	var file: FileAccess = FileAccess.open(save_path, FileAccess.WRITE)
+	if file == null:
+		push_error("WorldBuilderUI: Failed to save world config to " + save_path)
+		return
+	
+	var save_data: Dictionary = {
+		"world_name": world_name,
+		"step_data": step_data.duplicate(true),
+		"timestamp": Time.get_datetime_string_from_system()
+	}
+	
+	file.store_string(JSON.stringify(save_data, "\t"))
+	file.close()
+	
+	print("WorldBuilderUI: Saved world config to " + save_path)
+
+
+func _on_export_heightmap_pressed() -> void:
+	"""Export terrain heightmap as 16-bit PNG."""
+	if terrain_manager == null or terrain_manager.terrain == null:
+		push_warning("WorldBuilderUI: No terrain available for export")
+		return
+	
+	var world_name: String = step_data.get("Export", {}).get("world_name", "MyWorld")
+	var export_path: String = "user://exports/" + world_name + "_heightmap.png"
+	
+	DirAccess.make_dir_recursive_absolute("user://exports/")
+	
+	# TODO: Implement actual heightmap export from Terrain3D
+	print("WorldBuilderUI: Heightmap export to " + export_path + " (not yet implemented)")
+
+
+func _on_export_biome_map_pressed() -> void:
+	"""Export biome map as PNG."""
+	var world_name: String = step_data.get("Export", {}).get("world_name", "MyWorld")
+	var export_path: String = "user://exports/" + world_name + "_biomes.png"
+	
+	DirAccess.make_dir_recursive_absolute("user://exports/")
+	
+	# TODO: Implement biome map export
+	print("WorldBuilderUI: Biome map export to " + export_path + " (not yet implemented)")
+
+
+func _on_generate_scene_pressed() -> void:
+	"""Generate full 3D scene in res://worlds/."""
+	var world_name: String = step_data.get("Export", {}).get("world_name", "MyWorld")
+	var scene_path: String = "res://worlds/" + world_name + ".tscn"
+	
+	DirAccess.make_dir_recursive_absolute("res://worlds/")
+	
+	# TODO: Implement scene generation
+	print("WorldBuilderUI: Generating 3D scene at " + scene_path + " (not yet implemented)")
