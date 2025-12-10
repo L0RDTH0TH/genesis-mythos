@@ -25,6 +25,10 @@ window/size/windowed_scale=0.75
 window/stretch/mode="viewport"
 window/stretch/aspect="keep"
 
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/terrain_3d/plugin.cfg")
+
 [rendering]
 renderer/rendering_method="forward_plus"
 rendering_method="vulkan"

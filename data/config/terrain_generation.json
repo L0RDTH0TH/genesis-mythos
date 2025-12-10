@@ -1,0 +1,34 @@
+{
+  "noise": {
+    "seed": 12345,
+    "frequency": 0.0005,
+    "type": "Perlin",
+    "octaves": 4,
+    "lacunarity": 2.0,
+    "gain": 0.5
+  },
+  "height": {
+    "min": 0.0,
+    "max": 150.0,
+    "scale": 1.0
+  },
+  "textures": [
+    {
+      "id": 0,
+      "name": "Grass",
+      "weight": 0.8,
+      "uv_scale": 0.1
+    },
+    {
+      "id": 1,
+      "name": "Dirt",
+      "weight": 0.2,
+      "uv_scale": 0.03
+    }
+  ],
+  "terrain": {
+    "region_size": 1024,
+    "mesh_size": 64,
+    "vertex_spacing": 1.0
+  }
+}
