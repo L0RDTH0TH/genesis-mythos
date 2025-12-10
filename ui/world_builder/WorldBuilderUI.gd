@@ -50,6 +50,7 @@ var current_icon_group_index: int = 0
 ## Paths
 const MAP_ICONS_PATH: String = "res://data/map_icons.json"
 const UI_CONFIG_PATH: String = "res://data/config/world_builder_ui.json"
+const BIOMES_PATH: String = "res://data/biomes.json"
 
 ## Control references
 var control_references: Dictionary = {}
@@ -57,6 +58,7 @@ var control_references: Dictionary = {}
 
 func _ready() -> void:
 	_load_map_icons()
+	_load_biomes()
 	_apply_theme()
 	_ensure_visibility()
 	_setup_navigation()
@@ -151,8 +153,11 @@ func _setup_step_content() -> void:
 	# Create step 4: Climate
 	_create_step_climate(step_container)
 	
-	# Create remaining steps (5-9) as placeholders
-	for i in range(4, STEPS.size()):
+	# Create step 5: Biomes
+	_create_step_biomes(step_container)
+	
+	# Create remaining steps (6-9) as placeholders
+	for i in range(5, STEPS.size()):
 		_create_step_placeholder(step_container, i)
 
 
@@ -621,8 +626,87 @@ func _create_step_climate(parent: VBoxContainer) -> void:
 	step_data["Climate"]["time_of_day"] = 12.0
 
 
+func _create_step_biomes(parent: VBoxContainer) -> void:
+	"""Create Step 5: Biomes content."""
+	var step_panel: Panel = Panel.new()
+	step_panel.name = "StepBiomes"
+	step_panel.visible = (current_step == 4)
+	parent.add_child(step_panel)
+	
+	var container: VBoxContainer = VBoxContainer.new()
+	container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	container.add_theme_constant_override("separation", 10)
+	step_panel.add_child(container)
+	
+	# Biome overlay toggle
+	var overlay_container: HBoxContainer = HBoxContainer.new()
+	var overlay_label: Label = Label.new()
+	overlay_label.text = "Show Biome Overlay:"
+	overlay_label.custom_minimum_size = Vector2(200, 0)
+	overlay_container.add_child(overlay_label)
+	
+	var overlay_checkbox: CheckBox = CheckBox.new()
+	overlay_checkbox.name = "show_biome_overlay"
+	overlay_checkbox.button_pressed = false
+	overlay_checkbox.toggled.connect(func(pressed): _on_biome_overlay_toggled(pressed))
+	overlay_container.add_child(overlay_checkbox)
+	container.add_child(overlay_container)
+	control_references["Biomes/show_biome_overlay"] = overlay_checkbox
+	step_data["Biomes"] = {}
+	step_data["Biomes"]["show_biome_overlay"] = false
+	
+	# Biome selection list
+	var biome_list_label: Label = Label.new()
+	biome_list_label.text = "Available Biomes:"
+	container.add_child(biome_list_label)
+	
+	var biome_list: ItemList = ItemList.new()
+	biome_list.name = "biome_list"
+	biome_list.custom_minimum_size = Vector2(0, 200)
+	biome_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	
+	# Populate biome list from JSON
+	var biomes: Array = biomes_data.get("biomes", [])
+	for biome_data: Dictionary in biomes:
+		var biome_name: String = biome_data.get("name", "Unknown")
+		biome_list.add_item(biome_name)
+	
+	biome_list.item_selected.connect(func(idx): _on_biome_selected(idx))
+	container.add_child(biome_list)
+	control_references["Biomes/biome_list"] = biome_list
+	
+	# Generation mode
+	var mode_container: HBoxContainer = HBoxContainer.new()
+	var mode_label: Label = Label.new()
+	mode_label.text = "Generation Mode:"
+	mode_label.custom_minimum_size = Vector2(200, 0)
+	mode_container.add_child(mode_label)
+	
+	var mode_option: OptionButton = OptionButton.new()
+	mode_option.name = "generation_mode"
+	mode_option.add_item("Manual Painting")
+	mode_option.add_item("Auto-Generate from Climate")
+	mode_option.add_item("Auto-Generate from Height")
+	mode_option.selected = 1  # Default to auto-generate from climate
+	mode_option.item_selected.connect(func(idx): _on_biome_generation_mode_changed(idx))
+	mode_container.add_child(mode_option)
+	container.add_child(mode_container)
+	control_references["Biomes/generation_mode"] = mode_option
+	step_data["Biomes"]["generation_mode"] = 1
+	
+	# Generate/Auto-Apply button
+	var button_container: HBoxContainer = HBoxContainer.new()
+	var generate_button: Button = Button.new()
+	generate_button.name = "generate_biomes"
+	generate_button.text = "Generate Biomes"
+	generate_button.pressed.connect(_on_generate_biomes_pressed)
+	button_container.add_child(generate_button)
+	container.add_child(button_container)
+	control_references["Biomes/generate_biomes"] = generate_button
+
+
 func _create_step_placeholder(parent: VBoxContainer, step_index: int) -> void:
-	"""Create placeholder content for steps 5-9."""
+	"""Create placeholder content for steps 6-9."""
 	var step_panel: Panel = Panel.new()
 	step_panel.name = "Step" + str(step_index + 1)
 	step_panel.visible = (current_step == step_index)
@@ -1029,3 +1113,151 @@ func _on_terrain_generated(_terrain) -> void:  # _terrain: Terrain3D - type hint
 func _on_terrain_updated() -> void:
 	"""Handle terrain update signal."""
 	pass
+
+
+func _on_climate_param_changed(param_name: String, value: Variant) -> void:
+	"""Handle climate parameter changes with live updates."""
+	step_data["Climate"][param_name] = value
+	
+	# Update value labels
+	match param_name:
+		"temperature_intensity":
+			var label: Label = control_references.get("Climate/temperature_intensity_value") as Label
+			if label != null:
+				label.text = "%.2f" % value
+		"rainfall_intensity":
+			var label: Label = control_references.get("Climate/rainfall_intensity_value") as Label
+			if label != null:
+				label.text = "%.2f" % value
+		"wind_strength":
+			var label: Label = control_references.get("Climate/wind_strength_value") as Label
+			if label != null:
+				label.text = "%.1f" % value
+		"time_of_day":
+			var label: Label = control_references.get("Climate/time_of_day_value") as Label
+			if label != null:
+				label.text = "%.1f" % value
+	
+	# Live climate update (affects sky in real time)
+	call_deferred("_update_climate_live")
+
+
+func _update_climate_live() -> void:
+	"""Update climate effects in real-time."""
+	if terrain_manager == null:
+		return
+	
+	# Only update if we're on the climate step
+	if current_step != 3:
+		return
+	
+	var climate_params: Dictionary = step_data.get("Climate", {})
+	if climate_params.is_empty():
+		return
+	
+	# Update time of day (affects sky)
+	var time_of_day: float = climate_params.get("time_of_day", 12.0)
+	var wind_strength: float = climate_params.get("wind_strength", 1.0)
+	var wind_dir_x: float = climate_params.get("wind_direction_x", 1.0)
+	var wind_dir_y: float = climate_params.get("wind_direction_y", 0.0)
+	
+	# Update environment if terrain manager supports it
+	if terrain_manager.has_method("update_environment"):
+		terrain_manager.update_environment(time_of_day, 0.1, wind_strength, "clear", Color(0.5, 0.7, 1.0, 1.0), Color(0.3, 0.3, 0.3, 1.0))
+
+
+func _on_biome_overlay_toggled(pressed: bool) -> void:
+	"""Handle biome overlay toggle."""
+	step_data["Biomes"]["show_biome_overlay"] = pressed
+	print("WorldBuilderUI: Biome overlay ", "enabled" if pressed else "disabled")
+
+
+func _on_biome_selected(index: int) -> void:
+	"""Handle biome selection from list."""
+	var biomes: Array = biomes_data.get("biomes", [])
+	if index >= 0 and index < biomes.size():
+		var biome_data: Dictionary = biomes[index]
+		step_data["Biomes"]["selected_biome"] = biome_data.get("id", "")
+		print("WorldBuilderUI: Selected biome: ", biome_data.get("name", "Unknown"))
+
+
+func _on_biome_generation_mode_changed(index: int) -> void:
+	"""Handle biome generation mode change."""
+	step_data["Biomes"]["generation_mode"] = index
+	print("WorldBuilderUI: Biome generation mode changed to: ", index)
+
+
+func _on_generate_biomes_pressed() -> void:
+	"""Handle Generate Biomes button press."""
+	var mode: int = step_data.get("Biomes", {}).get("generation_mode", 1)
+	
+	match mode:
+		0:  # Manual Painting
+			print("WorldBuilderUI: Manual biome painting mode (not yet implemented)")
+		1:  # Auto-Generate from Climate
+			_generate_biomes_from_climate()
+		2:  # Auto-Generate from Height
+			_generate_biomes_from_height()
+	
+	# Show overlay if enabled
+	if step_data.get("Biomes", {}).get("show_biome_overlay", false):
+		_show_biome_overlay()
+
+
+func _generate_biomes_from_climate() -> void:
+	"""Generate biomes based on climate parameters."""
+	print("WorldBuilderUI: Generating biomes from climate...")
+	
+	var climate_params: Dictionary = step_data.get("Climate", {})
+	var temperature_intensity: float = climate_params.get("temperature_intensity", 0.5)
+	var rainfall_intensity: float = climate_params.get("rainfall_intensity", 0.5)
+	
+	# Map intensity (0-1) to actual ranges
+	# Temperature: -50 to 50 degrees
+	var temperature: float = lerp(-50.0, 50.0, temperature_intensity)
+	# Rainfall: 0 to 300 mm
+	var rainfall: float = lerp(0.0, 300.0, rainfall_intensity)
+	
+	# Find matching biome
+	var biomes: Array = biomes_data.get("biomes", [])
+	var matched_biome: Dictionary = {}
+	
+	for biome: Dictionary in biomes:
+		var temp_range: Array = biome.get("temperature_range", [])
+		var rain_range: Array = biome.get("rainfall_range", [])
+		
+		if temp_range.size() >= 2 and rain_range.size() >= 2:
+			if temperature >= temp_range[0] and temperature <= temp_range[1]:
+				if rainfall >= rain_range[0] and rainfall <= rain_range[1]:
+					matched_biome = biome
+					break
+	
+	if matched_biome.is_empty() and biomes.size() > 0:
+		# Default to first biome if no match
+		matched_biome = biomes[0]
+	
+	if not matched_biome.is_empty():
+		step_data["Biomes"]["generated_biome"] = matched_biome.get("id", "")
+		print("WorldBuilderUI: Generated biome: ", matched_biome.get("name", "Unknown"))
+		
+		# Apply biome to terrain if manager supports it
+		if terrain_manager != null and terrain_manager.has_method("apply_biome_map"):
+			var biome_color_array: Array = matched_biome.get("color", [0.5, 0.5, 0.5, 1.0])
+			var biome_color: Color = Color(biome_color_array[0], biome_color_array[1], biome_color_array[2], biome_color_array[3])
+			terrain_manager.apply_biome_map(matched_biome.get("id", ""), 0.5, biome_color)
+
+
+func _generate_biomes_from_height() -> void:
+	"""Generate biomes based on terrain height."""
+	print("WorldBuilderUI: Generating biomes from height...")
+	
+	# Simple height-based biome assignment
+	# Higher = mountain/tundra, lower = ocean/swamp
+	step_data["Biomes"]["generated_biome"] = "mountain"  # Placeholder
+	print("WorldBuilderUI: Height-based biome generation (simplified)")
+
+
+func _show_biome_overlay() -> void:
+	"""Show biome overlay on 2D map."""
+	print("WorldBuilderUI: Showing biome overlay on 2D map")
+	# TODO: Implement visual overlay on map canvas
