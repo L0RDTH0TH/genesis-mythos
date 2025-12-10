@@ -161,8 +161,11 @@ func _setup_step_content() -> void:
 	# Create step 6: Structures & Civilizations
 	_create_step_structures(step_container)
 	
-	# Create remaining steps (7-9) as placeholders
-	for i in range(6, STEPS.size()):
+	# Create step 7: Environment
+	_create_step_environment(step_container)
+	
+	# Create remaining steps (8-9) as placeholders
+	for i in range(7, STEPS.size()):
 		_create_step_placeholder(step_container, i)
 
 
