@@ -21,9 +21,9 @@ func _ready() -> void:
 
 func load_config() -> void:
 	if ResourceLoader.exists(TERRAIN_CONFIG_PATH):
-		var file := FileAccess.open(TERRAIN_CONFIG_PATH, FileAccess.READ)
-		var json_text := file.get_as_text()
-		var parsed := JSON.parse_string(json_text)
+		var file: FileAccess = FileAccess.open(TERRAIN_CONFIG_PATH, FileAccess.READ)
+		var json_text: String = file.get_as_text()
+		var parsed: Variant = JSON.parse_string(json_text)
 		if parsed is Dictionary:
 			data_directory = parsed.get("data_dir", data_directory)
 	else:
