@@ -86,6 +86,8 @@ Files in this directory are kept for reference but are no longer actively mainta
 
 - [API Reference](./api/API_REFERENCE.md)
 - [Data Schemas](./schemas/DATA_SCHEMAS.md)
+- [World Builder Wizard Guide](./WORLD_BUILDER_WIZARD_GUIDE.md) - **NEW**: Complete guide to the wizard-style world builder
+- [World Builder API Reference](./WORLD_BUILDER_API_REFERENCE.md) - **NEW**: API documentation for world builder classes
 - [World Generation System](./world_generation.md)
 - [Testing Documentation](./testing/README.md)
 - [Technical Documentation](./technical/CurrentVisualPipelineDocumentation.gd)

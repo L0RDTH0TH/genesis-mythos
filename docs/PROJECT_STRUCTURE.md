@@ -87,13 +87,22 @@ JSON data files and configuration files.
 ```
 data/
 ├── config/           # Configuration files
-│   └── logging_config.json
-└── ui/               # UI configuration data
+│   ├── logging_config.json
+│   ├── terrain_generation.json
+│   └── world_builder_ui.json
+├── map_icons.json    # 2D map icon definitions
+├── biomes.json       # Biome definitions with temperature/rainfall ranges
+├── civilizations.json # Civilization types for city assignment
+└── resources.json    # Resource type definitions
 ```
 
 **Purpose**: All data-driven content. JSON files define game content that can be modified without code changes.
 
-**Note**: Previously contained character creation and world generation data files, which have been removed.
+**Key Files**:
+- `map_icons.json` - Icon definitions for 2D map maker (forest, mountain, city, etc.)
+- `biomes.json` - Biome definitions with climate ranges and colors
+- `civilizations.json` - Civilization types (Human Kingdom, Elven Enclave, etc.)
+- `resources.json` - Resource types (Iron, Gold, Mana Crystal, etc.)
 
 ### `docs/`
 Project documentation.
