@@ -164,9 +164,11 @@ func _setup_step_content() -> void:
 	# Create step 7: Environment
 	_create_step_environment(step_container)
 	
-	# Create remaining steps (8-9) as placeholders
-	for i in range(7, STEPS.size()):
-		_create_step_placeholder(step_container, i)
+	# Create step 8: Resources & Magic
+	_create_step_resources(step_container)
+	
+	# Create step 9: Export
+	_create_step_export(step_container)
 
 
 func _create_step_seed_size(parent: VBoxContainer) -> void:
@@ -1102,6 +1104,142 @@ func _generate_3d_world() -> void:
 	print("WorldBuilderUI: 3D world generation complete")
 
 
+func _create_step_resources(parent: VBoxContainer) -> void:
+	"""Create Step 8: Resources & Magic content."""
+	var step_panel: Panel = Panel.new()
+	step_panel.name = "StepResources"
+	step_panel.visible = (current_step == 7)
+	parent.add_child(step_panel)
+	
+	var container: VBoxContainer = VBoxContainer.new()
+	container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	container.add_theme_constant_override("separation", 10)
+	step_panel.add_child(container)
+	
+	# Resource overlay toggle
+	var overlay_container: HBoxContainer = HBoxContainer.new()
+	var overlay_label: Label = Label.new()
+	overlay_label.text = "Show Resource Overlay:"
+	overlay_label.custom_minimum_size = Vector2(200, 0)
+	overlay_container.add_child(overlay_label)
+	
+	var overlay_checkbox: CheckBox = CheckBox.new()
+	overlay_checkbox.name = "show_resource_overlay"
+	overlay_checkbox.button_pressed = false
+	overlay_checkbox.toggled.connect(func(pressed): step_data["Resources & Magic"]["show_resource_overlay"] = pressed)
+	overlay_container.add_child(overlay_checkbox)
+	container.add_child(overlay_container)
+	control_references["Resources & Magic/show_resource_overlay"] = overlay_checkbox
+	step_data["Resources & Magic"] = {}
+	step_data["Resources & Magic"]["show_resource_overlay"] = false
+	
+	# Magic density
+	var magic_density_container: HBoxContainer = HBoxContainer.new()
+	var magic_density_label: Label = Label.new()
+	magic_density_label.text = "Magic Density:"
+	magic_density_label.custom_minimum_size = Vector2(200, 0)
+	magic_density_container.add_child(magic_density_label)
+	
+	var magic_density_slider: HSlider = HSlider.new()
+	magic_density_slider.name = "magic_density"
+	magic_density_slider.min_value = 0.0
+	magic_density_slider.max_value = 1.0
+	magic_density_slider.step = 0.01
+	magic_density_slider.value = 0.5
+	magic_density_slider.value_changed.connect(func(v): step_data["Resources & Magic"]["magic_density"] = v)
+	magic_density_container.add_child(magic_density_slider)
+	
+	var magic_density_value_label: Label = Label.new()
+	magic_density_value_label.name = "magic_density_value"
+	magic_density_value_label.custom_minimum_size = Vector2(80, 0)
+	magic_density_value_label.text = "0.50"
+	magic_density_container.add_child(magic_density_value_label)
+	container.add_child(magic_density_container)
+	control_references["Resources & Magic/magic_density"] = magic_density_slider
+	control_references["Resources & Magic/magic_density_value"] = magic_density_value_label
+	step_data["Resources & Magic"]["magic_density"] = 0.5
+	
+	# Ley line placement info
+	var ley_line_label: Label = Label.new()
+	ley_line_label.text = "Ley Line Placement: Drag on 2D map to place ley lines"
+	ley_line_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	container.add_child(ley_line_label)
+	step_data["Resources & Magic"]["ley_lines"] = []
+
+
+func _create_step_export(parent: VBoxContainer) -> void:
+	"""Create Step 9: Export content."""
+	var step_panel: Panel = Panel.new()
+	step_panel.name = "StepExport"
+	step_panel.visible = (current_step == 8)
+	parent.add_child(step_panel)
+	
+	var container: VBoxContainer = VBoxContainer.new()
+	container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	container.add_theme_constant_override("separation", 10)
+	step_panel.add_child(container)
+	
+	# World name
+	var name_container: HBoxContainer = HBoxContainer.new()
+	var name_label: Label = Label.new()
+	name_label.text = "World Name:"
+	name_label.custom_minimum_size = Vector2(200, 0)
+	name_container.add_child(name_label)
+	
+	var name_edit: LineEdit = LineEdit.new()
+	name_edit.name = "world_name"
+	name_edit.placeholder_text = "Enter world name..."
+	name_edit.text = "MyWorld"
+	name_edit.text_changed.connect(func(text): step_data["Export"]["world_name"] = text)
+	name_container.add_child(name_edit)
+	container.add_child(name_container)
+	control_references["Export/world_name"] = name_edit
+	step_data["Export"] = {}
+	step_data["Export"]["world_name"] = "MyWorld"
+	
+	# Summary panel
+	var summary_label: Label = Label.new()
+	summary_label.text = "World Summary:"
+	container.add_child(summary_label)
+	
+	var summary_text: RichTextLabel = RichTextLabel.new()
+	summary_text.name = "summary_text"
+	summary_text.custom_minimum_size = Vector2(0, 200)
+	summary_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	summary_text.bbcode_enabled = true
+	container.add_child(summary_text)
+	control_references["Export/summary_text"] = summary_text
+	
+	# Update summary when entering this step
+	call_deferred("_update_export_summary")
+	
+	# Export buttons
+	var buttons_container: VBoxContainer = VBoxContainer.new()
+	buttons_container.add_theme_constant_override("separation", 5)
+	
+	var save_config_button: Button = Button.new()
+	save_config_button.text = "Save World Config"
+	save_config_button.pressed.connect(_on_save_world_config_pressed)
+	buttons_container.add_child(save_config_button)
+	
+	var export_heightmap_button: Button = Button.new()
+	export_heightmap_button.text = "Export Heightmap"
+	export_heightmap_button.pressed.connect(_on_export_heightmap_pressed)
+	buttons_container.add_child(export_heightmap_button)
+	
+	var export_biome_map_button: Button = Button.new()
+	export_biome_map_button.text = "Export Biome Map"
+	export_biome_map_button.pressed.connect(_on_export_biome_map_pressed)
+	buttons_container.add_child(export_biome_map_button)
+	
+	var generate_scene_button: Button = Button.new()
+	generate_scene_button.text = "Generate Full 3D Scene"
+	generate_scene_button.pressed.connect(_on_generate_scene_pressed)
+	buttons_container.add_child(generate_scene_button)
+	
+	container.add_child(buttons_container)
+
+
 func set_terrain_manager(manager) -> void:  # manager: Terrain3DManager - type hint removed
 	"""Set the terrain manager reference."""
 	terrain_manager = manager
@@ -1415,3 +1553,53 @@ func _update_city_list() -> void:
 					city_name += " (" + civ.get("name", "") + ")"
 					break
 		city_list.add_item(city_name)
+
+
+func _on_environment_param_changed(param_name: String, value: Variant) -> void:
+	"""Handle environment parameter changes with live updates."""
+	step_data["Environment"][param_name] = value
+	
+	# Update value labels
+	match param_name:
+		"fog_density":
+			var label: Label = control_references.get("Environment/fog_density_value") as Label
+			if label != null:
+				label.text = "%.2f" % value
+		"ambient_intensity":
+			var label: Label = control_references.get("Environment/ambient_intensity_value") as Label
+			if label != null:
+				label.text = "%.2f" % value
+		"water_level":
+			var label: Label = control_references.get("Environment/water_level_value") as Label
+			if label != null:
+				label.text = "%.1f" % value
+	
+	# Live environment update
+	call_deferred("_update_environment_live")
+
+
+func _update_environment_live() -> void:
+	"""Update environment effects in real-time."""
+	if terrain_manager == null:
+		return
+	
+	# Only update if we're on the environment step
+	if current_step != 6:
+		return
+	
+	var env_params: Dictionary = step_data.get("Environment", {})
+	if env_params.is_empty():
+		return
+	
+	# Get parameters
+	var fog_density: float = env_params.get("fog_density", 0.1)
+	var fog_color: Color = env_params.get("fog_color", Color(0.8, 0.8, 0.9, 1.0))
+	var ambient_intensity: float = env_params.get("ambient_intensity", 0.3)
+	var ambient_color: Color = env_params.get("ambient_color", Color(0.3, 0.3, 0.3, 1.0))
+	
+	# Get time of day from climate step
+	var time_of_day: float = step_data.get("Climate", {}).get("time_of_day", 12.0)
+	
+	# Update environment if terrain manager supports it
+	if terrain_manager.has_method("update_environment"):
+		terrain_manager.update_environment(time_of_day, fog_density, 1.0, "clear", Color(0.5, 0.7, 1.0, 1.0), ambient_color * ambient_intensity)

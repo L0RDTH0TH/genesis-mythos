@@ -1,0 +1,24 @@
+{
+  "resources": [
+    {
+      "id": "iron",
+      "name": "Iron Ore",
+      "color": [0.6, 0.5, 0.4, 1.0]
+    },
+    {
+      "id": "gold",
+      "name": "Gold",
+      "color": [1.0, 0.84, 0.0, 1.0]
+    },
+    {
+      "id": "mana_crystal",
+      "name": "Mana Crystal",
+      "color": [0.5, 0.3, 1.0, 1.0]
+    },
+    {
+      "id": "ancient_ruin",
+      "name": "Ancient Ruin",
+      "color": [0.4, 0.3, 0.2, 1.0]
+    }
+  ]
+}
