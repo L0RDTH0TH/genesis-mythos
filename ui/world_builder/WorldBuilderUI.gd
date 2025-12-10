@@ -1101,18 +1101,19 @@ func _show_icon_type_selection_dialog() -> void:
 		_generate_3d_world()
 		return
 	
-	var group: Array = icon_groups[current_icon_group_index]
-	var first_icon = group[0] if group.size() > 0 else null
-	if first_icon == null:
-		current_icon_group_index += 1
-		_show_icon_type_selection_dialog()
-		return
-	
-	# Find icon data
-	var icon_data: Dictionary = {}
-	var icons: Array = map_icons_data.get("icons", [])
-	for icon: Dictionary in icons:
-		if icon.get("id", "") == first_icon.icon_id:
+		var group: Array = icon_groups[current_icon_group_index]
+		var first_icon = group[0] if group.size() > 0 else null
+		if first_icon == null:
+			current_icon_group_index += 1
+			_show_icon_type_selection_dialog()
+			return
+		
+		# Find icon data
+		var icon_data: Dictionary = {}
+		var icons: Array = map_icons_data.get("icons", [])
+		var first_icon_id: String = str(first_icon.get("icon_id", "")) if first_icon.has("icon_id") else ""
+		for icon: Dictionary in icons:
+			if icon.get("id", "") == first_icon_id:
 			icon_data = icon
 			break
 	
@@ -1675,7 +1676,9 @@ func _on_process_cities_pressed() -> void:
 	# Find all city icons from Step 2
 	var city_icons: Array = []
 	for icon in placed_icons:
-		var icon_id: String = icon.get("icon_id", "") if icon is Dictionary else icon.icon_id
+		if not icon:
+			continue
+		var icon_id: String = icon.get("icon_id") if icon.has("icon_id") else ""
 		if icon_id == "city":
 			city_icons.append(icon)
 	
@@ -1686,7 +1689,7 @@ func _on_process_cities_pressed() -> void:
 	# Store city data
 	var cities: Array = []
 	for icon in city_icons:
-		var icon_pos: Vector2 = icon.get("map_position", Vector2.ZERO) if icon is Dictionary else icon.map_position
+		var icon_pos: Vector2 = icon.get("map_position") if icon.has("map_position") else Vector2.ZERO
 		cities.append({
 			"icon": icon,
 			"position": icon_pos,
