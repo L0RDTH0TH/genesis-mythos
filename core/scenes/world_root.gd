@@ -92,28 +92,28 @@ func _ready() -> void:
 
 
 func _initialize_terrain_system() -> void:
-	# Create terrain manager (load class explicitly)
-	var manager_class = load("res://core/world_generation/Terrain3DManager.gd")
-	terrain_manager = manager_class.new()
+	# Create terrain manager using preloaded class
+	var manager: Terrain3DManager = Terrain3DManager.new()
+	terrain_manager = manager
 	
 	# Initialize terrain (creates Terrain3D node programmatically)
 	var data_directory: String = "user://terrain3d/"
-	var terrain = terrain_manager.initialize_terrain(self, data_directory)
+	# Use call() to avoid static analysis issues with class_name resolution
+	var terrain = manager.call("initialize_terrain", self, data_directory)
 	
-	# Load config from JSON
-	var config_class = load("res://core/world_generation/TerrainGenerationConfig.gd")
-	var config: Dictionary = config_class.load_from_json(TERRAIN_CONFIG_PATH)
+	# Load config from JSON using preloaded class
+	var config: Dictionary = TerrainGenerationConfig.load_from_json(TERRAIN_CONFIG_PATH)
 	
 	if not config.is_empty():
 		# Apply terrain settings from config
-		var terrain_settings: Dictionary = config_class.get_terrain_settings(config)
+		var terrain_settings: Dictionary = TerrainGenerationConfig.get_terrain_settings(config)
 		terrain.region_size = terrain_settings.get("region_size", 1024)
 		terrain.mesh_size = terrain_settings.get("mesh_size", 64)
 		terrain.vertex_spacing = terrain_settings.get("vertex_spacing", 1.0)
 		
 		# Generate initial terrain from config
-		var noise_config: Dictionary = config_class.get_noise_config(config)
-		var height_config: Dictionary = config_class.get_height_config(config)
+		var noise_config: Dictionary = TerrainGenerationConfig.get_noise_config(config)
+		var height_config: Dictionary = TerrainGenerationConfig.get_height_config(config)
 		
 		terrain_manager.generate_from_noise(
 			noise_config.get("seed", 0),

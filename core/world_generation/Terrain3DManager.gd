@@ -8,21 +8,31 @@ class_name Terrain3DManager
 extends RefCounted
 
 ## Signal emitted when terrain generation completes
-signal terrain_generated(terrain: Terrain3D)
+signal terrain_generated(terrain)
 
 ## Signal emitted when terrain parameters change
 signal terrain_updated()
 
 ## Reference to the active terrain node
-var terrain: Terrain3D = null
+var terrain = null
 
 ## Current generation parameters
 var generation_params: Dictionary = {}
 
 
 ## Initialize terrain with basic configuration
-func initialize_terrain(parent: Node, data_directory: String = "user://terrain3d/") -> Terrain3D:
-	var new_terrain: Terrain3D = Terrain3D.new()
+func initialize_terrain(parent: Node, data_directory: String = "user://terrain3d/"):
+	# Terrain3D is from GDExtension addon - use call() to avoid parse-time errors
+	# Check if Terrain3D class is available
+	if not ClassDB.class_exists("Terrain3D"):
+		push_error("Terrain3DManager: Terrain3D class not found - ensure addon is loaded")
+		return null
+	
+	# Use ClassDB to instantiate (works for GDExtension classes)
+	var new_terrain = ClassDB.instantiate("Terrain3D")
+	if new_terrain == null:
+		push_error("Terrain3DManager: Failed to instantiate Terrain3D - addon may not be loaded")
+		return null
 	new_terrain.name = "Terrain3D"
 	new_terrain.data_directory = data_directory
 	new_terrain.region_size = 1024
@@ -90,9 +100,9 @@ func scale_heights(scale_factor: float) -> void:
 		push_error("Terrain3DManager: No terrain initialized")
 		return
 	
-	var terrain_data: Terrain3DData = terrain.data
+	var terrain_data = terrain.data
 	var region_location: Vector2i = Vector2i(0, 0)
-	var region: Terrain3DRegion = terrain_data.get_region(region_location)
+	var region = terrain_data.get_region(region_location)
 	
 	if region == null:
 		push_warning("Terrain3DManager: Region not found at " + str(region_location))
@@ -145,9 +155,9 @@ func enable_dynamic_collision(enabled: bool = true) -> void:
 		return
 	
 	if enabled:
-		terrain.collision.mode = Terrain3DCollision.DYNAMIC_RUNTIME
+		terrain.collision.mode = 1  # Terrain3DCollision.DYNAMIC_RUNTIME
 	else:
-		terrain.collision.mode = Terrain3DCollision.STATIC
+		terrain.collision.mode = 0  # Terrain3DCollision.STATIC
 
 
 ## Apply biome map to terrain (stub for future implementation)
@@ -197,9 +207,9 @@ func export_heightmap(path: String) -> bool:
 		push_error("Terrain3DManager: No terrain initialized")
 		return false
 	
-	var terrain_data: Terrain3DData = terrain.data
+	var terrain_data = terrain.data
 	var region_location: Vector2i = Vector2i(0, 0)
-	var region: Terrain3DRegion = terrain_data.get_region(region_location)
+	var region = terrain_data.get_region(region_location)
 	
 	if region == null:
 		push_warning("Terrain3DManager: Region not found at " + str(region_location))

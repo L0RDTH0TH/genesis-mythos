@@ -62,7 +62,7 @@ static func get_terrain_settings(config: Dictionary) -> Dictionary:
 
 
 ## Apply config to Terrain3DManager
-static func apply_to_manager(config: Dictionary, manager: Terrain3DManager) -> void:
+static func apply_to_manager(config: Dictionary, manager) -> void:
 	var noise_config: Dictionary = get_noise_config(config)
 	var height_config: Dictionary = get_height_config(config)
 	var terrain_settings: Dictionary = get_terrain_settings(config)
