@@ -47,12 +47,15 @@ var map_root: Node2D
 
 func _ready() -> void:
 	"""Initialize MapMakerModule."""
+	print("DEBUG: MapMakerModule._ready() called")
 	_setup_ui()
 	_setup_viewport()
 	_setup_generator()
 	_setup_renderer()
 	_setup_editor()
 	_setup_marker_manager()
+	_setup_keyboard_shortcuts()
+	print("DEBUG: MapMakerModule._ready() complete")
 
 
 func _setup_viewport() -> void:
@@ -72,22 +75,26 @@ func _setup_viewport() -> void:
 	map_viewport_container.name = "MapViewportContainer"
 	map_viewport_container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	map_viewport_container.stretch = true
+	map_viewport_container.visible = true
 	map_viewport_container.gui_input.connect(_on_viewport_container_input)
 	map_viewport_container.resized.connect(_on_viewport_container_resized)
 	map_viewport_container.add_child(map_viewport)
 	
 	map_canvas.add_child(map_viewport_container)
+	print("DEBUG: Viewport container added to canvas, visible:", map_viewport_container.visible)
 	
 	# Setup camera and root
 	map_root = Node2D.new()
 	map_root.name = "MapRoot"
 	map_viewport.add_child(map_root)
+	print("DEBUG: MapRoot added to viewport")
 	
 	map_camera = Camera2D.new()
 	map_camera.name = "MapCamera"
 	map_camera.enabled = true
 	map_camera.zoom = Vector2(0.5, 0.5)  # Start zoomed out
 	map_root.add_child(map_camera)
+	print("DEBUG: Camera added, enabled:", map_camera.enabled, " zoom:", map_camera.zoom)
 	
 	# Update viewport size to match container
 	call_deferred("_update_viewport_size")
@@ -149,6 +156,47 @@ func _setup_marker_manager() -> void:
 	map_root.add_child(marker_manager)
 
 
+func _setup_parchment_overlay() -> void:
+	"""Setup parchment-style background overlay."""
+	if map_canvas == null:
+		return
+	
+	# Create ColorRect for parchment overlay (behind viewport)
+	var parchment_overlay: ColorRect = ColorRect.new()
+	parchment_overlay.name = "ParchmentOverlay"
+	parchment_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	parchment_overlay.color = Color(1.0, 1.0, 1.0, 1.0)
+	parchment_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Let input pass through
+	
+	# Create shader material
+	var shader: Shader = load("res://shaders/parchment.gdshader")
+	if shader != null:
+		var shader_material: ShaderMaterial = ShaderMaterial.new()
+		shader_material.shader = shader
+		
+		# Load parchment texture (if available, otherwise will use default)
+		var parchment_texture_path: String = "res://assets/textures/parchment_background.png"
+		if ResourceLoader.exists(parchment_texture_path):
+			var parchment_texture: Texture2D = load(parchment_texture_path)
+			shader_material.set_shader_parameter("parchment_texture", parchment_texture)
+		else:
+			# Fallback: create a simple beige texture
+			var fallback_img: Image = Image.create(256, 256, false, Image.FORMAT_RGB8)
+			fallback_img.fill(Color(0.85, 0.75, 0.65, 1.0))  # Parchment beige
+			var fallback_texture: ImageTexture = ImageTexture.new()
+			fallback_texture.set_image(fallback_img)
+			shader_material.set_shader_parameter("parchment_texture", fallback_texture)
+			push_warning("MapMakerModule: Parchment texture not found at " + parchment_texture_path + ", using fallback")
+		
+		parchment_overlay.material = shader_material
+	else:
+		push_error("MapMakerModule: Failed to load parchment shader")
+	
+	# Add as first child (behind viewport container)
+	map_canvas.add_child(parchment_overlay)
+	parchment_overlay.move_to_back()  # Ensure it's behind viewport
+
+
 func _setup_ui() -> void:
 	"""Setup UI panels and controls."""
 	# Create main container with split layout
@@ -173,6 +221,9 @@ func _setup_ui() -> void:
 	map_canvas.name = "MapCanvas"
 	map_canvas.mouse_filter = Control.MOUSE_FILTER_STOP
 	map_container.add_child(map_canvas)
+	
+	# Create parchment overlay (behind everything)
+	_setup_parchment_overlay()
 	
 	# Create right side (params panel)
 	params_panel = Panel.new()
@@ -240,6 +291,18 @@ func _create_toolbar() -> void:
 	regen_btn.text = "Regenerate"
 	regen_btn.pressed.connect(_on_regenerate_pressed)
 	toolbar.add_child(regen_btn)
+	
+	# Generate 3D World button
+	var generate_3d_sep: Control = Control.new()
+	generate_3d_sep.custom_minimum_size = Vector2(20, 0)
+	toolbar.add_child(generate_3d_sep)
+	
+	var generate_3d_btn: Button = Button.new()
+	generate_3d_btn.name = "Generate3DButton"
+	generate_3d_btn.text = "Generate 3D World"
+	generate_3d_btn.tooltip_text = "Turn your hand-drawn parchment map into the real 3D world"
+	generate_3d_btn.pressed.connect(_on_generate_3d_button_pressed)
+	toolbar.add_child(generate_3d_btn)
 
 
 func _create_params_panel() -> void:
@@ -328,7 +391,9 @@ func _create_param_spinbox(parent: VBoxContainer, label_text: String, param_name
 
 func initialize_from_step_data(seed_value: int, width: int, height: int) -> void:
 	"""Initialize map from Step 1 data (seed, size)."""
+	print("DEBUG: initialize_from_step_data called - seed:", seed_value, " width:", width, " height:", height)
 	if is_initialized:
+		print("DEBUG: Already initialized, skipping")
 		return
 	
 	# Create world map data
@@ -340,18 +405,28 @@ func initialize_from_step_data(seed_value: int, width: int, height: int) -> void
 	# Create heightmap image (use power-of-2 for better performance, but match aspect ratio)
 	var map_size_x: int = max(512, next_power_of_2(int(width)))
 	var map_size_y: int = max(512, next_power_of_2(int(height)))
+	print("DEBUG: Creating heightmap image size:", map_size_x, "x", map_size_y)
 	world_map_data.create_heightmap(map_size_x, map_size_y)
+	print("DEBUG: Heightmap created, image is null:", world_map_data.heightmap_image == null)
+	if world_map_data.heightmap_image != null:
+		print("DEBUG: Heightmap image size:", world_map_data.heightmap_image.get_size())
 	
 	# Update render target sprite scale to match world size
 	var render_target: Sprite2D = map_root.get_node_or_null("RenderTarget") as Sprite2D
+	print("DEBUG: Render target found:", render_target != null)
 	if render_target != null and render_target.texture != null:
 		var tex_size: Vector2 = render_target.texture.get_size()
+		print("DEBUG: Render target texture size:", tex_size)
 		if tex_size.x > 0 and tex_size.y > 0:
 			render_target.scale = Vector2(float(width) / tex_size.x, float(height) / tex_size.y)
+			print("DEBUG: Render target scale set to:", render_target.scale)
 	
 	# Connect components
 	if map_renderer != null:
+		print("DEBUG: Setting world_map_data to renderer")
 		map_renderer.set_world_map_data(world_map_data)
+	else:
+		print("DEBUG: ERROR - map_renderer is null!")
 	if map_editor != null:
 		map_editor.set_world_map_data(world_map_data)
 	if marker_manager != null:
@@ -361,23 +436,43 @@ func initialize_from_step_data(seed_value: int, width: int, height: int) -> void
 	generate_map()
 	
 	is_initialized = true
+	print("DEBUG: initialize_from_step_data complete, is_initialized:", is_initialized)
 
 
 func generate_map() -> void:
 	"""Generate map using current parameters."""
 	if world_map_data == null:
+		print("DEBUG: generate_map() - world_map_data is null, aborting")
 		return
 	
-	print("MapMakerModule: Generating map...")
+	print("DEBUG: MapMakerModule: Generating map...")
+	if map_generator == null:
+		print("DEBUG: ERROR - map_generator is null!")
+		return
+	
 	map_generator.generate_map(world_map_data, false)  # Synchronous for now
+	print("DEBUG: Generation complete, checking heightmap...")
+	if world_map_data.heightmap_image != null:
+		var sample_pos: Vector2i = Vector2i(100, 100)
+		var size: Vector2i = world_map_data.heightmap_image.get_size()
+		if sample_pos.x < size.x and sample_pos.y < size.y:
+			var sample_color: Color = world_map_data.heightmap_image.get_pixel(sample_pos.x, sample_pos.y)
+			print("DEBUG: Heightmap sample at (100,100): r=", sample_color.r, " (should be > 0)")
 	
 	# Generate biome preview
+	print("DEBUG: Generating biome preview...")
 	map_generator.generate_biome_preview(world_map_data)
+	if world_map_data.biome_preview_image != null:
+		print("DEBUG: Biome preview generated, size:", world_map_data.biome_preview_image.get_size())
 	
 	# Refresh renderer
-	map_renderer.refresh()
+	print("DEBUG: Refreshing renderer...")
+	if map_renderer != null:
+		map_renderer.refresh()
+	else:
+		print("DEBUG: ERROR - map_renderer is null, cannot refresh!")
 	
-	print("MapMakerModule: Map generation complete")
+	print("DEBUG: MapMakerModule: Map generation complete")
 
 
 func set_view_mode(mode: MapRenderer.ViewMode) -> void:
@@ -424,6 +519,89 @@ func _on_param_changed(param_name: String, value: Variant) -> void:
 func get_world_map_data() -> WorldMapData:
 	"""Get world map data (for export to Step 3)."""
 	return world_map_data
+
+
+func set_terrain_manager(manager) -> void:  # manager: Terrain3DManager - type hint removed
+	"""Set terrain manager reference for 3D generation."""
+	terrain_3d_manager = manager
+
+
+func _on_generate_3d_button_pressed() -> void:
+	"""Handle Generate 3D World button press."""
+	if world_map_data == null or world_map_data.heightmap_image == null:
+		push_error("MapMakerModule: No heightmap to generate from!")
+		# Show notification if possible
+		if has_method("_show_notification"):
+			_show_notification("No heightmap available! Generate a map first.", Color.RED)
+		return
+	
+	if terrain_3d_manager == null:
+		push_error("MapMakerModule: Terrain3DManager not set! Cannot generate 3D terrain.")
+		# Try to find it in the scene tree
+		var world_root: Node = get_tree().get_first_node_in_group("world_root")
+		if world_root == null:
+			world_root = get_tree().root.get_node_or_null("WorldRoot")
+		if world_root != null:
+			var manager: Node = world_root.get_node_or_null("Terrain3DManager")
+			if manager != null:
+				terrain_3d_manager = manager
+				print("MapMakerModule: Found Terrain3DManager in scene tree")
+			else:
+				push_error("MapMakerModule: Terrain3DManager not found in scene tree")
+				return
+		else:
+			push_error("MapMakerModule: WorldRoot not found in scene tree")
+			return
+	
+	# Optional: Save EXR for debugging
+	var save_path: String = "user://exports/last_hand_drawn_heightmap.exr"
+	DirAccess.make_dir_recursive_absolute("user://exports/")
+	var save_result: Error = world_map_data.heightmap_image.save_exr(save_path, true)
+	if save_result == OK:
+		print("MapMakerModule: Saved heightmap to ", save_path)
+	else:
+		push_warning("MapMakerModule: Failed to save heightmap EXR: ", save_result)
+	
+	# Calculate world size (assuming 1 pixel = 1 meter)
+	var size_x: float = float(world_map_data.heightmap_image.get_width())
+	var size_z: float = float(world_map_data.heightmap_image.get_height())
+	var center_pos: Vector3 = Vector3(-size_x / 2.0, 0.0, -size_z / 2.0)
+	
+	# Call the new method
+	terrain_3d_manager.generate_from_heightmap(
+		world_map_data.heightmap_image.duplicate(),  # duplicate to be safe
+		-50.0,
+		300.0,
+		center_pos
+	)
+	
+	# Switch to 3D preview step (if WorldBuilderUI exists)
+	var world_builder_ui: Control = get_tree().get_first_node_in_group("world_builder_ui")
+	if world_builder_ui == null:
+		# Try to find it by name or by traversing up the tree
+		world_builder_ui = get_tree().root.find_child("WorldBuilderUI", true, false) as Control
+		if world_builder_ui == null:
+			# Try parent
+			var parent_node: Node = get_parent()
+			while parent_node != null:
+				if parent_node.name == "WorldBuilderUI" or parent_node.has_method("_update_step_display"):
+					world_builder_ui = parent_node as Control
+					break
+				parent_node = parent_node.get_parent()
+	
+	if world_builder_ui != null:
+		# Set current_step to 2 (Terrain step) and update display
+		if world_builder_ui.has("current_step"):
+			world_builder_ui.current_step = 2  # Step 2 is "Terrain" (0-indexed: 0=Seed, 1=2D Map, 2=Terrain)
+			if world_builder_ui.has_method("_update_step_display"):
+				world_builder_ui._update_step_display()
+			print("MapMakerModule: Switched to Terrain preview step")
+	
+	# Show success message
+	print("MapMakerModule: 3D world generated from parchment drawing!")
+	# Try to show notification if method exists
+	if world_builder_ui != null and world_builder_ui.has_method("_show_notification"):
+		world_builder_ui._show_notification("3D world generated from your parchment drawing!", Color.GREEN)
 
 
 func _on_viewport_container_resized() -> void:
@@ -508,3 +686,20 @@ func _screen_to_world_position(screen_pos: Vector2) -> Vector2:
 	var world_pos: Vector2 = camera_pos + world_offset
 	
 	return world_pos
+
+
+func _setup_keyboard_shortcuts() -> void:
+	"""Setup keyboard shortcuts for map editor."""
+	# Ctrl+Enter to generate 3D world
+	# This will be handled in _unhandled_key_input()
+
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	"""Handle keyboard shortcuts."""
+	if event is InputEventKey:
+		var key_event: InputEventKey = event as InputEventKey
+		if key_event.pressed:
+			# Ctrl+Enter to generate 3D world
+			if key_event.keycode == KEY_ENTER and (key_event.ctrl_pressed or key_event.meta_pressed):
+				_on_generate_3d_button_pressed()
+				get_viewport().set_input_as_handled()

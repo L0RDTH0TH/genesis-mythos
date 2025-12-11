@@ -432,11 +432,17 @@ func _update_map_grid() -> void:
 
 func update_camera_for_step(step: int) -> void:
 	"""Update camera projection and position based on current step, and toggle 2D/3D views."""
+	print("DEBUG: update_camera_for_step() called with step:", step)
 	match step:
 		0, 1:  # Steps 1-2: Show 2D map, hide 3D viewport
-			# Show 2D map texture
+			# Show 2D map texture (but hide if MapMakerModule is active)
 			if map_2d_texture != null:
-				map_2d_texture.visible = true
+				if map_maker_module != null:
+					print("DEBUG: MapMakerModule exists, hiding map_2d_texture placeholder")
+					map_2d_texture.visible = false
+				else:
+					print("DEBUG: MapMakerModule not yet created, showing map_2d_texture placeholder")
+					map_2d_texture.visible = true
 			
 			# Hide 3D terrain viewport (prevents rendering)
 			if terrain_3d_view != null:
@@ -1149,39 +1155,63 @@ func _update_step_display() -> void:
 
 func _initialize_map_maker_module() -> void:
 	"""Initialize MapMakerModule in center panel when entering Step 2."""
+	print("DEBUG: _initialize_map_maker_module() called")
 	if map_maker_module != null:
+		print("DEBUG: MapMakerModule already exists, skipping")
 		return  # Already initialized
+	
+	# Hide placeholder map_2d_texture
+	if map_2d_texture != null:
+		print("DEBUG: Hiding map_2d_texture placeholder, visible before:", map_2d_texture.visible)
+		map_2d_texture.visible = false
+		print("DEBUG: map_2d_texture visible after:", map_2d_texture.visible)
 	
 	# Create MapMakerModule instance using load() at runtime
 	var module_script: GDScript = load("res://ui/world_builder/MapMakerModule.gd") as GDScript
 	if module_script != null:
 		map_maker_module = module_script.new()
+		print("DEBUG: MapMakerModule instance created")
 	else:
 		push_error("WorldBuilderUI: Failed to load MapMakerModule script")
 		return
 	map_maker_module.name = "MapMakerModule"
 	map_maker_module.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	map_maker_module.visible = true
+	print("DEBUG: MapMakerModule configured, visible:", map_maker_module.visible)
 	
 	# Add to center panel (replacing map_2d_texture view)
 	if center_panel != null:
+		print("DEBUG: Adding MapMakerModule to center_panel, children before:", center_panel.get_child_count())
 		center_panel.add_child(map_maker_module)
+		print("DEBUG: Children after:", center_panel.get_child_count())
 		
 		# Get MapCanvas from module
 		var map_canvas: Control = map_maker_module.get_node_or_null("MapCanvas")
 		if map_canvas == null:
+			print("DEBUG: MapCanvas not found, creating...")
 			# Create MapCanvas if it doesn't exist
 			map_canvas = Control.new()
 			map_canvas.name = "MapCanvas"
 			map_canvas.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 			map_maker_module.add_child(map_canvas)
+		else:
+			print("DEBUG: MapCanvas found, visible:", map_canvas.visible)
+	else:
+		print("DEBUG: ERROR - center_panel is null!")
 	
 	# Initialize with seed and size from Step 1
 	var seed_value: int = step_data.get("Seed & Size", {}).get("seed", 12345)
 	var width: int = step_data.get("Seed & Size", {}).get("width", 1000)
 	var height: int = step_data.get("Seed & Size", {}).get("height", 1000)
+	print("DEBUG: Calling initialize_from_step_data with seed:", seed_value, " width:", width, " height:", height)
+	
+	# Pass terrain manager to MapMakerModule
+	if terrain_manager != null:
+		map_maker_module.set_terrain_manager(terrain_manager)
+		print("DEBUG: WorldBuilderUI: Terrain manager passed to MapMakerModule")
 	
 	map_maker_module.initialize_from_step_data(seed_value, width, height)
-	print("WorldBuilderUI: MapMakerModule initialized")
+	print("DEBUG: WorldBuilderUI: MapMakerModule initialized")
 
 
 func _export_map_data_to_terrain() -> void:

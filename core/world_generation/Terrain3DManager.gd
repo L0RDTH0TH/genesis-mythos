@@ -107,3 +107,35 @@ func generate_from_noise(seed_value: int, frequency: float, min_height: float, m
 			terrain.create_from_heightmap_image(height_image)
 	
 	print("Terrain3DManager: Generated terrain from noise (seed: ", seed_value, ", frequency: ", frequency, ")")
+
+
+func generate_from_heightmap(heightmap_image: Image, min_height: float = -50.0, max_height: float = 300.0, terrain_position: Vector3 = Vector3.ZERO) -> void:
+	"""Generate terrain from hand-drawn heightmap image."""
+	if terrain == null:
+		create_terrain()
+	
+	if heightmap_image == null:
+		push_error("Terrain3DManager: generate_from_heightmap() - heightmap_image is null")
+		return
+	
+	# Ensure image is in correct format (Terrain3D prefers 16-bit or float)
+	if heightmap_image.get_format() != Image.FORMAT_RF:
+		heightmap_image.convert(Image.FORMAT_RF)
+	
+	# Center the terrain
+	terrain.global_position = terrain_position
+	
+	# Import heightmap directly (Terrain3D supports Image array: [height, control, color])
+	var images: Array[Image] = [heightmap_image, null, null]
+	var offset: Vector3 = Vector3(-heightmap_image.get_width() / 2.0, min_height, -heightmap_image.get_height() / 2.0)
+	
+	if terrain.has_method("data") and terrain.data != null:
+		terrain.data.import_images(images, offset, 1.0, max_height - min_height)
+		
+		# Force update
+		terrain.update_maps()
+		terrain.update_collision()
+		
+		print("Terrain3DManager: Generated terrain from hand-drawn heightmap! Size: ", heightmap_image.get_size(), " Height range: ", min_height, " to ", max_height)
+	else:
+		push_error("Terrain3DManager: Terrain data is null, cannot import heightmap")
