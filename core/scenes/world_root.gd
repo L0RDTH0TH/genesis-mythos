@@ -134,13 +134,8 @@ func _setup_world_builder_ui() -> void:
 		world_builder_ui.set_terrain_manager(terrain_manager)
 		print("WorldRoot: Terrain manager connected to WorldBuilderUI")
 	
-	# Position UI - make it larger and more visible (80% width, 80% height)
-	world_builder_ui.anchor_left = 0.0
-	world_builder_ui.anchor_top = 0.0
-	world_builder_ui.anchor_right = 0.8
-	world_builder_ui.anchor_bottom = 0.8
-	world_builder_ui.offset_left = 10.0
-	world_builder_ui.offset_top = 10.0
+	# Position UI - full screen
+	world_builder_ui.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	
 	# Ensure UI is visible
 	world_builder_ui.visible = true

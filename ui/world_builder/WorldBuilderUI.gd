@@ -49,6 +49,7 @@ var icon_groups: Array[Array] = []
 var current_icon_group_index: int = 0
 
 ## References to UI nodes
+@onready var background_rect: ColorRect = $BackgroundRect
 @onready var left_nav: Panel = $BackgroundPanel/MainContainer/LeftNav
 @onready var center_panel: Panel = $BackgroundPanel/MainContainer/RightSplit/CenterPanel
 @onready var map_2d_texture: TextureRect = $BackgroundPanel/MainContainer/RightSplit/CenterPanel/Map2DTexture

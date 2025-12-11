@@ -1,8 +1,9 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://ui/world_builder/WorldBuilderUI.gd" id="1_worldbuilder"]
 [ext_resource type="Theme" path="res://themes/bg3_theme.tres" id="2_theme"]
 [ext_resource type="Shader" path="res://shaders/overlay_vignette.gdshader" id="3_vignette"]
+[ext_resource type="Environment" path="res://assets/environments/eryndor_base.tres" id="4_environment"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_center"]
 bg_color = Color(0.25, 0.2, 0.15, 1)
@@ -16,6 +17,9 @@ corner_radius_top_right = 4
 corner_radius_bottom_right = 4
 corner_radius_bottom_left = 4
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bg"]
+bg_color = Color(0.1, 0.1, 0.1, 1)
+
 [node name="WorldBuilderUI" type="Control"]
 layout_mode = 3
 anchors_preset = 15
@@ -25,6 +29,15 @@ grow_horizontal = 2
 grow_vertical = 2
 theme = ExtResource("2_theme")
 script = ExtResource("1_worldbuilder")
+
+[node name="BackgroundRect" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.1, 0.1, 0.1, 1)
 
 [node name="Overlay" type="ColorRect" parent="."]
 layout_mode = 1
@@ -47,14 +60,14 @@ mouse_filter = 2
 
 [node name="TitleLabel" type="Label" parent="BackgroundPanel"]
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
+anchors_preset = 6
+anchor_left = 0.0
 anchor_top = 0.0
-anchor_right = 0.5
+anchor_right = 1.0
 anchor_bottom = 0.0
-offset_left = -250.0
+offset_left = 0.0
 offset_top = 10.0
-offset_right = 250.0
+offset_right = 0.0
 offset_bottom = 50.0
 grow_horizontal = 2
 grow_vertical = 0
@@ -74,10 +87,10 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-offset_left = 10.0
-offset_top = 60.0
-offset_right = -10.0
-offset_bottom = -60.0
+offset_left = 0.0
+offset_top = 50.0
+offset_right = 0.0
+offset_bottom = -50.0
 split_offset = 250
 
 [node name="LeftNav" type="Panel" parent="BackgroundPanel/MainContainer"]
@@ -121,6 +134,9 @@ handle_input_locally = false
 render_target_update_mode = 0
 
 [node name="PreviewWorld" type="Node3D" parent="BackgroundPanel/MainContainer/RightSplit/CenterPanel/Terrain3DView/PreviewViewport"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="BackgroundPanel/MainContainer/RightSplit/CenterPanel/Terrain3DView/PreviewViewport/PreviewWorld"]
+environment = ExtResource("4_environment")
 
 [node name="PreviewCamera" type="Camera3D" parent="BackgroundPanel/MainContainer/RightSplit/CenterPanel/Terrain3DView/PreviewViewport/PreviewWorld"]
 transform = Transform3D(1, 0, 0, 0, -0.707107, 0.707107, 0, -0.707107, -0.707107, 0, 100, 0)
