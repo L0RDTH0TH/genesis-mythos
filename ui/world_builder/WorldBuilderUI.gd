@@ -49,17 +49,17 @@ var icon_groups: Array[Array] = []
 var current_icon_group_index: int = 0
 
 ## References to UI nodes
+@onready var preview_viewport_container: SubViewportContainer = $PreviewViewportContainer
+@onready var preview_viewport: SubViewport = $PreviewViewportContainer/PreviewViewport
+@onready var preview_world: Node3D = $PreviewViewportContainer/PreviewViewport/PreviewWorld
+@onready var preview_camera: Camera3D = $PreviewViewportContainer/PreviewViewport/PreviewWorld/PreviewCamera
+@onready var map_2d_layer: Node2D = $PreviewViewportContainer/PreviewViewport/PreviewWorld/Map2DLayer
+@onready var overlay: ColorRect = $Overlay
 @onready var left_nav: Panel = $BackgroundPanel/MainContainer/LeftNav
-@onready var center_preview: SubViewportContainer = $BackgroundPanel/MainContainer/RightSplit/CenterPreview
-@onready var preview_viewport: SubViewport = $BackgroundPanel/MainContainer/RightSplit/CenterPreview/PreviewViewport
-@onready var preview_world: Node3D = $BackgroundPanel/MainContainer/RightSplit/CenterPreview/PreviewViewport/PreviewWorld
-@onready var preview_camera: Camera3D = $BackgroundPanel/MainContainer/RightSplit/CenterPreview/PreviewViewport/PreviewWorld/PreviewCamera
-@onready var map_2d_layer: Node2D = $BackgroundPanel/MainContainer/RightSplit/CenterPreview/PreviewViewport/PreviewWorld/Map2DLayer
 @onready var right_content: PanelContainer = $BackgroundPanel/MainContainer/RightSplit/RightContent
 @onready var step_buttons: Array[Button] = []
 @onready var next_button: Button = $BackgroundPanel/ButtonContainer/NextButton
 @onready var back_button: Button = $BackgroundPanel/ButtonContainer/BackButton
-@onready var overlay: ColorRect = $Overlay
 
 ## Preview terrain reference (will be set when terrain manager is connected)
 var preview_terrain: Node = null
@@ -562,8 +562,8 @@ func _create_step_map_maker(parent: VBoxContainer) -> void:
 	container.add_child(zoom_container)
 	
 	# Make preview viewport clickable for icon placement
-	if center_preview != null:
-		center_preview.gui_input.connect(_on_preview_clicked)
+	if preview_viewport_container != null:
+		preview_viewport_container.gui_input.connect(_on_preview_clicked)
 
 
 func _create_step_terrain(parent: VBoxContainer) -> void:
