@@ -50,11 +50,11 @@ var icon_groups: Array[Array] = []
 var current_icon_group_index: int = 0
 
 ## References to UI nodes
-@onready var navigation_panel: Panel = $MainContainer/LeftNavigation
-@onready var content_area: Control = $MainContainer/ContentArea
+@onready var navigation_panel: Panel = $BackgroundPanel/MainContainer/LeftNavigation
+@onready var content_area: Control = $BackgroundPanel/MainContainer/ContentArea
 @onready var step_labels: Array[Label] = []
-@onready var next_button: Button = $MainContainer/ButtonContainer/NextButton
-@onready var back_button: Button = $MainContainer/ButtonContainer/BackButton
+@onready var next_button: Button = $BackgroundPanel/ButtonContainer/NextButton
+@onready var back_button: Button = $BackgroundPanel/ButtonContainer/BackButton
 
 ## Paths
 const MAP_ICONS_PATH: String = "res://data/map_icons.json"
