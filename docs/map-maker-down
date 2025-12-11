@@ -1,0 +1,128 @@
+### Project Overview
+
+The 2D Map Maker will serve as a key component in the "World Builder" toolset for the Genesis 3D First Person Virtual Tabletop. It will allow users to create and edit a top-down 2D representation of a fantasy world map, focusing on seeding major terrain features such as mountains, rivers, forests, cities, oceans, and other landmarks. This 2D map will act as a blueprint to guide subsequent 3D terrain generation, ensuring that user-defined features translate into procedurally generated 3D models (e.g., via heightmaps, biomes, and placement algorithms).
+
+The visual style will emulate the provided example maps: parchment-like backgrounds with hand-drawn aesthetics, including stylized icons for features (e.g., jagged lines for mountains, wavy lines for rivers, tree clusters for forests), labels, and decorative elements like compasses or sea creatures. The UI will integrate seamlessly with the provided example layout, where the central gray area becomes an interactive canvas, flanked by side panels for tools and settings.
+
+Key goals:
+- User-friendly interface for manual and semi-procedural map creation.
+- Exportable data format (e.g., JSON or image-based masks) for 3D integration.
+- Scalability for world sizes from small regions (e.g., 100x100 units) to large continents (e.g., 1000x1000 units).
+- Performance optimization for real-time editing on standard hardware.
+
+Assumptions:
+- The tool is a desktop application (based on the UI screenshot's windowed debug mode).
+- Integration with later steps (e.g., Terrain, Climate) in the World Builder pipeline.
+- No real-time collaboration; single-user focus initially.
+
+### Phase 1: Requirements Gathering and Planning (1-2 Weeks)
+
+1. **Stakeholder Input and Research**
+   - Review provided images: Analyze the UI for integration points (e.g., seed value from Step 1 influences initial map generation) and map examples for stylistic elements (e.g., color palettes: sepia tones, hand-sketch lines; features: labeled settlements, trade routes).
+   - Research similar tools: Study open-source map editors like Inkarnate, Wonderdraft, or Azgaar's Fantasy Map Generator for best practices in feature placement, undo/redo, and export formats.
+   - Define user personas: e.g., Game masters for tabletop RPGs needing quick prototypes; world-builders for detailed fantasy settings.
+   - Gather functional requirements:
+     - Input: World seed and size from Step 1.
+     - Output: Editable 2D map data for Steps 3+ (e.g., terrain masks).
+     - Non-functional: Cross-platform (Windows, macOS, Linux); responsive to window resizing; support for high-DPI displays.
+
+2. **Feature Prioritization**
+   - **Must-Have Features:**
+     - Interactive canvas in the central UI area for drawing and placement.
+     - Tools: Brush for freehand drawing (rivers, coastlines); shape stamps for features (mountains, forests); point placement for cities/landmarks with labels.
+     - Layers: Separate layers for terrain types (e.g., base land, water, vegetation) to allow non-destructive editing.
+     - Procedural seeding: Use the world seed to auto-generate basic outlines (e.g., Perlin noise for initial terrain contours).
+     - Styling: Apply parchment filters, auto-stylize drawings to match hand-drawn look (e.g., wobbly lines, texture overlays).
+     - Zoom/pan navigation; undo/redo stack.
+   - **Nice-to-Have Features:**
+     - Auto-generation assistants (e.g., river flow simulation based on elevation).
+     - Custom icon libraries for fantasy elements (e.g., castles, ruins).
+     - Import/export: Load external images as bases; export as PNG/SVG for sharing or JSON for 3D seeding.
+   - **Out of Scope (for v1):** Multi-user editing, AI-assisted feature suggestion, mobile support.
+
+3. **Risk Assessment**
+   - Technical: Canvas performance with large maps (mitigate with chunking or WebGL acceleration).
+   - Integration: Ensure compatibility with 3D pipeline (e.g., map coordinates map to 3D voxels).
+   - Timeline: Potential delays in UI polishing to match the debug-style screenshot.
+
+4. **Timeline and Milestones**
+   - Total estimated duration: 8-12 weeks for MVP.
+   - Milestones: End of Phase 1 - Requirements document and wireframes.
+
+### Phase 2: Design (2-3 Weeks)
+
+1. **UI/UX Design**
+   - Extend the provided UI: Left sidebar for tool selection (e.g., tabs for Draw, Place, Edit); top bar for seed/world size display and controls; bottom bar for Back/Next navigation.
+   - Canvas: Grid overlay optional; real-time preview of stylized map.
+   - Wireframes: Sketch layouts using tools like Figma, including tool palettes (e.g., brush sizes, color pickers tuned to sepia palette).
+   - User Flow: Start with seeded blank map → Select tool → Draw/place features → Apply styles → Export to next step.
+   - Accessibility: Keyboard shortcuts (e.g., Ctrl+Z for undo); color contrast for labels.
+
+2. **Architecture and Data Model**
+   - **Frontend-Centric Architecture:** Use a framework like Electron (for desktop) with HTML5 Canvas or PixiJS for rendering. If integrating with Unity (for 3D synergy), use Unity's 2D tools.
+   - **Data Model:**
+     - Map as a grid (e.g., 2D array of cells with attributes: type=forest, elevation=high, label="Elfwood").
+     - Vector-based features for scalability (e.g., Bezier curves for rivers).
+     - JSON schema for storage: { "width": 1000, "height": 1000, "features": [{ "type": "mountain", "path": [...coords] }] }.
+   - **Integration Points:** Input seed for RNG; output feature masks (e.g., binary images for mountain placement) to feed 3D generation algorithms (e.g., via Marching Cubes for terrain extrusion).
+
+3. **Prototyping**
+   - Build a low-fidelity prototype: Basic canvas with one tool (e.g., river drawing) to test interaction.
+   - Gather feedback: Simulate user testing on map styling to ensure it matches examples.
+
+### Phase 3: Development (4-6 Weeks)
+
+1. **Setup and Core Engine**
+   - Initialize project: Set up repo (GitHub); choose stack (e.g., Electron + TypeScript + Canvas).
+   - Implement canvas: Handle rendering, zooming, panning.
+   - Integrate seed: Use seed for initial procedural generation (e.g., noise libraries like FastNoise to outline continents).
+
+2. **Tool Implementation**
+   - **Drawing Tools:** Freehand brush with stylus support; auto-stylize to wobbly/hand-drawn (add noise to paths).
+   - **Placement Tools:** Drag-and-drop stamps (e.g., mountain icons from asset packs); auto-snap to grid.
+   - **Editing Tools:** Select/move/resize features; layer management.
+   - **Styling Engine:** Apply textures (parchment background); filters for aging effects (e.g., vignette, grain).
+   - **Labeling:** Text tool with fantasy fonts; auto-placement to avoid overlaps.
+
+3. **Procedural and Advanced Features**
+   - Semi-auto generation: e.g., Suggest river paths from high to low elevation.
+   - Performance: Use web workers for heavy computations (e.g., flood-fill for lakes).
+
+4. **Integration with World Builder**
+   - Hook into UI steps: Load from Step 1; pass data to Step 3.
+   - Export: Generate feature data for 3D (e.g., heightmap PNG where darker = lower elevation).
+
+5. **Code Quality**
+   - Unit tests: For tools and data serialization.
+   - Version control: Branch per feature.
+
+### Phase 4: Testing and Iteration (1-2 Weeks)
+
+1. **Testing Types**
+   - Unit/Integration: Test tool accuracy (e.g., river drawing persists after zoom).
+   - Usability: User tests to create a map mimicking examples; measure time to complete.
+   - Performance: Stress test large maps (e.g., 2000x2000).
+   - Compatibility: Cross-OS; handle different resolutions.
+
+2. **Bug Fixing and Iteration**
+   - Prioritize based on feedback: e.g., Refine styling if maps don't feel "hand-drawn" enough.
+   - Edge Cases: Empty maps, invalid seeds, oversized features.
+
+### Phase 5: Deployment and Maintenance
+
+1. **Release**
+   - Package as executable (via Electron-builder).
+   - Documentation: User guide, API for extensions.
+   - Version 1.0: Integrate into Eryndor/Genesis toolchain.
+
+2. **Post-Launch**
+   - Monitor usage: Add analytics for popular tools.
+   - Roadmap: Add AI enhancements (e.g., auto-labeling); community asset sharing.
+   - Maintenance: Bug fixes, updates for new OS versions.
+
+### Resources Needed
+- Team: 1-2 developers (frontend focus); 1 designer for assets.
+- Budget: Low (open-source tools); ~$500 for stock assets if needed.
+- Tools: VS Code, Git, Figma, asset libraries (e.g., free fantasy icons from OpenGameArt).
+
+This plan provides a structured path to deliver a functional 2D Map Maker that aligns with your vision, ensuring it's intuitive, stylistically accurate, and ready for 3D integration. If specifics like tech stack need adjustment, we can refine based on constraints.

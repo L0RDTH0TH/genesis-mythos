@@ -70,6 +70,9 @@ var map_2d_viewport: SubViewport = null
 ## Preview terrain reference (will be set when terrain manager is connected)
 var preview_terrain: Node = null
 
+## MapMakerModule instance (Step 2)
+var map_maker_module = null  # MapMakerModule - type hint removed to avoid parser error
+
 ## Paths
 const MAP_ICONS_PATH: String = "res://data/map_icons.json"
 const UI_CONFIG_PATH: String = "res://data/config/world_builder_ui.json"
@@ -576,7 +579,7 @@ func _create_step_seed_size(parent: VBoxContainer) -> void:
 
 
 func _create_step_map_maker(parent: VBoxContainer) -> void:
-	"""Create Step 2: 2D Map Maker content - now integrated in central viewport."""
+	"""Create Step 2: 2D Map Maker content with MapMakerModule."""
 	var step_panel: Panel = Panel.new()
 	step_panel.name = "StepMapMaker"
 	step_panel.visible = (current_step == 1)
@@ -589,61 +592,13 @@ func _create_step_map_maker(parent: VBoxContainer) -> void:
 	
 	# Info label
 	var info_label: Label = Label.new()
-	info_label.text = "Click on the central map preview to place icons.\nSelect an icon type from the toolbar below, then click on the map."
+	info_label.text = "Procedural 2D Map Maker - Generate and edit your world map.\nLeft-click to paint terrain, scroll to zoom, drag to pan."
 	info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	container.add_child(info_label)
 	
-	# Toolbar for icon selection
-	var toolbar_label: Label = Label.new()
-	toolbar_label.text = "Icon Tools:"
-	container.add_child(toolbar_label)
-	
-	var toolbar: HBoxContainer = HBoxContainer.new()
-	toolbar.name = "IconToolbar"
-	toolbar.add_theme_constant_override("separation", 5)
-	container.add_child(toolbar)
-	
-	# Create buttons for each icon type
-	var icons: Array = map_icons_data.get("icons", [])
-	for icon_data: Dictionary in icons:
-		var icon_button: Button = Button.new()
-		icon_button.text = icon_data.get("id", "unknown")
-		icon_button.pressed.connect(func(): _on_icon_toolbar_selected(icon_data.get("id", "")))
-		icon_button.custom_minimum_size = Vector2(80, 40)
-		toolbar.add_child(icon_button)
-	
-	# Delete/Erase tool
-	var delete_button: Button = Button.new()
-	delete_button.text = "Delete"
-	delete_button.pressed.connect(func(): _on_icon_toolbar_selected("delete"))
-	delete_button.custom_minimum_size = Vector2(80, 40)
-	toolbar.add_child(delete_button)
-	
-	# Zoom controls
-	var zoom_label: Label = Label.new()
-	zoom_label.text = "Zoom:"
-	container.add_child(zoom_label)
-	
-	var zoom_container: HBoxContainer = HBoxContainer.new()
-	var zoom_out_button: Button = Button.new()
-	zoom_out_button.text = "-"
-	zoom_out_button.pressed.connect(func(): _on_zoom_changed(-0.1))
-	zoom_container.add_child(zoom_out_button)
-	
-	var zoom_reset_button: Button = Button.new()
-	zoom_reset_button.text = "Reset"
-	zoom_reset_button.pressed.connect(func(): _on_zoom_changed(0.0))
-	zoom_container.add_child(zoom_reset_button)
-	
-	var zoom_in_button: Button = Button.new()
-	zoom_in_button.text = "+"
-	zoom_in_button.pressed.connect(func(): _on_zoom_changed(0.1))
-	zoom_container.add_child(zoom_in_button)
-	container.add_child(zoom_container)
-	
-	# Make 2D map texture clickable for icon placement
-	if map_2d_texture != null:
-		map_2d_texture.gui_input.connect(_on_preview_clicked)
+	# MapMakerModule will be added to center panel when step is shown
+	# Store reference for later initialization
+	control_references["2D Map Maker/step_panel"] = step_panel
 
 
 func _create_step_terrain(parent: VBoxContainer) -> void:
@@ -1177,13 +1132,72 @@ func _update_step_display() -> void:
 	# Update camera for current step
 	update_camera_for_step(current_step)
 	
+	# Initialize MapMakerModule when entering Step 2
+	if current_step == 1:
+		_initialize_map_maker_module()
+	
 	# Update seed in Step 3 when entering terrain step
 	if current_step == 2:
 		_update_terrain_seed_from_step1()
+		# Export map data from Step 2 to Step 3
+		_export_map_data_to_terrain()
 	
 	# Update export summary when entering export step
 	if current_step == 8:
 		_update_export_summary()
+
+
+func _initialize_map_maker_module() -> void:
+	"""Initialize MapMakerModule in center panel when entering Step 2."""
+	if map_maker_module != null:
+		return  # Already initialized
+	
+	# Create MapMakerModule instance using load() at runtime
+	var module_script: GDScript = load("res://ui/world_builder/MapMakerModule.gd") as GDScript
+	if module_script != null:
+		map_maker_module = module_script.new()
+	else:
+		push_error("WorldBuilderUI: Failed to load MapMakerModule script")
+		return
+	map_maker_module.name = "MapMakerModule"
+	map_maker_module.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	
+	# Add to center panel (replacing map_2d_texture view)
+	if center_panel != null:
+		center_panel.add_child(map_maker_module)
+		
+		# Get MapCanvas from module
+		var map_canvas: Control = map_maker_module.get_node_or_null("MapCanvas")
+		if map_canvas == null:
+			# Create MapCanvas if it doesn't exist
+			map_canvas = Control.new()
+			map_canvas.name = "MapCanvas"
+			map_canvas.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+			map_maker_module.add_child(map_canvas)
+	
+	# Initialize with seed and size from Step 1
+	var seed_value: int = step_data.get("Seed & Size", {}).get("seed", 12345)
+	var width: int = step_data.get("Seed & Size", {}).get("width", 1000)
+	var height: int = step_data.get("Seed & Size", {}).get("height", 1000)
+	
+	map_maker_module.initialize_from_step_data(seed_value, width, height)
+	print("WorldBuilderUI: MapMakerModule initialized")
+
+
+func _export_map_data_to_terrain() -> void:
+	"""Export map data from Step 2 to Step 3 (Terrain step)."""
+	if map_maker_module == null:
+		return
+	
+	var world_map_data = map_maker_module.get_world_map_data()  # WorldMapData - type hint removed
+	if world_map_data == null:
+		return
+	
+	# Store heightmap in step_data for terrain generation
+	step_data["2D Map Maker"]["world_map_data"] = world_map_data
+	step_data["2D Map Maker"]["heightmap_image"] = world_map_data.heightmap_image
+	
+	print("WorldBuilderUI: Map data exported to Terrain step")
 
 
 func _on_next_pressed() -> void:

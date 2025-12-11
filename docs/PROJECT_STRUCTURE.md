@@ -239,10 +239,18 @@ UI component scenes and scripts.
 ui/
 ├── components/       # Reusable UI components
 ├── main_menu/        # Main menu UI
+├── world_builder/    # World Builder wizard system
+│   ├── WorldBuilderUI.gd    # Main wizard UI controller
+│   ├── WorldBuilderUI.tscn  # Wizard scene file
+│   └── IconNode.gd          # Icon node class for 2D map
 └── theme/            # UI theme resources
 ```
 
 **Purpose**: UI-specific scenes and scripts. Reusable UI components and menu systems.
+
+**Key Files**:
+- `world_builder/WorldBuilderUI.gd` - Step-by-step wizard controller with 9 steps
+- `world_builder/IconNode.gd` - Icon data structure for 2D map canvas
 
 ## File Naming Conventions
 
