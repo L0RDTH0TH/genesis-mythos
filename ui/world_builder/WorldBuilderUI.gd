@@ -49,17 +49,18 @@ var icon_groups: Array[Array] = []
 var current_icon_group_index: int = 0
 
 ## References to UI nodes
+@onready var left_nav: Panel = $BackgroundPanel/MainContainer/LeftNav
+@onready var center_preview: Control = $BackgroundPanel/MainContainer/RightSplit/CenterPreview
 @onready var preview_viewport_container: SubViewportContainer = $PreviewViewportContainer
 @onready var preview_viewport: SubViewport = $PreviewViewportContainer/PreviewViewport
 @onready var preview_world: Node3D = $PreviewViewportContainer/PreviewViewport/PreviewWorld
 @onready var preview_camera: Camera3D = $PreviewViewportContainer/PreviewViewport/PreviewWorld/PreviewCamera
 @onready var map_2d_layer: Node2D = $PreviewViewportContainer/PreviewViewport/PreviewWorld/Map2DLayer
-@onready var overlay: ColorRect = $Overlay
-@onready var left_nav: Panel = $BackgroundPanel/MainContainer/LeftNav
 @onready var right_content: PanelContainer = $BackgroundPanel/MainContainer/RightSplit/RightContent
 @onready var step_buttons: Array[Button] = []
 @onready var next_button: Button = $BackgroundPanel/ButtonContainer/NextButton
 @onready var back_button: Button = $BackgroundPanel/ButtonContainer/BackButton
+@onready var overlay: ColorRect = $Overlay
 
 ## Preview terrain reference (will be set when terrain manager is connected)
 var preview_terrain: Node = null
@@ -149,9 +150,15 @@ func _load_civilizations() -> void:
 
 func _apply_theme() -> void:
 	"""Apply bg3_theme to this UI."""
-	var theme: Theme = load("res://themes/bg3_theme.tres")
-	if theme != null:
-		self.theme = theme
+	var bg3_theme: Theme = load("res://themes/bg3_theme.tres")
+	if bg3_theme != null:
+		self.theme = bg3_theme
+	
+	# Ensure overlay is properly configured (shader is set in scene)
+	if overlay != null:
+		overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# Overlay always visible during world creation process
+		overlay.visible = true
 
 
 func _ensure_visibility() -> void:

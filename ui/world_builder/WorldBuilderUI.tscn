@@ -2,14 +2,7 @@
 
 [ext_resource type="Script" path="res://ui/world_builder/WorldBuilderUI.gd" id="1_worldbuilder"]
 [ext_resource type="Theme" path="res://themes/bg3_theme.tres" id="2_theme"]
-[ext_resource type="Shader" path="res://shaders/overlay_vignette.gdshader" id="3_vignette_shader"]
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_1"]
-shader = ExtResource("3_vignette_shader")
-shader_parameter/vignette_strength = 0.7
-shader_parameter/center_radius = 0.4
-shader_parameter/edge_falloff = 0.3
-shader_parameter/overlay_color = Color(0, 0, 0, 0.65)
+[ext_resource type="Shader" path="res://shaders/overlay_vignette.gdshader" id="3_vignette"]
 
 [node name="WorldBuilderUI" type="Control"]
 layout_mode = 3
@@ -21,11 +14,23 @@ grow_vertical = 2
 theme = ExtResource("2_theme")
 script = ExtResource("1_worldbuilder")
 
-[node name="PreviewViewportContainer" type="SubViewportContainer" parent="."]
+[node name="Overlay" type="ColorRect" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+shader = ExtResource("3_vignette")
+
+[node name="PreviewViewportContainer" type="SubViewportContainer" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_left = 0.2
+anchor_top = 0.1
+anchor_right = 0.8
+anchor_bottom = 0.9
 grow_horizontal = 2
 grow_vertical = 2
 stretch = true
@@ -34,8 +39,7 @@ stretch = true
 size = Vector2(1920, 1080)
 transparent_bg = true
 handle_input_locally = false
-snap_2d_transforms_to_pixel = false
-snap_2d_vertices_to_pixel = false
+render_target_update_mode = 2
 
 [node name="PreviewWorld" type="Node3D" parent="PreviewViewportContainer/PreviewViewport"]
 
@@ -54,17 +58,6 @@ shadow_enabled = true
 [node name="Map2DLayer" type="Node2D" parent="PreviewViewportContainer/PreviewViewport/PreviewWorld"]
 visible = true
 
-[node name="Overlay" type="ColorRect" parent="."]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-color = Color(0, 0, 0, 0.65)
-mouse_filter = 2
-material = SubResource("ShaderMaterial_1")
-
 [node name="BackgroundPanel" type="Panel" parent="."]
 layout_mode = 1
 anchors_preset = 15
@@ -72,7 +65,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-mouse_filter = 0
+mouse_filter = 2
 
 [node name="TitleLabel" type="Label" parent="BackgroundPanel"]
 layout_mode = 1
@@ -118,7 +111,7 @@ layout_mode = 2
 size_flags_horizontal = 3
 split_offset = 60
 
-[node name="CenterPreviewPlaceholder" type="Control" parent="BackgroundPanel/MainContainer/RightSplit"]
+[node name="CenterPreview" type="Control" parent="BackgroundPanel/MainContainer/RightSplit"]
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
