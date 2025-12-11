@@ -1359,11 +1359,10 @@ func _on_preview_clicked(event: InputEvent) -> void:
 	var icon_color: Color = Color(icon_color_array[0], icon_color_array[1], icon_color_array[2], icon_color_array[3])
 	icon_node.set_icon_data(selected_icon_id, icon_color)
 	
-	var map_root: Node2D = map_2d_viewport.get_node_or_null("MapRoot")
-	if map_root != null:
-		map_root.add_child(icon_node)
-		placed_icons.append(icon_node)
-		print("WorldBuilderUI: Placed icon ", selected_icon_id, " at ", world_pos)
+	# Add icon to map root (already retrieved above)
+	map_root.add_child(icon_node)
+	placed_icons.append(icon_node)
+	print("WorldBuilderUI: Placed icon ", selected_icon_id, " at ", world_pos)
 
 
 func _screen_to_map_position(screen_pos: Vector2) -> Vector2:
