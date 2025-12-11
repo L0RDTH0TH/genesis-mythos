@@ -1101,21 +1101,21 @@ func _show_icon_type_selection_dialog() -> void:
 		_generate_3d_world()
 		return
 	
-		var group: Array = icon_groups[current_icon_group_index]
-		var first_icon = group[0] if group.size() > 0 else null
-		if first_icon == null:
-			current_icon_group_index += 1
-			_show_icon_type_selection_dialog()
-			return
-		
-		# Find icon data
-		var icon_data: Dictionary = {}
-		var icons: Array = map_icons_data.get("icons", [])
-		var first_icon_id: String = str(first_icon.get("icon_id", "")) if first_icon.has("icon_id") else ""
-		for icon: Dictionary in icons:
-			if icon.get("id", "") == first_icon_id:
-				icon_data = icon
-				break
+	var group: Array = icon_groups[current_icon_group_index]
+	var first_icon = group[0] if group.size() > 0 else null
+	if first_icon == null:
+		current_icon_group_index += 1
+		_show_icon_type_selection_dialog()
+		return
+	
+	# Find icon data
+	var icon_data: Dictionary = {}
+	var icons: Array = map_icons_data.get("icons", [])
+	var first_icon_id: String = str(first_icon.get("icon_id", "")) if first_icon.has("icon_id") else ""
+	for icon: Dictionary in icons:
+		if icon.get("id", "") == first_icon_id:
+			icon_data = icon
+			break
 	
 	if icon_data.is_empty():
 		current_icon_group_index += 1
