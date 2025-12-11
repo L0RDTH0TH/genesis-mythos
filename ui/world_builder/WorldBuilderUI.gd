@@ -6,8 +6,7 @@
 
 extends Control
 
-## Preload IconNode class to ensure it's available
-const IconNode = preload("res://ui/world_builder/IconNode.gd")
+## IconNode is available via class_name, no preload needed
 
 ## Reference to terrain manager
 var terrain_manager = null  # Terrain3DManager - type hint removed to avoid parser error
@@ -50,11 +49,20 @@ var icon_groups: Array[Array] = []
 var current_icon_group_index: int = 0
 
 ## References to UI nodes
-@onready var navigation_panel: Panel = $BackgroundPanel/MainContainer/LeftNavigation
-@onready var content_area: Control = $BackgroundPanel/MainContainer/ContentArea
-@onready var step_labels: Array[Label] = []
+@onready var left_nav: Panel = $BackgroundPanel/MainContainer/LeftNav
+@onready var center_preview: SubViewportContainer = $BackgroundPanel/MainContainer/RightSplit/CenterPreview
+@onready var preview_viewport: SubViewport = $BackgroundPanel/MainContainer/RightSplit/CenterPreview/PreviewViewport
+@onready var preview_world: Node3D = $BackgroundPanel/MainContainer/RightSplit/CenterPreview/PreviewViewport/PreviewWorld
+@onready var preview_camera: Camera3D = $BackgroundPanel/MainContainer/RightSplit/CenterPreview/PreviewViewport/PreviewWorld/PreviewCamera
+@onready var map_2d_layer: Node2D = $BackgroundPanel/MainContainer/RightSplit/CenterPreview/PreviewViewport/PreviewWorld/Map2DLayer
+@onready var right_content: PanelContainer = $BackgroundPanel/MainContainer/RightSplit/RightContent
+@onready var step_buttons: Array[Button] = []
 @onready var next_button: Button = $BackgroundPanel/ButtonContainer/NextButton
 @onready var back_button: Button = $BackgroundPanel/ButtonContainer/BackButton
+@onready var overlay: ColorRect = $Overlay
+
+## Preview terrain reference (will be set when terrain manager is connected)
+var preview_terrain: Node = null
 
 ## Paths
 const MAP_ICONS_PATH: String = "res://data/map_icons.json"
@@ -154,39 +162,38 @@ func _ensure_visibility() -> void:
 
 
 func _setup_navigation() -> void:
-	"""Setup left navigation panel with step labels."""
-	if navigation_panel == null:
+	"""Setup left navigation panel with step buttons."""
+	if left_nav == null:
 		return
 	
-	var nav_container: VBoxContainer = VBoxContainer.new()
+	var nav_container: VFlowContainer = VFlowContainer.new()
 	nav_container.name = "NavContainer"
 	nav_container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	nav_container.add_theme_constant_override("separation", 10)
-	navigation_panel.add_child(nav_container)
+	left_nav.add_child(nav_container)
 	
-	# Create step labels
+	# Create step buttons
 	for i in range(STEPS.size()):
-		var step_label: Label = Label.new()
-		step_label.name = "Step" + str(i + 1) + "Label"
-		step_label.text = str(i + 1) + ". " + STEPS[i]
-		step_label.custom_minimum_size = Vector2(0, 40)
-		step_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		step_label.add_theme_constant_override("margin_left", 10)
-		step_label.add_theme_constant_override("margin_right", 10)
-		step_labels.append(step_label)
-		nav_container.add_child(step_label)
+		var step_button: Button = Button.new()
+		step_button.name = "Step" + str(i + 1) + "Button"
+		step_button.text = str(i + 1) + ". " + STEPS[i]
+		step_button.custom_minimum_size = Vector2(0, 50)
+		step_button.pressed.connect(func(): _on_step_button_pressed(i))
+		step_buttons.append(step_button)
+		nav_container.add_child(step_button)
 
 
 func _setup_step_content() -> void:
-	"""Setup content panels for each step."""
-	if content_area == null:
+	"""Setup content panels for each step in right panel."""
+	if right_content == null:
 		return
 	
 	# Create container for step content
 	var step_container: VBoxContainer = VBoxContainer.new()
 	step_container.name = "StepContainer"
 	step_container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	content_area.add_child(step_container)
+	step_container.add_theme_constant_override("separation", 10)
+	right_content.add_child(step_container)
 	
 	# Initialize step data
 	for step_name: String in STEPS:
@@ -218,6 +225,197 @@ func _setup_step_content() -> void:
 	
 	# Create step 9: Export
 	_create_step_export(step_container)
+	
+	# Setup camera and preview
+	_setup_preview_camera()
+	_setup_2d_map_layer()
+
+
+func _setup_preview_camera() -> void:
+	"""Setup preview camera with orthographic top-down view for Steps 1-2."""
+	if preview_camera == null:
+		return
+	
+	# Default: Orthographic top-down view
+	preview_camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+	preview_camera.size = 200.0
+	preview_camera.transform.origin = Vector3(0, 100, 0)
+	preview_camera.rotation_degrees = Vector3(-90, 0, 0)  # Look straight down
+	preview_camera.current = true
+
+
+func _setup_2d_map_layer() -> void:
+	"""Setup 2D map layer with parchment background and grid."""
+	if map_2d_layer == null:
+		return
+	
+	# Get world size for background
+	var world_width: float = float(step_data.get("Seed & Size", {}).get("width", 1000))
+	var world_height: float = float(step_data.get("Seed & Size", {}).get("height", 1000))
+	
+	# Create parchment background using Sprite2D with colored quad
+	# We'll use a simple approach: create a large colored rectangle using Polygon2D
+	var parchment_bg: Polygon2D = Polygon2D.new()
+	parchment_bg.name = "ParchmentBackground"
+	parchment_bg.color = Color(0.85, 0.75, 0.65, 1.0)  # Parchment color
+	# Create rectangle polygon
+	parchment_bg.polygon = PackedVector2Array([
+		Vector2(-world_width / 2, -world_height / 2),
+		Vector2(world_width / 2, -world_height / 2),
+		Vector2(world_width / 2, world_height / 2),
+		Vector2(-world_width / 2, world_height / 2)
+	])
+	map_2d_layer.add_child(parchment_bg)
+	
+	# Try to load parchment texture if available (as overlay)
+	var parchment_texture_path: String = "res://assets/ui/parchment_background.png"
+	if ResourceLoader.exists(parchment_texture_path):
+		var texture: Texture2D = load(parchment_texture_path)
+		if texture != null:
+			var parchment_sprite: Sprite2D = Sprite2D.new()
+			parchment_sprite.name = "ParchmentTexture"
+			parchment_sprite.texture = texture
+			parchment_sprite.position = Vector2.ZERO
+			parchment_sprite.scale = Vector2(world_width / texture.get_width(), world_height / texture.get_height())
+			parchment_sprite.modulate = Color(1, 1, 1, 0.7)  # Semi-transparent overlay
+			map_2d_layer.add_child(parchment_sprite)
+	
+	# Create grid lines (using Line2D nodes)
+	_create_map_grid()
+	
+	# Create compass rose placeholder (will be added later)
+	_create_compass_rose()
+
+
+func _create_map_grid() -> void:
+	"""Create grid lines for the 2D map."""
+	if map_2d_layer == null:
+		return
+	
+	var grid_container: Node2D = Node2D.new()
+	grid_container.name = "GridContainer"
+	map_2d_layer.add_child(grid_container)
+	
+	# Get world size from step data
+	var world_width: float = float(step_data.get("Seed & Size", {}).get("width", 1000))
+	var world_height: float = float(step_data.get("Seed & Size", {}).get("height", 1000))
+	
+	# Create horizontal grid lines
+	var grid_spacing: float = 100.0
+	var grid_color: Color = Color(0.6, 0.5, 0.4, 0.3)  # Light ink color
+	
+	for y in range(0, int(world_height) + 1, int(grid_spacing)):
+		var line: Line2D = Line2D.new()
+		line.add_point(Vector2(-world_width / 2, y - world_height / 2))
+		line.add_point(Vector2(world_width / 2, y - world_height / 2))
+		line.width = 1.0
+		line.default_color = grid_color
+		grid_container.add_child(line)
+	
+	# Create vertical grid lines
+	for x in range(0, int(world_width) + 1, int(grid_spacing)):
+		var line: Line2D = Line2D.new()
+		line.add_point(Vector2(x - world_width / 2, -world_height / 2))
+		line.add_point(Vector2(x - world_width / 2, world_height / 2))
+		line.width = 1.0
+		line.default_color = grid_color
+		grid_container.add_child(line)
+
+
+func _create_compass_rose() -> void:
+	"""Create compass rose decoration for the map."""
+	if map_2d_layer == null:
+		return
+	
+	# Create compass rose using simple 2D shapes
+	var compass_container: Node2D = Node2D.new()
+	compass_container.name = "CompassRose"
+	compass_container.position = Vector2(-450, -450)  # Top-left corner
+	map_2d_layer.add_child(compass_container)
+	
+	# Create N marker using Line2D
+	var n_marker: Line2D = Line2D.new()
+	n_marker.add_point(Vector2(0, -20))
+	n_marker.add_point(Vector2(0, 20))
+	n_marker.width = 3.0
+	n_marker.default_color = Color(0.85, 0.7, 0.4, 1.0)
+	compass_container.add_child(n_marker)
+	
+	# Add N label using a simple approach (we'll use a sprite or draw)
+	# For now, just the line marker
+
+
+func _update_map_grid() -> void:
+	"""Update map grid when world size changes."""
+	if map_2d_layer == null:
+		return
+	
+	# Remove old grid
+	var old_grid: Node2D = map_2d_layer.get_node_or_null("GridContainer")
+	if old_grid != null:
+		old_grid.queue_free()
+	
+	# Create new grid with updated size
+	_create_map_grid()
+
+
+func update_camera_for_step(step: int) -> void:
+	"""Update camera projection and position based on current step."""
+	if preview_camera == null:
+		return
+	
+	match step:
+		0, 1:  # Steps 1-2: Orthographic top-down
+			preview_camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+			preview_camera.size = 200.0
+			preview_camera.transform.origin = Vector3(0, 100, 0)
+			preview_camera.rotation_degrees = Vector3(-90, 0, 0)
+			# Show 2D map layer
+			if map_2d_layer != null:
+				map_2d_layer.visible = true
+				map_2d_layer.modulate.a = 1.0
+			# Hide terrain preview if it exists
+			if preview_terrain != null:
+				preview_terrain.visible = false
+		2, 3, 4, 5, 6, 7, 8:  # Steps 3+: Perspective with orbit
+			# Transition to perspective
+			preview_camera.projection = Camera3D.PROJECTION_PERSPECTIVE
+			preview_camera.fov = 70.0
+			# Position camera to view terrain
+			var world_width: float = float(step_data.get("Seed & Size", {}).get("width", 1000))
+			var world_height: float = float(step_data.get("Seed & Size", {}).get("height", 1000))
+			var max_dim: float = max(world_width, world_height)
+			preview_camera.transform.origin = Vector3(max_dim * 0.5, max_dim * 0.3, max_dim * 0.5)
+			preview_camera.look_at(Vector3(world_width / 2, 0, world_height / 2), Vector3.UP)
+			# Fade out 2D map layer
+			if map_2d_layer != null:
+				_fade_out_2d_map()
+			# Show terrain preview
+			call_deferred("_ensure_terrain_in_preview")
+
+
+func _fade_out_2d_map() -> void:
+	"""Fade out the 2D map layer when transitioning to 3D."""
+	if map_2d_layer == null:
+		return
+	
+	# Create tween for smooth fade
+	var tween: Tween = create_tween()
+	tween.tween_property(map_2d_layer, "modulate:a", 0.0, 1.0)
+	tween.tween_callback(func(): map_2d_layer.visible = false)
+
+
+func _ensure_terrain_in_preview() -> void:
+	"""Ensure terrain is visible in preview viewport for Steps 3+."""
+	if terrain_manager == null or preview_world == null:
+		return
+	
+	# For now, terrain is in main scene - preview won't show it directly
+	# In a full implementation, we'd duplicate terrain or use ViewportTexture
+	# For MVP, we'll show a placeholder or use the main scene's terrain via remote
+	# For now, just ensure camera is positioned correctly
+	# The actual terrain rendering will happen in the main scene
+	print("WorldBuilderUI: Terrain preview ready for Step 3+")
 
 
 func _create_step_seed_size(parent: VBoxContainer) -> void:
@@ -279,17 +477,26 @@ func _create_step_seed_size(parent: VBoxContainer) -> void:
 	height_spinbox.min_value = 100
 	height_spinbox.max_value = 10000
 	height_spinbox.value = 1000
-	height_spinbox.value_changed.connect(func(v): step_data["Seed & Size"]["height"] = int(v))
+	height_spinbox.value_changed.connect(func(v): 
+		step_data["Seed & Size"]["height"] = int(v)
+		call_deferred("_update_map_grid")
+	)
 	size_container.add_child(height_spinbox)
 	container.add_child(size_container)
 	control_references["Seed & Size/width"] = width_spinbox
 	control_references["Seed & Size/height"] = height_spinbox
 	step_data["Seed & Size"]["width"] = 1000
 	step_data["Seed & Size"]["height"] = 1000
+	
+	# Update width change handler too
+	width_spinbox.value_changed.connect(func(v): 
+		step_data["Seed & Size"]["width"] = int(v)
+		call_deferred("_update_map_grid")
+	)
 
 
 func _create_step_map_maker(parent: VBoxContainer) -> void:
-	"""Create Step 2: 2D Map Maker content."""
+	"""Create Step 2: 2D Map Maker content - now integrated in central viewport."""
 	var step_panel: Panel = Panel.new()
 	step_panel.name = "StepMapMaker"
 	step_panel.visible = (current_step == 1)
@@ -300,9 +507,20 @@ func _create_step_map_maker(parent: VBoxContainer) -> void:
 	container.add_theme_constant_override("separation", 10)
 	step_panel.add_child(container)
 	
+	# Info label
+	var info_label: Label = Label.new()
+	info_label.text = "Click on the central map preview to place icons.\nSelect an icon type from the toolbar below, then click on the map."
+	info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	container.add_child(info_label)
+	
 	# Toolbar for icon selection
+	var toolbar_label: Label = Label.new()
+	toolbar_label.text = "Icon Tools:"
+	container.add_child(toolbar_label)
+	
 	var toolbar: HBoxContainer = HBoxContainer.new()
 	toolbar.name = "IconToolbar"
+	toolbar.add_theme_constant_override("separation", 5)
 	container.add_child(toolbar)
 	
 	# Create buttons for each icon type
@@ -310,27 +528,42 @@ func _create_step_map_maker(parent: VBoxContainer) -> void:
 	for icon_data: Dictionary in icons:
 		var icon_button: Button = Button.new()
 		icon_button.text = icon_data.get("id", "unknown")
-		var icon_color_array: Array = icon_data.get("color", [0.5, 0.5, 0.5, 1.0])
-		var icon_color: Color = Color(icon_color_array[0], icon_color_array[1], icon_color_array[2], icon_color_array[3])
 		icon_button.pressed.connect(func(): _on_icon_toolbar_selected(icon_data.get("id", "")))
+		icon_button.custom_minimum_size = Vector2(80, 40)
 		toolbar.add_child(icon_button)
 	
-	# Map canvas (using Control with custom drawing)
-	var canvas_container: Panel = Panel.new()
-	canvas_container.name = "MapCanvas"
-	canvas_container.custom_minimum_size = Vector2(600, 400)
-	canvas_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	container.add_child(canvas_container)
+	# Delete/Erase tool
+	var delete_button: Button = Button.new()
+	delete_button.text = "Delete"
+	delete_button.pressed.connect(func(): _on_icon_toolbar_selected("delete"))
+	delete_button.custom_minimum_size = Vector2(80, 40)
+	toolbar.add_child(delete_button)
 	
-	# Create a Control container for icons (will use Control-based icons)
-	var icon_container: Control = Control.new()
-	icon_container.name = "IconContainer"
-	icon_container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	icon_container.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Let clicks pass through
-	canvas_container.add_child(icon_container)
+	# Zoom controls
+	var zoom_label: Label = Label.new()
+	zoom_label.text = "Zoom:"
+	container.add_child(zoom_label)
 	
-	# Make canvas clickable
-	canvas_container.gui_input.connect(_on_canvas_clicked)
+	var zoom_container: HBoxContainer = HBoxContainer.new()
+	var zoom_out_button: Button = Button.new()
+	zoom_out_button.text = "-"
+	zoom_out_button.pressed.connect(func(): _on_zoom_changed(-0.1))
+	zoom_container.add_child(zoom_out_button)
+	
+	var zoom_reset_button: Button = Button.new()
+	zoom_reset_button.text = "Reset"
+	zoom_reset_button.pressed.connect(func(): _on_zoom_changed(0.0))
+	zoom_container.add_child(zoom_reset_button)
+	
+	var zoom_in_button: Button = Button.new()
+	zoom_in_button.text = "+"
+	zoom_in_button.pressed.connect(func(): _on_zoom_changed(0.1))
+	zoom_container.add_child(zoom_in_button)
+	container.add_child(zoom_container)
+	
+	# Make preview viewport clickable for icon placement
+	if center_preview != null:
+		center_preview.gui_input.connect(_on_preview_clicked)
 
 
 func _create_step_terrain(parent: VBoxContainer) -> void:
@@ -836,16 +1069,20 @@ func _setup_buttons() -> void:
 
 func _update_step_display() -> void:
 	"""Update UI to show current step."""
-	# Update step labels highlighting
-	for i in range(step_labels.size()):
+	# Update step button highlighting
+	for i in range(step_buttons.size()):
 		if i == current_step:
-			# Highlight current step in gold
-			step_labels[i].add_theme_color_override("font_color", Color(1, 0.843137, 0, 1))
+			# Highlight current step in gold (use theme override)
+			step_buttons[i].add_theme_color_override("font_color", Color(1, 0.843137, 0, 1))
+			step_buttons[i].add_theme_color_override("font_hover_color", Color(1, 0.95, 0.75, 1))
 		else:
-			step_labels[i].remove_theme_color_override("font_color")
+			step_buttons[i].remove_theme_color_override("font_color")
+			step_buttons[i].remove_theme_color_override("font_hover_color")
+		# Disable future steps until previous ones are complete
+		step_buttons[i].disabled = (i > current_step)
 	
 	# Show/hide step content panels
-	var step_container: VBoxContainer = content_area.get_node_or_null("StepContainer")
+	var step_container: VBoxContainer = right_content.get_node_or_null("StepContainer")
 	if step_container != null:
 		for i in range(step_container.get_child_count()):
 			var child: Node = step_container.get_child(i)
@@ -856,6 +1093,9 @@ func _update_step_display() -> void:
 		back_button.disabled = (current_step == 0)
 	if next_button != null:
 		next_button.disabled = (current_step == STEPS.size() - 1)
+	
+	# Update camera for current step
+	update_camera_for_step(current_step)
 	
 	# Update seed in Step 3 when entering terrain step
 	if current_step == 2:
@@ -881,6 +1121,14 @@ func _on_back_pressed() -> void:
 	"""Handle Back button press."""
 	if current_step > 0:
 		current_step -= 1
+		_update_step_display()
+
+
+func _on_step_button_pressed(step_index: int) -> void:
+	"""Handle step button press - jump to step if allowed."""
+	# Only allow jumping to completed steps or current step
+	if step_index <= current_step:
+		current_step = step_index
 		_update_step_display()
 
 
@@ -938,10 +1186,13 @@ func _update_terrain_live() -> void:
 	# Generate terrain
 	if terrain_manager.has_method("generate_from_noise"):
 		terrain_manager.generate_from_noise(seed_value, frequency, min_height, max_height)
+		# Update preview
+		call_deferred("_update_preview_terrain")
 	else:
 		# Fallback: use generate_initial_terrain if available
 		if terrain_manager.has_method("generate_initial_terrain"):
 			terrain_manager.generate_initial_terrain()
+			call_deferred("_update_preview_terrain")
 
 
 func _on_regenerate_terrain_pressed() -> void:
@@ -959,6 +1210,8 @@ func _on_seed_changed(new_seed: int) -> void:
 		if terrain_seed != null:
 			terrain_seed.value = new_seed
 			step_data["Terrain"]["seed"] = new_seed
+	# Update grid if world size changed
+	call_deferred("_update_map_grid")
 
 
 func _update_terrain_seed_from_step1() -> void:
@@ -977,8 +1230,11 @@ func _on_icon_toolbar_selected(icon_id: String) -> void:
 	print("WorldBuilderUI: Selected icon: ", icon_id)
 
 
-func _on_canvas_clicked(event: InputEvent) -> void:
-	"""Handle clicks on map canvas to place icons."""
+func _on_preview_clicked(event: InputEvent) -> void:
+	"""Handle clicks on preview viewport to place icons on 2D map."""
+	if current_step != 1:  # Only allow placement in Step 2
+		return
+	
 	if not event is InputEventMouseButton:
 		return
 	
@@ -986,24 +1242,14 @@ func _on_canvas_clicked(event: InputEvent) -> void:
 	if not mouse_event.pressed or mouse_event.button_index != MOUSE_BUTTON_LEFT:
 		return
 	
-	var step_container: VBoxContainer = content_area.get_node_or_null("StepContainer")
-	if step_container == null:
-		return
-	
-	var step_panel: Panel = step_container.get_node_or_null("StepMapMaker")
-	if step_panel == null:
-		return
-	
-	var canvas: Panel = step_panel.get_node_or_null("MapCanvas")
-	if canvas == null:
-		return
-	
-	var icon_container: Control = canvas.get_node_or_null("IconContainer")
-	if icon_container == null:
+	if map_2d_layer == null:
 		return
 	
 	var selected_icon_id: String = step_data.get("2D Map Maker", {}).get("selected_icon", "")
-	if selected_icon_id.is_empty():
+	if selected_icon_id.is_empty() or selected_icon_id == "delete":
+		# Handle delete mode - remove icon at click position
+		if selected_icon_id == "delete":
+			_remove_icon_at_position(mouse_event.position)
 		return
 	
 	# Find icon data
@@ -1017,37 +1263,90 @@ func _on_canvas_clicked(event: InputEvent) -> void:
 	if icon_data.is_empty():
 		return
 	
-	# Get click position relative to canvas
-	var click_pos: Vector2 = mouse_event.position
+	# Convert screen position to world position in Map2DLayer
+	var world_pos: Vector2 = _screen_to_map_position(mouse_event.position)
 	
-	# Create icon visual (using Control-based approach for compatibility)
-	var icon_visual: Control = Control.new()
-	icon_visual.name = "Icon_" + str(placed_icons.size())
-	icon_visual.position = click_pos
-	icon_visual.custom_minimum_size = Vector2(32, 32)
-	icon_visual.size = Vector2(32, 32)
+	# Create icon node as Sprite2D in Map2DLayer
+	var icon_node: IconNode = IconNode.new()
+	icon_node.name = "Icon_" + str(placed_icons.size())
+	icon_node.position = world_pos
+	icon_node.map_position = world_pos
 	
-	# Create colored rectangle as icon
-	var icon_rect: ColorRect = ColorRect.new()
-	icon_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var icon_color_array: Array = icon_data.get("color", [0.5, 0.5, 0.5, 1.0])
 	var icon_color: Color = Color(icon_color_array[0], icon_color_array[1], icon_color_array[2], icon_color_array[3])
-	icon_rect.color = icon_color
-	icon_visual.add_child(icon_rect)
-	
-	# Create icon node data structure (simplified for Control-based approach)
-	var icon_node = IconNode.new()
 	icon_node.set_icon_data(selected_icon_id, icon_color)
-	icon_node.position = click_pos
-	icon_node.map_position = click_pos
 	
-	# Store reference to visual
-	icon_node.sprite = icon_visual
-	
-	icon_container.add_child(icon_visual)
+	map_2d_layer.add_child(icon_node)
 	placed_icons.append(icon_node)
 	
-	print("WorldBuilderUI: Placed icon ", selected_icon_id, " at ", click_pos)
+	print("WorldBuilderUI: Placed icon ", selected_icon_id, " at ", world_pos)
+
+
+func _screen_to_map_position(screen_pos: Vector2) -> Vector2:
+	"""Convert screen position to world position in Map2DLayer coordinates."""
+	if preview_camera == null or map_2d_layer == null:
+		return Vector2.ZERO
+	
+	# Get viewport size
+	var viewport_size: Vector2 = preview_viewport.size if preview_viewport != null else Vector2(1920, 1080)
+	
+	# Normalize screen position to -1..1 range
+	var normalized: Vector2 = (screen_pos / viewport_size) * 2.0 - Vector2(1.0, 1.0)
+	normalized.y = -normalized.y  # Flip Y axis
+	
+	# Get world size from step data
+	var world_width: float = float(step_data.get("Seed & Size", {}).get("width", 1000))
+	var world_height: float = float(step_data.get("Seed & Size", {}).get("height", 1000))
+	
+	# Convert to world coordinates (orthographic camera view)
+	var camera_size: float = preview_camera.size if preview_camera.projection == Camera3D.PROJECTION_ORTHOGONAL else 100.0
+	var world_pos: Vector2 = Vector2(
+		normalized.x * camera_size,
+		normalized.y * camera_size
+	)
+	
+	return world_pos
+
+
+func _remove_icon_at_position(screen_pos: Vector2) -> void:
+	"""Remove icon closest to click position."""
+	if map_2d_layer == null or placed_icons.is_empty():
+		return
+	
+	var world_pos: Vector2 = _screen_to_map_position(screen_pos)
+	var min_distance: float = 50.0  # Click radius
+	var closest_icon: IconNode = null
+	var closest_index: int = -1
+	
+	for i in range(placed_icons.size()):
+		var icon: IconNode = placed_icons[i]
+		if icon == null:
+			continue
+		var distance: float = icon.map_position.distance_to(world_pos)
+		if distance < min_distance:
+			min_distance = distance
+			closest_icon = icon
+			closest_index = i
+	
+	if closest_icon != null:
+		placed_icons.remove_at(closest_index)
+		closest_icon.queue_free()
+		print("WorldBuilderUI: Removed icon at ", world_pos)
+
+
+func _on_zoom_changed(zoom_delta: float) -> void:
+	"""Handle zoom changes for the 2D map."""
+	if preview_camera == null:
+		return
+	
+	if zoom_delta == 0.0:
+		# Reset zoom
+		preview_camera.size = 200.0
+	else:
+		# Adjust zoom
+		preview_camera.size = clamp(preview_camera.size * (1.0 - zoom_delta), 50.0, 500.0)
+	
+	print("WorldBuilderUI: Camera size: ", preview_camera.size)
 
 
 func _start_3d_conversion() -> void:
@@ -1511,6 +1810,38 @@ func set_terrain_manager(manager) -> void:  # manager: Terrain3DManager - type h
 			terrain_manager.terrain_generated.connect(_on_terrain_generated)
 		if terrain_manager.has_method("terrain_updated"):
 			terrain_manager.terrain_updated.connect(_on_terrain_updated)
+		
+		# Connect terrain to preview viewport
+		_connect_terrain_to_preview()
+
+
+func _connect_terrain_to_preview() -> void:
+	"""Connect terrain from terrain manager to preview viewport."""
+	if terrain_manager == null or preview_world == null:
+		return
+	
+	# For Steps 1-2, we show 2D map only
+	# For Steps 3+, terrain will be generated and shown
+	# The terrain from Terrain3DManager is in the main scene
+	# We'll create a preview instance when terrain is generated
+	print("WorldBuilderUI: Terrain manager connected, preview will update when terrain is generated")
+
+
+func _update_preview_terrain() -> void:
+	"""Update preview viewport with terrain when it's generated."""
+	if terrain_manager == null or preview_world == null:
+		return
+	
+	# Check if terrain exists in manager
+	if terrain_manager.has("terrain") and terrain_manager.terrain != null:
+		var terrain_node: Node = terrain_manager.terrain
+		preview_terrain = terrain_node
+		
+		# For now, terrain is in main scene - preview camera will look at it
+		# In future, we could duplicate terrain for preview if needed
+		# Adjust camera to show terrain properly
+		if current_step >= 2:  # Step 3+
+			update_camera_for_step(current_step)
 
 
 func _on_terrain_generated(_terrain) -> void:  # _terrain: Terrain3D - type hint removed
@@ -1566,8 +1897,6 @@ func _update_climate_live() -> void:
 	# Update time of day (affects sky)
 	var time_of_day: float = climate_params.get("time_of_day", 12.0)
 	var wind_strength: float = climate_params.get("wind_strength", 1.0)
-	var wind_dir_x: float = climate_params.get("wind_direction_x", 1.0)
-	var wind_dir_y: float = climate_params.get("wind_direction_y", 0.0)
 	
 	# Update environment if terrain manager supports it
 	if terrain_manager.has_method("update_environment"):
@@ -1859,7 +2188,6 @@ func _update_environment_live() -> void:
 	
 	# Get parameters
 	var fog_density: float = env_params.get("fog_density", 0.1)
-	var fog_color: Color = env_params.get("fog_color", Color(0.8, 0.8, 0.9, 1.0))
 	var ambient_intensity: float = env_params.get("ambient_intensity", 0.3)
 	var ambient_color: Color = env_params.get("ambient_color", Color(0.3, 0.3, 0.3, 1.0))
 	
