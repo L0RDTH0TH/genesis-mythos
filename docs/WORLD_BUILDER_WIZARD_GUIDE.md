@@ -14,9 +14,37 @@ The World Builder is a step-by-step wizard-style interface for creating procedur
 
 The wizard interface consists of:
 
-1. **Left Navigation Panel** - Vertical list of 9 steps with gold highlighting for current step
-2. **Main Content Area** - Displays the active step's controls
-3. **Navigation Buttons** - Next/Back buttons at the bottom
+1. **Background Layer** - Opaque black ColorRect (`BackgroundRect`) covering full screen to block background rendering
+2. **Overlay Layer** - Vignette shader overlay (`Overlay`) with transparent center window for BG3-inspired aesthetic
+3. **Left Navigation Panel** - Vertical list of 9 steps with gold highlighting for current step
+4. **Center Preview Area** - Displays either 2D map (Steps 1-2) or 3D terrain preview (Steps 3+)
+5. **Right Content Panel** - Displays the active step's controls
+6. **Navigation Buttons** - Next/Back buttons at the bottom
+
+### Rendering Architecture
+
+**Full-Screen Layout:**
+- Root `WorldBuilderUI` Control uses full rect anchors (0,0,1,1) for complete screen coverage
+- `BackgroundRect` provides opaque background (Color(0.1, 0.1, 0.1, 1)) to prevent 3D bleed-through
+- All UI panels use proper anchor-based layout for responsive sizing
+
+**2D/3D View Separation:**
+- **Steps 1-2 (Seed & Size, 2D Map Maker):**
+  - `Map2DTexture` (TextureRect) visible - displays 2D map from dedicated SubViewport
+  - `Terrain3DView` (SubViewportContainer) hidden - 3D rendering disabled
+  - 2D map rendered via `map_2d_viewport` SubViewport with parchment background and grid
+  
+- **Steps 3+ (Terrain and beyond):**
+  - `Map2DTexture` hidden
+  - `Terrain3DView` visible - 3D terrain preview active
+  - `PreviewViewport` contains isolated 3D world with its own `WorldEnvironment`
+  - Camera and lighting configured for perspective view
+
+**3D Isolation:**
+- 3D SubViewport has its own `WorldEnvironment` node to isolate environment effects
+- Prevents main scene's WorldEnvironment from affecting UI background
+- 3D rendering only occurs when `Terrain3DView` is visible (step >= 2)
+- Render target update mode set to `UPDATE_DISABLED` when hidden to prevent unnecessary rendering
 
 ### Step Flow
 
@@ -348,14 +376,27 @@ func set_terrain_manager(manager) -> void:
 ### Scene File
 - **File:** `ui/world_builder/WorldBuilderUI.tscn`
 - **Structure:**
-  - BackgroundPanel
-    - TitleLabel
-    - MainContainer (HSplitContainer)
-      - LeftNavigation (Panel)
-      - ContentArea (Control)
-    - ButtonContainer
-      - BackButton
-      - NextButton
+  - WorldBuilderUI (Control, full rect)
+    - BackgroundRect (ColorRect, full rect, opaque black)
+    - Overlay (ColorRect, full rect, vignette shader)
+    - BackgroundPanel (Panel, full rect)
+      - TitleLabel (top center)
+      - MainContainer (HSplitContainer, full rect with margins)
+        - LeftNav (Panel, fixed width 250px)
+        - RightSplit (HSplitContainer)
+          - CenterPanel (Panel, expanding)
+            - Map2DTexture (TextureRect, full rect, visible for steps 1-2)
+            - Terrain3DView (SubViewportContainer, full rect, hidden by default)
+              - PreviewViewport (SubViewport)
+                - PreviewWorld (Node3D)
+                  - WorldEnvironment (isolated environment)
+                  - PreviewCamera (Camera3D)
+                  - PreviewLight (DirectionalLight3D)
+                  - Map2DLayer (Node2D, hidden in 3D mode)
+          - RightContent (PanelContainer, fixed width 400px)
+      - ButtonContainer (HBoxContainer, bottom center)
+        - BackButton
+        - NextButton
 
 ## Theme Integration
 
@@ -402,6 +443,33 @@ The wizard system should be tested for:
 
 ---
 
+## Recent Updates (2025-01-XX)
+
+### UI Rendering Fixes
+
+**Full-Screen Layout:**
+- Fixed UI proportioning - WorldBuilderUI now uses full screen (not 80% size)
+- Added opaque `BackgroundRect` to prevent 3D terrain/sky from rendering behind UI
+- All panels use proper anchor-based layout for responsive full-screen display
+
+**2D/3D View Control:**
+- 2D map displays immediately on launch (Steps 1-2)
+- 3D terrain only renders when Step 3 (Terrain) is selected
+- Proper visibility toggling prevents premature 3D rendering
+- 3D SubViewport isolated with its own WorldEnvironment to prevent global effects
+
+**Scene Structure:**
+- Restructured scene tree for proper layering: Background → Overlay → UI Panels
+- CenterPanel contains both 2D and 3D views, with visibility controlled by step
+- 3D rendering confined to center panel, never extends to background
+
+**Files Modified:**
+- `ui/world_builder/WorldBuilderUI.tscn` - Scene restructure with BackgroundRect and proper anchors
+- `ui/world_builder/WorldBuilderUI.gd` - Step visibility control and 2D viewport setup
+- `core/scenes/world_root.gd` - Fixed UI sizing to full screen
+
+---
+
 **Last Updated:** 2025-01-XX  
-**Version:** 1.0.0  
+**Version:** 1.1.0  
 **Author:** Lordthoth
