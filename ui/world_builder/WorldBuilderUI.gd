@@ -50,17 +50,21 @@ var current_icon_group_index: int = 0
 
 ## References to UI nodes
 @onready var left_nav: Panel = $BackgroundPanel/MainContainer/LeftNav
-@onready var center_preview: Control = $BackgroundPanel/MainContainer/RightSplit/CenterPreview
-@onready var preview_viewport_container: SubViewportContainer = $PreviewViewportContainer
-@onready var preview_viewport: SubViewport = $PreviewViewportContainer/PreviewViewport
-@onready var preview_world: Node3D = $PreviewViewportContainer/PreviewViewport/PreviewWorld
-@onready var preview_camera: Camera3D = $PreviewViewportContainer/PreviewViewport/PreviewWorld/PreviewCamera
-@onready var map_2d_layer: Node2D = $PreviewViewportContainer/PreviewViewport/PreviewWorld/Map2DLayer
+@onready var center_panel: Panel = $BackgroundPanel/MainContainer/RightSplit/CenterPanel
+@onready var map_2d_texture: TextureRect = $BackgroundPanel/MainContainer/RightSplit/CenterPanel/Map2DTexture
+@onready var terrain_3d_view: SubViewportContainer = $BackgroundPanel/MainContainer/RightSplit/CenterPanel/Terrain3DView
+@onready var preview_viewport: SubViewport = $BackgroundPanel/MainContainer/RightSplit/CenterPanel/Terrain3DView/PreviewViewport
+@onready var preview_world: Node3D = $BackgroundPanel/MainContainer/RightSplit/CenterPanel/Terrain3DView/PreviewViewport/PreviewWorld
+@onready var preview_camera: Camera3D = $BackgroundPanel/MainContainer/RightSplit/CenterPanel/Terrain3DView/PreviewViewport/PreviewWorld/PreviewCamera
+@onready var map_2d_layer: Node2D = $BackgroundPanel/MainContainer/RightSplit/CenterPanel/Terrain3DView/PreviewViewport/PreviewWorld/Map2DLayer
 @onready var right_content: PanelContainer = $BackgroundPanel/MainContainer/RightSplit/RightContent
 @onready var step_buttons: Array[Button] = []
 @onready var next_button: Button = $BackgroundPanel/ButtonContainer/NextButton
 @onready var back_button: Button = $BackgroundPanel/ButtonContainer/BackButton
 @onready var overlay: ColorRect = $Overlay
+
+## 2D map viewport for rendering map to texture
+var map_2d_viewport: SubViewport = null
 
 ## Preview terrain reference (will be set when terrain manager is connected)
 var preview_terrain: Node = null
@@ -84,6 +88,7 @@ func _ready() -> void:
 	_setup_navigation()
 	_setup_step_content()
 	_setup_buttons()
+	_setup_2d_map_viewport()
 	_update_step_display()
 	print("WorldBuilderUI: Wizard-style UI ready")
 
@@ -251,9 +256,35 @@ func _setup_preview_camera() -> void:
 	preview_camera.current = true
 
 
-func _setup_2d_map_layer() -> void:
+func _setup_2d_map_viewport() -> void:
+	"""Setup 2D map viewport for rendering map to texture."""
+	if map_2d_texture == null:
+		return
+	
+	# Create SubViewport for 2D map rendering
+	map_2d_viewport = SubViewport.new()
+	map_2d_viewport.name = "Map2DViewport"
+	map_2d_viewport.size = Vector2i(1920, 1080)
+	map_2d_viewport.transparent_bg = false
+	map_2d_viewport.handle_input_locally = false
+	map_2d_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	
+	# Create Node2D root for map content
+	var map_root: Node2D = Node2D.new()
+	map_root.name = "MapRoot"
+	map_2d_viewport.add_child(map_root)
+	
+	# Add viewport as child and connect texture
+	add_child(map_2d_viewport)
+	map_2d_texture.texture = map_2d_viewport.get_texture()
+	
+	# Setup 2D map layer content
+	_setup_2d_map_layer_content(map_root)
+
+
+func _setup_2d_map_layer_content(parent: Node2D) -> void:
 	"""Setup 2D map layer with parchment background and grid."""
-	if map_2d_layer == null:
+	if parent == null:
 		return
 	
 	# Get world size for background
@@ -272,7 +303,7 @@ func _setup_2d_map_layer() -> void:
 		Vector2(world_width / 2, world_height / 2),
 		Vector2(-world_width / 2, world_height / 2)
 	])
-	map_2d_layer.add_child(parchment_bg)
+	parent.add_child(parchment_bg)
 	
 	# Try to load parchment texture if available (as overlay)
 	var parchment_texture_path: String = "res://assets/ui/parchment_background.png"
@@ -285,23 +316,32 @@ func _setup_2d_map_layer() -> void:
 			parchment_sprite.position = Vector2.ZERO
 			parchment_sprite.scale = Vector2(world_width / texture.get_width(), world_height / texture.get_height())
 			parchment_sprite.modulate = Color(1, 1, 1, 0.7)  # Semi-transparent overlay
-			map_2d_layer.add_child(parchment_sprite)
+			parent.add_child(parchment_sprite)
 	
 	# Create grid lines (using Line2D nodes)
-	_create_map_grid()
+	_create_map_grid_in_parent(parent)
 	
 	# Create compass rose placeholder (will be added later)
-	_create_compass_rose()
+	_create_compass_rose_in_parent(parent)
 
 
-func _create_map_grid() -> void:
-	"""Create grid lines for the 2D map."""
-	if map_2d_layer == null:
+func _setup_2d_map_layer() -> void:
+	"""Legacy function - now delegates to _setup_2d_map_layer_content if map_2d_layer exists."""
+	# This is kept for compatibility but map2d_layer is now only used for 3D preview
+	if map_2d_layer != null and map_2d_viewport != null:
+		var map_root: Node2D = map_2d_viewport.get_node_or_null("MapRoot")
+		if map_root != null:
+			_setup_2d_map_layer_content(map_root)
+
+
+func _create_map_grid_in_parent(parent: Node2D) -> void:
+	"""Create grid lines for the 2D map in the specified parent."""
+	if parent == null:
 		return
 	
 	var grid_container: Node2D = Node2D.new()
 	grid_container.name = "GridContainer"
-	map_2d_layer.add_child(grid_container)
+	parent.add_child(grid_container)
 	
 	# Get world size from step data
 	var world_width: float = float(step_data.get("Seed & Size", {}).get("width", 1000))
@@ -329,16 +369,24 @@ func _create_map_grid() -> void:
 		grid_container.add_child(line)
 
 
-func _create_compass_rose() -> void:
-	"""Create compass rose decoration for the map."""
-	if map_2d_layer == null:
+func _create_map_grid() -> void:
+	"""Legacy function - delegates to _create_map_grid_in_parent."""
+	if map_2d_viewport != null:
+		var map_root: Node2D = map_2d_viewport.get_node_or_null("MapRoot")
+		if map_root != null:
+			_create_map_grid_in_parent(map_root)
+
+
+func _create_compass_rose_in_parent(parent: Node2D) -> void:
+	"""Create compass rose decoration for the map in the specified parent."""
+	if parent == null:
 		return
 	
 	# Create compass rose using simple 2D shapes
 	var compass_container: Node2D = Node2D.new()
 	compass_container.name = "CompassRose"
 	compass_container.position = Vector2(-450, -450)  # Top-left corner
-	map_2d_layer.add_child(compass_container)
+	parent.add_child(compass_container)
 	
 	# Create N marker using Line2D
 	var n_marker: Line2D = Line2D.new()
@@ -352,51 +400,75 @@ func _create_compass_rose() -> void:
 	# For now, just the line marker
 
 
+func _create_compass_rose() -> void:
+	"""Legacy function - delegates to _create_compass_rose_in_parent."""
+	if map_2d_viewport != null:
+		var map_root: Node2D = map_2d_viewport.get_node_or_null("MapRoot")
+		if map_root != null:
+			_create_compass_rose_in_parent(map_root)
+
+
 func _update_map_grid() -> void:
 	"""Update map grid when world size changes."""
-	if map_2d_layer == null:
+	if map_2d_viewport == null:
+		return
+	
+	var map_root: Node2D = map_2d_viewport.get_node_or_null("MapRoot")
+	if map_root == null:
 		return
 	
 	# Remove old grid
-	var old_grid: Node2D = map_2d_layer.get_node_or_null("GridContainer")
+	var old_grid: Node2D = map_root.get_node_or_null("GridContainer")
 	if old_grid != null:
 		old_grid.queue_free()
 	
 	# Create new grid with updated size
-	_create_map_grid()
+	_create_map_grid_in_parent(map_root)
 
 
 func update_camera_for_step(step: int) -> void:
-	"""Update camera projection and position based on current step."""
-	if preview_camera == null:
-		return
-	
+	"""Update camera projection and position based on current step, and toggle 2D/3D views."""
 	match step:
-		0, 1:  # Steps 1-2: Orthographic top-down
-			preview_camera.projection = Camera3D.PROJECTION_ORTHOGONAL
-			preview_camera.size = 200.0
-			preview_camera.transform.origin = Vector3(0, 100, 0)
-			preview_camera.rotation_degrees = Vector3(-90, 0, 0)
-			# Show 2D map layer
+		0, 1:  # Steps 1-2: Show 2D map, hide 3D viewport
+			# Show 2D map texture
+			if map_2d_texture != null:
+				map_2d_texture.visible = true
+			
+			# Hide 3D terrain viewport (prevents rendering)
+			if terrain_3d_view != null:
+				terrain_3d_view.visible = false
+				preview_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
+			
+			# Ensure camera is not rendering (safety)
+			if preview_camera != null:
+				preview_camera.current = false
+			
+		2, 3, 4, 5, 6, 7, 8:  # Steps 3+: Show 3D viewport, hide 2D map
+			# Hide 2D map texture
+			if map_2d_texture != null:
+				map_2d_texture.visible = false
+			
+			# Show 3D terrain viewport
+			if terrain_3d_view != null:
+				terrain_3d_view.visible = true
+				preview_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+			
+			# Setup camera for 3D perspective view
+			if preview_camera != null:
+				preview_camera.projection = Camera3D.PROJECTION_PERSPECTIVE
+				preview_camera.fov = 70.0
+				# Position camera to view terrain
+				var world_width: float = float(step_data.get("Seed & Size", {}).get("width", 1000))
+				var world_height: float = float(step_data.get("Seed & Size", {}).get("height", 1000))
+				var max_dim: float = max(world_width, world_height)
+				preview_camera.transform.origin = Vector3(max_dim * 0.5, max_dim * 0.3, max_dim * 0.5)
+				preview_camera.look_at(Vector3(world_width / 2, 0, world_height / 2), Vector3.UP)
+				preview_camera.current = true
+			
+			# Hide 2D map layer in 3D viewport (if it exists)
 			if map_2d_layer != null:
-				map_2d_layer.visible = true
-				map_2d_layer.modulate.a = 1.0
-			# Hide terrain preview if it exists
-			if preview_terrain != null:
-				preview_terrain.visible = false
-		2, 3, 4, 5, 6, 7, 8:  # Steps 3+: Perspective with orbit
-			# Transition to perspective
-			preview_camera.projection = Camera3D.PROJECTION_PERSPECTIVE
-			preview_camera.fov = 70.0
-			# Position camera to view terrain
-			var world_width: float = float(step_data.get("Seed & Size", {}).get("width", 1000))
-			var world_height: float = float(step_data.get("Seed & Size", {}).get("height", 1000))
-			var max_dim: float = max(world_width, world_height)
-			preview_camera.transform.origin = Vector3(max_dim * 0.5, max_dim * 0.3, max_dim * 0.5)
-			preview_camera.look_at(Vector3(world_width / 2, 0, world_height / 2), Vector3.UP)
-			# Fade out 2D map layer
-			if map_2d_layer != null:
-				_fade_out_2d_map()
+				map_2d_layer.visible = false
+			
 			# Show terrain preview
 			call_deferred("_ensure_terrain_in_preview")
 
@@ -568,9 +640,9 @@ func _create_step_map_maker(parent: VBoxContainer) -> void:
 	zoom_container.add_child(zoom_in_button)
 	container.add_child(zoom_container)
 	
-	# Make preview viewport clickable for icon placement
-	if preview_viewport_container != null:
-		preview_viewport_container.gui_input.connect(_on_preview_clicked)
+	# Make 2D map texture clickable for icon placement
+	if map_2d_texture != null:
+		map_2d_texture.gui_input.connect(_on_preview_clicked)
 
 
 func _create_step_terrain(parent: VBoxContainer) -> void:
@@ -1238,7 +1310,7 @@ func _on_icon_toolbar_selected(icon_id: String) -> void:
 
 
 func _on_preview_clicked(event: InputEvent) -> void:
-	"""Handle clicks on preview viewport to place icons on 2D map."""
+	"""Handle clicks on 2D map to place icons."""
 	if current_step != 1:  # Only allow placement in Step 2
 		return
 	
@@ -1249,7 +1321,11 @@ func _on_preview_clicked(event: InputEvent) -> void:
 	if not mouse_event.pressed or mouse_event.button_index != MOUSE_BUTTON_LEFT:
 		return
 	
-	if map_2d_layer == null:
+	if map_2d_viewport == null:
+		return
+	
+	var map_root: Node2D = map_2d_viewport.get_node_or_null("MapRoot")
+	if map_root == null:
 		return
 	
 	var selected_icon_id: String = step_data.get("2D Map Maker", {}).get("selected_icon", "")
@@ -1270,10 +1346,10 @@ func _on_preview_clicked(event: InputEvent) -> void:
 	if icon_data.is_empty():
 		return
 	
-	# Convert screen position to world position in Map2DLayer
+	# Convert screen position to world position in 2D map
 	var world_pos: Vector2 = _screen_to_map_position(mouse_event.position)
 	
-	# Create icon node as Sprite2D in Map2DLayer
+	# Create icon node as Sprite2D in 2D map viewport
 	var icon_node: IconNode = IconNode.new()
 	icon_node.name = "Icon_" + str(placed_icons.size())
 	icon_node.position = world_pos
@@ -1283,33 +1359,32 @@ func _on_preview_clicked(event: InputEvent) -> void:
 	var icon_color: Color = Color(icon_color_array[0], icon_color_array[1], icon_color_array[2], icon_color_array[3])
 	icon_node.set_icon_data(selected_icon_id, icon_color)
 	
-	map_2d_layer.add_child(icon_node)
-	placed_icons.append(icon_node)
-	
-	print("WorldBuilderUI: Placed icon ", selected_icon_id, " at ", world_pos)
+	var map_root: Node2D = map_2d_viewport.get_node_or_null("MapRoot")
+	if map_root != null:
+		map_root.add_child(icon_node)
+		placed_icons.append(icon_node)
+		print("WorldBuilderUI: Placed icon ", selected_icon_id, " at ", world_pos)
 
 
 func _screen_to_map_position(screen_pos: Vector2) -> Vector2:
-	"""Convert screen position to world position in Map2DLayer coordinates."""
-	if preview_camera == null or map_2d_layer == null:
+	"""Convert screen position to world position in 2D map coordinates."""
+	if map_2d_texture == null or map_2d_viewport == null:
 		return Vector2.ZERO
 	
-	# Get viewport size
-	var viewport_size: Vector2 = preview_viewport.size if preview_viewport != null else Vector2(1920, 1080)
+	# Get texture rect size
+	var texture_size: Vector2 = map_2d_texture.size
 	
-	# Normalize screen position to -1..1 range
-	var normalized: Vector2 = (screen_pos / viewport_size) * 2.0 - Vector2(1.0, 1.0)
-	normalized.y = -normalized.y  # Flip Y axis
+	# Convert screen position to local texture coordinates (0..1)
+	var local_pos: Vector2 = screen_pos / texture_size if texture_size.length() > 0 else Vector2.ZERO
 	
 	# Get world size from step data
 	var world_width: float = float(step_data.get("Seed & Size", {}).get("width", 1000))
 	var world_height: float = float(step_data.get("Seed & Size", {}).get("height", 1000))
 	
-	# Convert to world coordinates (orthographic camera view)
-	var camera_size: float = preview_camera.size if preview_camera.projection == Camera3D.PROJECTION_ORTHOGONAL else 100.0
+	# Convert to world coordinates (map center at 0,0, with world_width/height range)
 	var world_pos: Vector2 = Vector2(
-		normalized.x * camera_size,
-		normalized.y * camera_size
+		lerp(-world_width / 2.0, world_width / 2.0, local_pos.x),
+		lerp(world_height / 2.0, -world_height / 2.0, local_pos.y)  # Flip Y for 2D space
 	)
 	
 	return world_pos
@@ -1317,7 +1392,7 @@ func _screen_to_map_position(screen_pos: Vector2) -> Vector2:
 
 func _remove_icon_at_position(screen_pos: Vector2) -> void:
 	"""Remove icon closest to click position."""
-	if map_2d_layer == null or placed_icons.is_empty():
+	if map_2d_viewport == null or placed_icons.is_empty():
 		return
 	
 	var world_pos: Vector2 = _screen_to_map_position(screen_pos)
