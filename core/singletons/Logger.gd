@@ -54,8 +54,12 @@ func _ready() -> void:
 
 func _exit_tree() -> void:
 	"""Cleanup on exit."""
+	# Write shutdown message before closing file
+	if current_log_file and current_log_file.is_open():
+		var shutdown_msg: String = _format_message("Logger", LogLevel.INFO, "Logging system shutting down", null)
+		current_log_file.store_string(shutdown_msg + "\n")
+		current_log_file.flush()
 	_close_log_file()
-	info("Logger", "Logging system shutting down")
 
 func _load_config() -> void:
 	"""Load configuration from JSON file."""
