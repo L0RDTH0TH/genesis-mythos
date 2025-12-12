@@ -18,6 +18,7 @@ config/features=PackedStringArray("4.3", "Forward Plus")
 [autoload]
 
 Eryndor="*res://core/singletons/eryndor.gd"
+Logger="*res://core/singletons/Logger.gd"
 WorldStreamer="*res://core/streaming/world_streamer.gd"
 EntitySim="*res://core/sim/entity_sim.gd"
 FactionEconomy="*res://core/sim/faction_economy.gd"
