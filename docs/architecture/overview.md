@@ -10,9 +10,8 @@
 
 1. [System Architecture](#system-architecture)
 2. [Core Systems](#core-systems)
-3. [World Generation](#world-generation)
-4. [Character Creation](#character-creation)
-5. [Data Flow](#data-flow)
+3. [World Builder](#world-builder)
+4. [Data Flow](#data-flow)
 
 ---
 
@@ -22,16 +21,16 @@ Genesis Mythos follows a modular, data-driven architecture with clear separation
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    GameData Singleton                    │
-│              (JSON Data Loader & Storage)                │
+│                    Core Singletons                       │
+│         (Eryndor, Logger, WorldStreamer, etc.)          │
 └─────────────────────────────────────────────────────────┘
                           │
         ┌─────────────────┼─────────────────┐
         │                 │                 │
         ▼                 ▼                 ▼
 ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-│   Character  │  │     World     │  │     UI       │
-│   Creation   │  │  Generation   │  │   System     │
+│   World      │  │   Terrain3D  │  │     UI       │
+│   Builder    │  │   System     │  │   System     │
 └──────────────┘  └──────────────┘  └──────────────┘
 ```
 
@@ -39,25 +38,39 @@ Genesis Mythos follows a modular, data-driven architecture with clear separation
 
 ## Core Systems
 
-### GameData Singleton
+### Core Singletons
 
-Central data management singleton that loads all JSON data files on startup.
+The project uses several autoload singletons for core functionality:
 
-**Responsibilities:**
-- Load all JSON data files (races, classes, backgrounds, etc.)
-- Provide data access to all systems
-- Store current world and character data
+**Eryndor** (`res://core/singletons/eryndor.gd`)
+- Main game controller and entry point
+- Initializes core systems on startup
 
-### Character Creation System
+**Logger** (`res://core/singletons/Logger.gd`)
+- Centralized logging system
+- Provides structured logging with categories and levels
 
-Complete D&D 5e character creation flow with tab-based navigation.
+**WorldStreamer** (`res://core/streaming/world_streamer.gd`)
+- World streaming and loading system
+- Manages dynamic world content loading
+
+**EntitySim** (`res://core/sim/entity_sim.gd`)
+- Entity simulation system
+- Handles entity behavior and state
+
+**FactionEconomy** (`res://core/sim/faction_economy.gd`)
+- Faction economy simulation
+- Manages economic interactions between factions
+
+### World Builder System
+
+Step-by-step wizard interface for creating procedural 3D worlds.
 
 **Key Components:**
-- `CharacterCreationRoot.gd` - Main controller
-- `TabNavigation.gd` - Tab switching and validation
-- Individual tab controllers (RaceTab, ClassTab, etc.)
-- `PlayerData` singleton - Character state storage
-- `CharacterPreview3D` - 3D character preview
+- `WorldBuilderUI.gd` - Main wizard controller with 9 steps
+- `MapMakerModule.gd` - 2D map editor with parchment styling
+- `Terrain3DManager.gd` - Terrain3D integration and management
+- `IconNode.gd` - Icon placement system for 2D map
 
 ### World Generation System
 
@@ -192,56 +205,61 @@ User sees final world
 
 ---
 
-## Character Creation
+## World Builder
 
 ### Architecture Flow
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│              CharacterCreationRoot                          │
+│              WorldBuilderUI                                   │
 │                                                             │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐ │
-│  │   Race   │  │  Class   │  │Background│  │  Ability  │ │
-│  │   Tab    │  │   Tab    │  │   Tab    │  │   Tab     │ │
+│  │  Step 1 │  │  Step 2 │  │  Step 3  │  │  Step 4  │ │
+│  │  Seed   │  │  2D Map │  │ Terrain  │  │ Climate  │ │
 │  └──────────┘  └──────────┘  └──────────┘  └──────────┘ │
 │                                                             │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐              │
+│  │  Step 5  │  │  Step 6  │  │  Step 7  │              │
+│  │ Biomes   │  │Resources  │  │Cities    │              │
+│  └──────────┘  └──────────┘  └──────────┘              │
+│                                                             │
 │  ┌──────────┐  ┌──────────┐                              │
-│  │Appearance│  │   Name   │                              │
-│  │   Tab    │  │   Tab    │                              │
+│  │  Step 8  │  │  Step 9  │                              │
+│  │Preview   │  │  Export  │                              │
 │  └──────────┘  └──────────┘                              │
 │                                                             │
 │  ┌─────────────────────────────────────────────────────┐ │
-│  │              PlayerData Singleton                     │ │
-│  │         (Character State Storage)                    │ │
+│  │              Terrain3DManager                         │ │
+│  │         (Terrain Generation & Management)            │ │
 │  └─────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ### Class Responsibilities
 
-#### CharacterCreationRoot
+#### WorldBuilderUI
 
 **Primary Responsibilities:**
-- Manage tab navigation
-- Load and display tab scenes
-- Coordinate between tabs and preview
-- Handle character confirmation
+- Manage wizard step navigation
+- Load and display step content
+- Coordinate between 2D map and 3D terrain preview
+- Handle world export and saving
 
-#### TabNavigation
-
-**Primary Responsibilities:**
-- Manage tab button states
-- Validate tab completion
-- Enable/disable navigation
-- Emit tab change signals
-
-#### PlayerData Singleton
+#### MapMakerModule
 
 **Primary Responsibilities:**
-- Store current character creation state
-- Provide calculated values (ability modifiers, etc.)
-- Emit signals on state changes
-- Reset character data
+- Provide 2D map editing interface
+- Handle brush tools and icon placement
+- Generate heightmaps from user input
+- Convert 2D map to 3D terrain data
+
+#### Terrain3DManager
+
+**Primary Responsibilities:**
+- Manage Terrain3D plugin integration
+- Generate terrain from heightmaps or noise
+- Handle terrain import/export
+- Coordinate terrain updates
 
 ---
 
@@ -259,39 +277,37 @@ JSON/Resources → WorldGenerationManager → World Mesh
      └─→ GameData.current_world_data
 ```
 
-### Character Creation Data Flow
+### World Builder Data Flow
 
 ```
-JSON Files → GameData → PlayerData → CharacterCreationRoot → UI
-     │          │          │              │
-     │          │          │              └─→ Tab Controllers
-     │          │          │
-     │          │          └─→ Character Preview
-     │          │
-     │          └─→ CharacterData Resource (on save)
+JSON Files → WorldBuilderUI → Terrain3DManager → 3D Terrain
+     │            │                  │
+     │            │                  └─→ Terrain3D Node
+     │            │
+     │            └─→ MapMakerModule → 2D Map Canvas
      │
-     └─→ races.json, classes.json, backgrounds.json, etc.
+     └─→ biomes.json, civilizations.json, resources.json, map_icons.json
 ```
 
 ---
 
 ## Integration Points
 
-### World → Character Creation
+### 2D Map → 3D Terrain
+
+When 2D map editing completes:
+1. `MapMakerModule` generates heightmap from user input
+2. Heightmap exported to EXR format
+3. `Terrain3DManager` imports heightmap into Terrain3D
+4. 3D terrain preview updates in real-time
+
+### World Builder → Export
 
 When world generation completes:
-1. `WorldGenerationManager` emits `generation_complete`
-2. `WorldCreator` stores world in `GameData.current_world_data`
-3. Scene transitions to character creation
-4. Character creation can access world via `GameData.current_world_data`
-
-### Character Creation → Game
-
-When character creation completes:
-1. `CharacterCreationRoot` creates `CharacterData` resource
-2. Stores in `GameData.current_character_data`
-3. Scene transitions to main game
-4. Game can access character and world data
+1. `WorldBuilderUI` collects all step data
+2. World data saved to JSON (`user://worlds/{name}.json`)
+3. Heightmap exported to PNG/EXR (`user://exports/{name}_heightmap.png`)
+4. Biome map exported (`user://exports/{name}_biomes.png`)
 
 ---
 

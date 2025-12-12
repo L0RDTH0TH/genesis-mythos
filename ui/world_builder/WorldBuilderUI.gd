@@ -39,6 +39,9 @@ var biomes_data: Dictionary = {}
 ## Civilizations data
 var civilizations_data: Dictionary = {}
 
+## Fantasy archetypes data
+var fantasy_archetypes: Dictionary = {}
+
 ## Placed icons on 2D map
 var placed_icons: Array = []  # Array[IconNode] - using untyped for compatibility
 
@@ -78,9 +81,13 @@ const MAP_ICONS_PATH: String = "res://data/map_icons.json"
 const UI_CONFIG_PATH: String = "res://data/config/world_builder_ui.json"
 const BIOMES_PATH: String = "res://data/biomes.json"
 const CIVILIZATIONS_PATH: String = "res://data/civilizations.json"
+const FANTASY_ARCHETYPES_PATH: String = "res://data/fantasy_archetypes.json"
 
 ## Control references
 var control_references: Dictionary = {}
+
+## Persistent texture for map preview (prevents scaling issues)
+var map_preview_texture: ImageTexture = ImageTexture.new()
 
 
 func _ready() -> void:
@@ -88,6 +95,7 @@ func _ready() -> void:
 	_load_map_icons()
 	_load_biomes()
 	_load_civilizations()
+	_load_fantasy_archetypes()
 	_apply_theme()
 	_ensure_visibility()
 	_setup_navigation()
@@ -160,6 +168,28 @@ func _load_civilizations() -> void:
 	civilizations_data = json.data
 	var civ_count: int = civilizations_data.get("civilizations", []).size()
 	Logger.info("UI/WorldBuilder", "Loaded civilization definitions", {"count": civ_count})
+
+
+func _load_fantasy_archetypes() -> void:
+	"""Load fantasy archetypes configuration from JSON."""
+	Logger.verbose("UI/WorldBuilder", "_load_fantasy_archetypes() called", {"path": FANTASY_ARCHETYPES_PATH})
+	var file: FileAccess = FileAccess.open(FANTASY_ARCHETYPES_PATH, FileAccess.READ)
+	if file == null:
+		Logger.error("UI/WorldBuilder", "Failed to load fantasy archetypes from %s" % FANTASY_ARCHETYPES_PATH)
+		return
+	
+	var json_string: String = file.get_as_text()
+	file.close()
+	
+	var json: JSON = JSON.new()
+	var parse_result: Error = json.parse(json_string)
+	if parse_result != OK:
+		Logger.error("UI/WorldBuilder", "Failed to parse fantasy archetypes JSON: %s" % json.get_error_message())
+		return
+	
+	fantasy_archetypes = json.data
+	var arch_count: int = fantasy_archetypes.size()
+	Logger.info("UI/WorldBuilder", "Loaded fantasy archetype definitions", {"count": arch_count})
 
 
 func _apply_theme() -> void:
@@ -513,7 +543,7 @@ func _ensure_terrain_in_preview() -> void:
 
 
 func _create_step_seed_size(parent: VBoxContainer) -> void:
-	"""Create Step 1: Seed & Size content."""
+	"""Create Step 1: Seed & Size content with fantasy archetypes."""
 	var step_panel: Panel = Panel.new()
 	step_panel.name = "StepSeedSize"
 	step_panel.visible = (current_step == 0)
@@ -524,69 +554,87 @@ func _create_step_seed_size(parent: VBoxContainer) -> void:
 	container.add_theme_constant_override("separation", 10)
 	step_panel.add_child(container)
 	
-	# Seed input
+	# Seed input with random button
 	var seed_container: HBoxContainer = HBoxContainer.new()
 	var seed_label: Label = Label.new()
 	seed_label.text = "Seed:"
 	seed_label.custom_minimum_size = Vector2(150, 0)
 	seed_container.add_child(seed_label)
 	
-	var seed_spinbox: SpinBox = SpinBox.new()
-	seed_spinbox.name = "seed"
-	seed_spinbox.min_value = 0
-	seed_spinbox.max_value = 999999
-	seed_spinbox.value = 12345
-	seed_spinbox.value_changed.connect(func(v): _on_seed_changed(int(v)))
-	seed_container.add_child(seed_spinbox)
+	var seed_input: LineEdit = LineEdit.new()
+	seed_input.name = "seed"
+	seed_input.text = "12345"
+	seed_input.text_submitted.connect(_on_seed_text_submitted)
+	seed_input.text_changed.connect(_on_seed_text_changed)
+	seed_container.add_child(seed_input)
+	
+	var random_seed_button: Button = Button.new()
+	random_seed_button.text = "Random"
+	random_seed_button.pressed.connect(_on_random_seed_pressed)
+	seed_container.add_child(random_seed_button)
 	container.add_child(seed_container)
-	control_references["Seed & Size/seed"] = seed_spinbox
+	control_references["Seed & Size/seed"] = seed_input
 	step_data["Seed & Size"]["seed"] = 12345
 	
-	# Size inputs
+	# Fantasy Style dropdown
+	var style_label: Label = Label.new()
+	style_label.text = "Fantasy Style:"
+	container.add_child(style_label)
+	
+	var style_dropdown: OptionButton = OptionButton.new()
+	style_dropdown.name = "style"
+	for style_name: String in fantasy_archetypes.keys():
+		style_dropdown.add_item(style_name)
+	style_dropdown.selected = 0
+	style_dropdown.item_selected.connect(_on_fantasy_style_selected)
+	container.add_child(style_dropdown)
+	control_references["Seed & Size/style"] = style_dropdown
+	step_data["Seed & Size"]["style"] = fantasy_archetypes.keys()[0] if fantasy_archetypes.size() > 0 else ""
+	
+	# Initialize with first style's recommendations
+	if fantasy_archetypes.size() > 0:
+		_on_fantasy_style_selected(0)
+	
+	# Size dropdown
 	var size_label: Label = Label.new()
 	size_label.text = "World Size:"
 	container.add_child(size_label)
 	
-	var size_container: HBoxContainer = HBoxContainer.new()
-	var width_label: Label = Label.new()
-	width_label.text = "Width:"
-	width_label.custom_minimum_size = Vector2(100, 0)
-	size_container.add_child(width_label)
+	var size_dropdown: OptionButton = OptionButton.new()
+	size_dropdown.name = "size"
+	var size_map: Dictionary = {"Tiny": 512, "Small": 1024, "Medium": 2048, "Large": 4096, "Extra Large": 8192}
+	for size_name: String in size_map.keys():
+		size_dropdown.add_item(size_name)
+	size_dropdown.selected = 1  # Default to Small
+	size_dropdown.item_selected.connect(_on_size_selected)
+	container.add_child(size_dropdown)
+	control_references["Seed & Size/size"] = size_dropdown
+	step_data["Seed & Size"]["size"] = "Small"
+	step_data["Seed & Size"]["width"] = size_map["Small"]
+	step_data["Seed & Size"]["height"] = size_map["Small"]
 	
-	var width_spinbox: SpinBox = SpinBox.new()
-	width_spinbox.name = "width"
-	width_spinbox.min_value = 100
-	width_spinbox.max_value = 10000
-	width_spinbox.value = 1000
-	width_spinbox.value_changed.connect(func(v): step_data["Seed & Size"]["width"] = int(v))
-	size_container.add_child(width_spinbox)
+	# Landmass dropdown
+	var landmass_label: Label = Label.new()
+	landmass_label.text = "Landmass Type:"
+	container.add_child(landmass_label)
 	
-	var height_label: Label = Label.new()
-	height_label.text = "Height:"
-	height_label.custom_minimum_size = Vector2(100, 0)
-	size_container.add_child(height_label)
+	var landmass_dropdown: OptionButton = OptionButton.new()
+	landmass_dropdown.name = "landmass"
+	var landmass_types: Array[String] = ["Continents", "Island Chain", "Single Island", "Archipelago", "Pangea", "Coastal"]
+	for landmass: String in landmass_types:
+		landmass_dropdown.add_item(landmass)
+	landmass_dropdown.selected = 0
+	landmass_dropdown.item_selected.connect(_on_landmass_selected)
+	container.add_child(landmass_dropdown)
+	control_references["Seed & Size/landmass"] = landmass_dropdown
+	step_data["Seed & Size"]["landmass"] = "Continents"
 	
-	var height_spinbox: SpinBox = SpinBox.new()
-	height_spinbox.name = "height"
-	height_spinbox.min_value = 100
-	height_spinbox.max_value = 10000
-	height_spinbox.value = 1000
-	height_spinbox.value_changed.connect(func(v): 
-		step_data["Seed & Size"]["height"] = int(v)
-		call_deferred("_update_map_grid")
-	)
-	size_container.add_child(height_spinbox)
-	container.add_child(size_container)
-	control_references["Seed & Size/width"] = width_spinbox
-	control_references["Seed & Size/height"] = height_spinbox
-	step_data["Seed & Size"]["width"] = 1000
-	step_data["Seed & Size"]["height"] = 1000
-	
-	# Update width change handler too
-	width_spinbox.value_changed.connect(func(v): 
-		step_data["Seed & Size"]["width"] = int(v)
-		call_deferred("_update_map_grid")
-	)
+	# Generate button
+	var generate_button: Button = Button.new()
+	generate_button.text = "Generate Map"
+	generate_button.pressed.connect(_on_generate_map_pressed)
+	container.add_child(generate_button)
+	control_references["Seed & Size/generate"] = generate_button
 
 
 func _create_step_map_maker(parent: VBoxContainer) -> void:
@@ -1351,6 +1399,268 @@ func _update_terrain_seed_from_step1() -> void:
 		if terrain_seed != null:
 			terrain_seed.value = step1_seed
 			step_data["Terrain"]["seed"] = step1_seed
+
+
+func _on_seed_text_submitted(text: String) -> void:
+	"""Handle seed text submission."""
+	_on_seed_text_changed(text)
+
+
+func _on_seed_text_changed(text: String) -> void:
+	"""Handle seed text change."""
+	if text.is_valid_int():
+		var seed_val: int = text.to_int()
+		step_data["Seed & Size"]["seed"] = seed_val
+		_on_seed_changed(seed_val)
+	else:
+		# Reset to current value if invalid
+		var seed_input: LineEdit = control_references.get("Seed & Size/seed") as LineEdit
+		if seed_input != null:
+			seed_input.text = str(step_data.get("Seed & Size", {}).get("seed", 12345))
+
+
+func _on_random_seed_pressed() -> void:
+	"""Generate a random seed."""
+	var seed_value: int = randi() % 999999 + 1
+	step_data["Seed & Size"]["seed"] = seed_value
+	var seed_input: LineEdit = control_references.get("Seed & Size/seed") as LineEdit
+	if seed_input != null:
+		seed_input.text = str(seed_value)
+	_on_seed_changed(seed_value)
+
+
+func _on_fantasy_style_selected(index: int) -> void:
+	"""Handle fantasy style selection - auto-update size and landmass."""
+	var style_dropdown: OptionButton = control_references.get("Seed & Size/style") as OptionButton
+	if style_dropdown == null:
+		return
+	
+	var selected_style: String = style_dropdown.get_item_text(index)
+	step_data["Seed & Size"]["style"] = selected_style
+	
+	var arch: Dictionary = fantasy_archetypes.get(selected_style, {})
+	if arch.is_empty():
+		return
+	
+	# Set recommended size
+	var rec_size: String = arch.get("recommended_size", "Small")
+	var size_dropdown: OptionButton = control_references.get("Seed & Size/size") as OptionButton
+	if size_dropdown != null:
+		var size_map: Dictionary = {"Tiny": 0, "Small": 1, "Medium": 2, "Large": 3, "Extra Large": 4}
+		var size_index: int = size_map.get(rec_size, 1)
+		if size_index >= 0 and size_index < size_dropdown.get_item_count():
+			size_dropdown.selected = size_index
+			_on_size_selected(size_index)
+	
+	# Set default landmass
+	var rec_land: String = arch.get("default_landmass", "Continents")
+	var landmass_dropdown: OptionButton = control_references.get("Seed & Size/landmass") as OptionButton
+	if landmass_dropdown != null:
+		var landmass_types: Array[String] = ["Continents", "Island Chain", "Single Island", "Archipelago", "Pangea", "Coastal"]
+		var land_index: int = landmass_types.find(rec_land)
+		if land_index >= 0:
+			landmass_dropdown.selected = land_index
+			step_data["Seed & Size"]["landmass"] = rec_land
+	
+	# Set tooltip with description
+	style_dropdown.tooltip_text = arch.get("description", "")
+
+
+func _on_size_selected(index: int) -> void:
+	"""Handle size selection - update width/height."""
+	var size_dropdown: OptionButton = control_references.get("Seed & Size/size") as OptionButton
+	if size_dropdown == null:
+		return
+	
+	var size_name: String = size_dropdown.get_item_text(index)
+	var size_map: Dictionary = {"Tiny": 512, "Small": 1024, "Medium": 2048, "Large": 4096, "Extra Large": 8192}
+	var map_size: int = size_map.get(size_name, 1024)
+	
+	step_data["Seed & Size"]["size"] = size_name
+	step_data["Seed & Size"]["width"] = map_size
+	step_data["Seed & Size"]["height"] = map_size
+	call_deferred("_update_map_grid")
+
+
+func _on_landmass_selected(index: int) -> void:
+	"""Handle landmass selection."""
+	var landmass_dropdown: OptionButton = control_references.get("Seed & Size/landmass") as OptionButton
+	if landmass_dropdown == null:
+		return
+	
+	var landmass: String = landmass_dropdown.get_item_text(index)
+	step_data["Seed & Size"]["landmass"] = landmass
+
+
+func _on_generate_map_pressed() -> void:
+	"""Generate procedural 2D map with archetype-based parameters."""
+	var seed_value: int = step_data.get("Seed & Size", {}).get("seed", 12345)
+	var style_name: String = step_data.get("Seed & Size", {}).get("style", "")
+	var map_width: int = step_data.get("Seed & Size", {}).get("width", 1024)
+	var map_height: int = step_data.get("Seed & Size", {}).get("height", 1024)
+	var landmass: String = step_data.get("Seed & Size", {}).get("landmass", "Continents")
+	
+	if style_name.is_empty() or not fantasy_archetypes.has(style_name):
+		Logger.warn("UI/WorldBuilder", "Invalid fantasy style selected")
+		return
+	
+	var arch: Dictionary = fantasy_archetypes[style_name]
+	
+	# Generate heightmap and biome map
+	var height_img: Image = Image.create(map_width, map_height, false, Image.FORMAT_RF)
+	var biome_img: Image = Image.create(map_width, map_height, false, Image.FORMAT_RGB8)
+	
+	# Setup noise
+	var noise: FastNoiseLite = FastNoiseLite.new()
+	noise.seed = seed_value
+	
+	# Map noise type string to enum
+	var noise_type_str: String = arch.get("noise_type", "TYPE_SIMPLEX")
+	var noise_type: FastNoiseLite.NoiseType = FastNoiseLite.NoiseType.TYPE_SIMPLEX
+	match noise_type_str:
+		"TYPE_SIMPLEX":
+			noise_type = FastNoiseLite.NoiseType.TYPE_SIMPLEX
+		"TYPE_SIMPLEX_SMOOTH":
+			noise_type = FastNoiseLite.NoiseType.TYPE_SIMPLEX_SMOOTH
+		"TYPE_PERLIN":
+			noise_type = FastNoiseLite.NoiseType.TYPE_PERLIN
+		"TYPE_VALUE":
+			noise_type = FastNoiseLite.NoiseType.TYPE_VALUE
+		"TYPE_CELLULAR":
+			noise_type = FastNoiseLite.NoiseType.TYPE_CELLULAR
+	
+	noise.noise_type = noise_type
+	noise.frequency = arch.get("frequency", 0.004)
+	noise.fractal_octaves = arch.get("octaves", 6)
+	noise.fractal_gain = arch.get("gain", 0.5)
+	noise.fractal_lacunarity = arch.get("lacunarity", 2.0)
+	var height_scale: float = arch.get("height_scale", 0.8)
+	var colors: Dictionary = arch.get("biome_colors", {})
+	
+	# Generate heightmap
+	for y: int in map_height:
+		for x: int in map_width:
+			var val: float = (noise.get_noise_2d(x, y) + 1.0) / 2.0 * height_scale
+			val = clampf(val, 0.0, 1.0)
+			height_img.set_pixel(x, y, Color(val, val, val))
+	
+	# Apply landmass-specific mask
+	match landmass:
+		"Single Island":
+			_apply_radial_mask(height_img, map_width, map_height, 0.5, 0.5, 0.35)
+		"Island Chain":
+			_apply_multi_radial_mask(height_img, map_width, map_height, 4, 0.25)
+		"Archipelago":
+			_apply_multi_radial_mask(height_img, map_width, map_height, 12, 0.15)
+		"Pangea":
+			_apply_radial_mask(height_img, map_width, map_height, 0.5, 0.5, 0.9, true)
+		"Coastal":
+			_apply_coastal_mask(height_img, map_width, map_height)
+		_:  # Continents: no mask
+			pass
+	
+	# Auto-assign biomes based on height thresholds
+	for y: int in map_height:
+		for x: int in map_width:
+			var h: float = height_img.get_pixel(x, y).r
+			var col: Color
+			if h < 0.35:
+				col = Color(colors.get("water", "#2a6d9e"))
+			elif h < 0.38:
+				col = Color(colors.get("beach", "#d4b56a"))
+			elif h < 0.5:
+				col = Color(colors.get("grass", "#3d8c40"))
+			elif h < 0.65:
+				col = Color(colors.get("forest", "#2d5a3d"))
+			elif h < 0.8:
+				col = Color(colors.get("hill", "#8b7355"))
+			elif h < 0.95:
+				col = Color(colors.get("mountain", "#c0c0c0"))
+			else:
+				col = Color(colors.get("snow", "#ffffff"))
+			biome_img.set_pixel(x, y, col)
+	
+	# Update 2D map preview
+	_update_2d_map_preview(height_img, biome_img, map_width, map_height)
+	
+	Logger.info("UI/WorldBuilder", "Generated procedural map", {"style": style_name, "landmass": landmass, "size": str(map_width) + "x" + str(map_height)})
+
+
+func _apply_radial_mask(img: Image, width: int, height: int, cx: float, cy: float, radius: float, invert: bool = false) -> void:
+	"""Apply radial mask to heightmap."""
+	var center: Vector2 = Vector2(width * cx, height * cy)
+	for y: int in height:
+		for x: int in width:
+			var dist: float = Vector2(x, y).distance_to(center) / (width * radius)
+			var falloff: float = clampf(1.0 - dist, 0.0, 1.0)
+			if invert:
+				falloff = 1.0 - falloff
+			var val: float = img.get_pixel(x, y).r * falloff
+			img.set_pixel(x, y, Color(val, val, val))
+
+
+func _apply_multi_radial_mask(img: Image, width: int, height: int, num: int, radius: float) -> void:
+	"""Apply multiple radial masks for island chains."""
+	for i: int in num:
+		var cx: float = randf_range(0.1, 0.9)
+		var cy: float = randf_range(0.1, 0.9)
+		_apply_radial_mask(img, width, height, cx, cy, radius)
+
+
+func _apply_coastal_mask(img: Image, width: int, height: int) -> void:
+	"""Apply coastal mask (lower edges)."""
+	_apply_radial_mask(img, width, height, 0.5, 0.5, 0.7, true)
+
+
+func _update_2d_map_preview(height_img: Image, biome_img: Image, width: int, height: int) -> void:
+	"""Update the 2D map preview with generated terrain - robust scaling fix."""
+	if map_2d_viewport == null:
+		return
+	
+	# Update viewport size to match generated map
+	map_2d_viewport.size = Vector2i(width, height)
+	
+	var map_root: Node2D = map_2d_viewport.get_node_or_null("MapRoot")
+	if map_root == null:
+		return
+	
+	# Create combined texture from height and biome
+	var combined: Image = Image.create(width, height, false, Image.FORMAT_RGBA8)
+	combined.blit_rect(biome_img, Rect2(0, 0, width, height), Vector2(0, 0))
+	
+	# Apply height as alpha for depth effect
+	for y: int in height:
+		for x: int in width:
+			var h: float = height_img.get_pixel(x, y).r
+			var col: Color = combined.get_pixel(x, y)
+			combined.set_pixel(x, y, Color(col.r, col.g, col.b, h))
+	
+	# Update the persistent ImageTexture resource (key fix for scaling)
+	map_preview_texture.set_image(combined)
+	
+	# Assign once - never loses reference
+	if map_2d_texture != null:
+		map_2d_texture.texture = map_preview_texture
+		map_2d_texture.visible = true
+		
+		# Dynamically scale to fit screen beautifully
+		var viewport_size: Vector2 = get_viewport_rect().size
+		var scale_factor: float = min(
+			(viewport_size.x * 0.85) / width,
+			(viewport_size.y * 0.75) / height
+		)
+		scale_factor = max(scale_factor, 0.1)  # Prevent collapse
+		
+		# Ensure proper centering and scaling
+		map_2d_texture.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+		map_2d_texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	
+	# Store in step data for later use
+	step_data["Seed & Size"]["heightmap_image"] = height_img
+	step_data["Seed & Size"]["biome_image"] = biome_img
+	
+	# Update grid to match new size
+	call_deferred("_update_map_grid")
 
 
 func _on_icon_toolbar_selected(icon_id: String) -> void:

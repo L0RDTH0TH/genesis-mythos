@@ -189,12 +189,17 @@ label.modulate = get_theme_color("disabled_color")
 Never hard-code game data. Load from JSON files:
 ```gdscript
 # BAD
-var races = ["human", "elf", "dwarf"]
+var biomes = ["forest", "desert", "tundra"]
 
 # GOOD
-var races: Array[Dictionary] = []
+var biomes: Array[Dictionary] = []
 func _ready() -> void:
-    races = load_json_array("res://data/races.json")
+    var file = FileAccess.open("res://data/biomes.json", FileAccess.READ)
+    if file:
+        var json = JSON.new()
+        json.parse(file.get_as_text())
+        biomes = json.data
+        file.close()
 ```
 
 ### Use Resources

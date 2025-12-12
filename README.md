@@ -95,10 +95,11 @@ The project is configured in `project.godot`:
 - **Window Size**: 1920x1080 (configurable)
 - **Theme**: `res://themes/bg3_theme.tres` (applied globally)
 - **Autoload Singletons**:
-  - `Eryndor`: Core game singleton
-  - `WorldStreamer`: World streaming system
-  - `EntitySim`: Entity simulation
-  - `FactionEconomy`: Faction economy system
+  - `Eryndor`: Core game singleton (`res://core/singletons/eryndor.gd`)
+  - `Logger`: Logging system (`res://core/singletons/Logger.gd`)
+  - `WorldStreamer`: World streaming system (`res://core/streaming/world_streamer.gd`)
+  - `EntitySim`: Entity simulation (`res://core/sim/entity_sim.gd`)
+  - `FactionEconomy`: Faction economy system (`res://core/sim/faction_economy.gd`)
 
 ## Documentation
 
