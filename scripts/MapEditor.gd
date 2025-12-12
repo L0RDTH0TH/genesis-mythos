@@ -97,11 +97,11 @@ func _resize_images() -> void:
 	height_img = Image.create(map_width, map_height, false, Image.FORMAT_RF)
 	biome_img = Image.create(map_width, map_height, false, Image.FORMAT_RGB8)
 	
-	# Reset with clean parchment
-	height_img.fill(Color.BLACK)
-	biome_img.fill(Color(0.92, 0.87, 0.75))  # Warm parchment base (will be themed later)
+	# DO NOT fill biome_img here — we want the procedural colors to show!
+	height_img.fill(Color.BLACK)  # Sea level = black
+	# biome_img is left completely empty on purpose
 	
-	update_canvas()
+	update_canvas()  # Will show clean parchment until Generate is pressed
 
 func update_canvas() -> void:
 	var combined: Image = Image.create(map_width, map_height, false, Image.FORMAT_RGBA8)
@@ -209,7 +209,6 @@ func _on_generate_map() -> void:
 	noise.fractal_gain = arch.get("gain", 0.5)
 	noise.fractal_lacunarity = arch.get("lacunarity", 2.0)
 	var height_scale: float = arch.get("height_scale", 0.8)
-	var colors: Dictionary = arch.get("biome_colors", {})
 	
 	# Generate heightmap
 	for y: int in map_height:
@@ -237,28 +236,24 @@ func _on_generate_map() -> void:
 		_:  # Continents: no mask
 			pass
 	
-	# Auto-assign biomes based on height thresholds
+	# NOW paint the biomes using the selected archetype
+	var colors: Dictionary = arch["biome_colors"]
+	
 	for y: int in map_height:
 		for x: int in map_width:
 			var h: float = height_img.get_pixel(x, y).r
-			var col: Color
-			if h < 0.35:
-				col = Color(colors.get("water", "#2a6d9e"))
-			elif h < 0.38:
-				col = Color(colors.get("beach", "#d4b56a"))
-			elif h < 0.5:
-				col = Color(colors.get("grass", "#3d8c40"))
-			elif h < 0.65:
-				col = Color(colors.get("forest", "#2d5a3d"))
-			elif h < 0.8:
-				col = Color(colors.get("hill", "#8b7355"))
-			elif h < 0.95:
-				col = Color(colors.get("mountain", "#c0c0c0"))
-			else:
-				col = Color(colors.get("snow", "#ffffff"))
+			
+			var col: Color = Color(colors["water"])
+			if h > 0.38:   col = Color(colors["beach"])
+			if h > 0.42:   col = Color(colors["grass"])
+			if h > 0.55:   col = Color(colors["forest"])
+			if h > 0.70:   col = Color(colors["hill"])
+			if h > 0.85:   col = Color(colors["mountain"])
+			if h > 0.95:   col = Color(colors["snow"])
+			
 			biome_img.set_pixel(x, y, col)
 	
-	update_canvas()
+	update_canvas()  # ← This now shows the real land!
 
 func _apply_radial_mask(cx: float, cy: float, radius: float, invert: bool = false) -> void:
 	var center: Vector2 = Vector2(map_width * cx, map_height * cy)
