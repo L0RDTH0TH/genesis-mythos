@@ -8,7 +8,7 @@
 		"Networking": "WARN",
 		"CharacterCreation": "DEBUG",
 		"WorldGeneration": "VERBOSE",
-		"Terrain": "INFO",
+		"Terrain": "VERBOSE",
 		"EntitySim": "INFO",
 		"FactionEconomy": "INFO",
 		"Logger": "INFO"
