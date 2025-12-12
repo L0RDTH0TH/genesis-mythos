@@ -7,7 +7,7 @@
 		"Inventory": "INFO",
 		"Networking": "WARN",
 		"CharacterCreation": "DEBUG",
-		"WorldGeneration": "INFO",
+		"WorldGeneration": "VERBOSE",
 		"Terrain": "INFO",
 		"EntitySim": "INFO",
 		"FactionEconomy": "INFO",
