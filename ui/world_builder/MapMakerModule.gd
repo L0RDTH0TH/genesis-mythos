@@ -175,7 +175,7 @@ func _setup_parchment_overlay() -> void:
 		shader_material.shader = shader
 		
 		# Load parchment texture (if available, otherwise will use default)
-		var parchment_texture_path: String = "res://assets/textures/parchment_background.png"
+		var parchment_texture_path: String = "res://assets/textures/ui/parchment_background.png"
 		if ResourceLoader.exists(parchment_texture_path):
 			var parchment_texture: Texture2D = load(parchment_texture_path)
 			shader_material.set_shader_parameter("parchment_texture", parchment_texture)

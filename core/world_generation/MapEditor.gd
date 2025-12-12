@@ -41,8 +41,9 @@ func set_world_map_data(data: WorldMapData) -> void:
 
 func set_tool(tool: EditTool) -> void:
 	"""Set current editing tool."""
+	Logger.verbose("World/Editor", "set_tool() called", {"tool": EditTool.keys()[tool]})
 	current_tool = tool
-	print("MapEditor: Tool set to ", EditTool.keys()[tool])
+	Logger.debug("World/Editor", "Tool set", {"tool": EditTool.keys()[tool]})
 
 
 func set_brush_radius(radius: float) -> void:

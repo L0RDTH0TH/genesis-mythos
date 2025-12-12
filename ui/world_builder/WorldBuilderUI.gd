@@ -84,6 +84,7 @@ var control_references: Dictionary = {}
 
 
 func _ready() -> void:
+	Logger.verbose("UI/WorldBuilder", "_ready() called")
 	_load_map_icons()
 	_load_biomes()
 	_load_civilizations()
@@ -94,7 +95,7 @@ func _ready() -> void:
 	_setup_buttons()
 	_setup_2d_map_viewport()
 	_update_step_display()
-	print("WorldBuilderUI: Wizard-style UI ready")
+	Logger.info("UI/WorldBuilder", "Wizard-style UI ready")
 
 
 func _load_map_icons() -> void:
@@ -119,9 +120,10 @@ func _load_map_icons() -> void:
 
 func _load_biomes() -> void:
 	"""Load biomes configuration from JSON."""
+	Logger.verbose("UI/WorldBuilder", "_load_biomes() called", {"path": BIOMES_PATH})
 	var file: FileAccess = FileAccess.open(BIOMES_PATH, FileAccess.READ)
 	if file == null:
-		push_error("WorldBuilderUI: Failed to load biomes from " + BIOMES_PATH)
+		Logger.error("UI/WorldBuilder", "Failed to load biomes from %s" % BIOMES_PATH)
 		return
 	
 	var json_string: String = file.get_as_text()
@@ -130,18 +132,20 @@ func _load_biomes() -> void:
 	var json: JSON = JSON.new()
 	var parse_result: Error = json.parse(json_string)
 	if parse_result != OK:
-		push_error("WorldBuilderUI: Failed to parse biomes JSON: " + json.get_error_message())
+		Logger.error("UI/WorldBuilder", "Failed to parse biomes JSON: %s" % json.get_error_message())
 		return
 	
 	biomes_data = json.data
-	print("WorldBuilderUI: Loaded ", biomes_data.get("biomes", []).size(), " biome definitions")
+	var biome_count: int = biomes_data.get("biomes", []).size()
+	Logger.info("UI/WorldBuilder", "Loaded biome definitions", {"count": biome_count})
 
 
 func _load_civilizations() -> void:
 	"""Load civilizations configuration from JSON."""
+	Logger.verbose("UI/WorldBuilder", "_load_civilizations() called", {"path": CIVILIZATIONS_PATH})
 	var file: FileAccess = FileAccess.open(CIVILIZATIONS_PATH, FileAccess.READ)
 	if file == null:
-		push_error("WorldBuilderUI: Failed to load civilizations from " + CIVILIZATIONS_PATH)
+		Logger.error("UI/WorldBuilder", "Failed to load civilizations from %s" % CIVILIZATIONS_PATH)
 		return
 	
 	var json_string: String = file.get_as_text()
@@ -150,11 +154,12 @@ func _load_civilizations() -> void:
 	var json: JSON = JSON.new()
 	var parse_result: Error = json.parse(json_string)
 	if parse_result != OK:
-		push_error("WorldBuilderUI: Failed to parse civilizations JSON: " + json.get_error_message())
+		Logger.error("UI/WorldBuilder", "Failed to parse civilizations JSON: %s" % json.get_error_message())
 		return
 	
 	civilizations_data = json.data
-	print("WorldBuilderUI: Loaded ", civilizations_data.get("civilizations", []).size(), " civilization definitions")
+	var civ_count: int = civilizations_data.get("civilizations", []).size()
+	Logger.info("UI/WorldBuilder", "Loaded civilization definitions", {"count": civ_count})
 
 
 func _apply_theme() -> void:
@@ -310,7 +315,7 @@ func _setup_2d_map_layer_content(parent: Node2D) -> void:
 	parent.add_child(parchment_bg)
 	
 	# Try to load parchment texture if available (as overlay)
-	var parchment_texture_path: String = "res://assets/ui/parchment_background.png"
+	var parchment_texture_path: String = "res://assets/textures/ui/parchment_background.png"
 	if ResourceLoader.exists(parchment_texture_path):
 		var texture: Texture2D = load(parchment_texture_path)
 		if texture != null:

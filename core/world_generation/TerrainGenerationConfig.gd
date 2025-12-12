@@ -9,9 +9,10 @@ extends RefCounted
 
 ## Load terrain generation config from JSON
 static func load_from_json(path: String) -> Dictionary:
+	Logger.verbose("World/Config", "TerrainGenerationConfig.load_from_json() called", {"path": path})
 	var file: FileAccess = FileAccess.open(path, FileAccess.READ)
 	if file == null:
-		push_error("TerrainGenerationConfig: Failed to load config from " + path)
+		Logger.error("World/Config", "Failed to load config from %s" % path)
 		return {}
 	
 	var json_string: String = file.get_as_text()
@@ -20,9 +21,10 @@ static func load_from_json(path: String) -> Dictionary:
 	var json: JSON = JSON.new()
 	var parse_result: Error = json.parse(json_string)
 	if parse_result != OK:
-		push_error("TerrainGenerationConfig: Failed to parse JSON: " + json.get_error_message())
+		Logger.error("World/Config", "Failed to parse JSON: %s" % json.get_error_message())
 		return {}
 	
+	Logger.info("World/Config", "Config loaded successfully", {"path": path})
 	return json.data as Dictionary
 
 

@@ -54,12 +54,8 @@ func _ready() -> void:
 
 func _exit_tree() -> void:
 	"""Cleanup on exit."""
-	# Write shutdown message before closing file
-	if current_log_file and current_log_file.is_open():
-		var shutdown_msg: String = _format_message("Logger", LogLevel.INFO, "Logging system shutting down", null)
-		current_log_file.store_string(shutdown_msg + "\n")
-		current_log_file.flush()
 	_close_log_file()
+	info("Logger", "Logging system shutting down")
 
 func _load_config() -> void:
 	"""Load configuration from JSON file."""
@@ -158,37 +154,21 @@ func _setup_file_logging() -> void:
 	if not log_to_file:
 		return
 	
-	# Determine if we're using an absolute path or user:// path
-	var is_absolute_path: bool = log_dir.begins_with("/")
-	var log_dir_path: String = log_dir.trim_suffix("/")
+	# Ensure log directory exists
+	var dir := DirAccess.open("user://")
+	if not dir:
+		push_error("Logger: Failed to open user:// directory")
+		return
 	
-	if is_absolute_path:
-		# Use absolute path directly
-		var dir := DirAccess.open("/")
-		if not dir:
-			push_error("Logger: Failed to open root directory")
+	var log_dir_path: String = log_dir.trim_suffix("/")
+	if log_dir_path.begins_with("user://"):
+		log_dir_path = log_dir_path.replace("user://", "")
+	
+	if not dir.dir_exists(log_dir_path):
+		var err: Error = dir.make_dir_recursive(log_dir_path)
+		if err != OK:
+			push_error("Logger: Failed to create log directory: %s" % log_dir_path)
 			return
-		
-		if not dir.dir_exists(log_dir_path):
-			var err: Error = dir.make_dir_recursive(log_dir_path)
-			if err != OK:
-				push_error("Logger: Failed to create log directory: %s" % log_dir_path)
-				return
-	else:
-		# Use user:// path (Godot's user data directory)
-		var dir := DirAccess.open("user://")
-		if not dir:
-			push_error("Logger: Failed to open user:// directory")
-			return
-		
-		if log_dir_path.begins_with("user://"):
-			log_dir_path = log_dir_path.replace("user://", "")
-		
-		if not dir.dir_exists(log_dir_path):
-			var err: Error = dir.make_dir_recursive(log_dir_path)
-			if err != OK:
-				push_error("Logger: Failed to create log directory: %s" % log_dir_path)
-				return
 	
 	# Open or create today's log file
 	_open_log_file()
@@ -207,9 +187,8 @@ func _open_log_file() -> void:
 	
 	# Build file path
 	var filename: String = "%s%s.txt" % [log_file_prefix, date_str]
-	var file_path: String = log_dir + filename if log_dir.ends_with("/") else log_dir + "/" + filename
+	var file_path: String = log_dir.path_join(filename) if log_dir.ends_with("/") else log_dir + "/" + filename
 	
-	# FileAccess.open() works with both absolute paths and user:// paths
 	current_log_file = FileAccess.open(file_path, FileAccess.WRITE)
 	if not current_log_file:
 		push_error("Logger: Failed to open log file: %s" % file_path)
@@ -362,8 +341,9 @@ func reload_config() -> void:
 
 func get_log_file_path() -> String:
 	"""Get the path to the current log file (for external access)."""
-	if not current_log_file or current_log_date.is_empty():
+	if not current_log_file:
 		return ""
 	
 	var filename: String = "%s%s.txt" % [log_file_prefix, current_log_date]
 	return log_dir + filename if log_dir.ends_with("/") else log_dir + "/" + filename
+

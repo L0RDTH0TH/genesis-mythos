@@ -6,5 +6,6 @@
 extends Control
 
 func _ready() -> void:
-	pass
+	Logger.verbose("UI/MainMenu", "_ready() called")
+	Logger.info("UI/MainMenu", "Main menu scene initialized")
 

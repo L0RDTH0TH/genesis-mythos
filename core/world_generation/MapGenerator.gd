@@ -25,71 +25,113 @@ var generation_thread: Thread
 
 func _init() -> void:
 	"""Initialize noise generators."""
+	Logger.verbose("World/Generation", "MapGenerator._init() - Initializing noise generators")
 	height_noise = FastNoiseLite.new()
 	continent_noise = FastNoiseLite.new()
 	temperature_noise = FastNoiseLite.new()
 	moisture_noise = FastNoiseLite.new()
+	Logger.verbose("World/Generation", "MapGenerator._init() - All noise generators created")
 
 
 func generate_map(world_map_data: WorldMapData, use_thread: bool = true) -> void:
 	"""Generate complete map (heightmap, rivers, biomes). Use thread for large maps."""
-	if world_map_data == null:
-		push_error("MapGenerator: world_map_data is null")
+	Logger.verbose("World/Generation", "MapGenerator.generate_map() - Starting map generation", {
+		"width": world_map_data.world_width if world_map_data else 0,
+		"height": world_map_data.world_height if world_map_data else 0,
+		"use_thread": use_thread
+	})
+	
+		if world_map_data == null:
+		Logger.error("World/Generation", "MapGenerator.generate_map() - world_map_data is null")
 		return
 	
-	if use_thread and world_map_data.world_width * world_map_data.world_height > 512 * 512:
+	var map_size: int = world_map_data.world_width * world_map_data.world_height
+	var use_threading: bool = use_thread and map_size > 512 * 512
+	
+	Logger.verbose("World/Generation", "MapGenerator.generate_map() - Map size: %d pixels, threading: %s" % [map_size, use_threading])
+	
+	if use_threading:
+		Logger.verbose("World/Generation", "MapGenerator.generate_map() - Using threaded generation")
 		_generate_in_thread(world_map_data)
 	else:
+		Logger.verbose("World/Generation", "MapGenerator.generate_map() - Using synchronous generation")
 		_generate_sync(world_map_data)
 
 
 func _generate_sync(world_map_data: WorldMapData) -> void:
 	"""Generate map synchronously (blocks main thread)."""
+	Logger.verbose("World/Generation", "MapGenerator._generate_sync() - Starting synchronous generation")
 	_configure_noise(world_map_data)
 	_generate_heightmap(world_map_data)
 	
 	if world_map_data.erosion_enabled:
+		Logger.verbose("World/Generation", "MapGenerator._generate_sync() - Erosion enabled, applying")
 		_apply_erosion(world_map_data)
+	else:
+		Logger.verbose("World/Generation", "MapGenerator._generate_sync() - Erosion disabled")
 	
 	if world_map_data.rivers_enabled:
+		Logger.verbose("World/Generation", "MapGenerator._generate_sync() - Rivers enabled, generating")
 		_generate_rivers(world_map_data)
+	else:
+		Logger.verbose("World/Generation", "MapGenerator._generate_sync() - Rivers disabled")
+	
+	Logger.verbose("World/Generation", "MapGenerator._generate_sync() - Synchronous generation complete")
 
 
 func _generate_in_thread(world_map_data: WorldMapData) -> void:
 	"""Generate map in background thread."""
+	Logger.verbose("World/Generation", "MapGenerator._generate_in_thread() - Starting threaded generation")
+	
 	if generation_thread != null and generation_thread.is_alive():
+		Logger.verbose("World/Generation", "MapGenerator._generate_in_thread() - Waiting for existing thread to finish")
 		generation_thread.wait_to_finish()
 	
+	Logger.verbose("World/Generation", "MapGenerator._generate_in_thread() - Creating new thread")
 	generation_thread = Thread.new()
 	generation_thread.start(_thread_generate.bind(world_map_data))
+	Logger.verbose("World/Generation", "MapGenerator._generate_in_thread() - Thread started")
 
 
 func _thread_generate(world_map_data: WorldMapData) -> void:
 	"""Thread function for map generation."""
+	Logger.verbose("World/Generation", "MapGenerator._thread_generate() - Thread function started")
 	_configure_noise(world_map_data)
 	_generate_heightmap(world_map_data)
 	
 	if world_map_data.erosion_enabled:
+		Logger.verbose("World/Generation", "MapGenerator._thread_generate() - Applying erosion in thread")
 		_apply_erosion(world_map_data)
 	
 	if world_map_data.rivers_enabled:
+		Logger.verbose("World/Generation", "MapGenerator._thread_generate() - Generating rivers in thread")
 		_generate_rivers(world_map_data)
 	
+	Logger.verbose("World/Generation", "MapGenerator._thread_generate() - Thread generation complete, signaling completion")
 	# Signal completion via call_deferred
 	call_deferred("_on_generation_complete", world_map_data)
 
 
 func _on_generation_complete(world_map_data: WorldMapData) -> void:
 	"""Called when thread generation completes."""
+	Logger.verbose("World/Generation", "MapGenerator._on_generation_complete() - Thread generation completed")
 	if generation_thread != null:
 		generation_thread.wait_to_finish()
 		generation_thread = null
+		Logger.verbose("World/Generation", "MapGenerator._on_generation_complete() - Thread cleaned up")
 	
-	print("MapGenerator: Map generation complete")
+	Logger.info("World/Generation", "MapGenerator: Map generation complete")
 
 
 func _configure_noise(world_map_data: WorldMapData) -> void:
 	"""Configure noise generators from world_map_data parameters."""
+	Logger.verbose("World/Generation", "MapGenerator._configure_noise() - Configuring noise generators", {
+		"seed": world_map_data.seed,
+		"noise_type": world_map_data.noise_type,
+		"frequency": world_map_data.noise_frequency,
+		"octaves": world_map_data.noise_octaves
+	})
+	
 	height_noise.seed = world_map_data.seed
 	height_noise.noise_type = world_map_data.noise_type
 	height_noise.frequency = world_map_data.noise_frequency
@@ -97,29 +139,45 @@ func _configure_noise(world_map_data: WorldMapData) -> void:
 	height_noise.fractal_gain = world_map_data.noise_persistence
 	height_noise.fractal_lacunarity = world_map_data.noise_lacunarity
 	height_noise.fractal_type = FastNoiseLite.FRACTAL_FBM
+	Logger.verbose("World/Generation", "MapGenerator._configure_noise() - Height noise configured")
 	
 	continent_noise.seed = world_map_data.seed + 1000
 	continent_noise.noise_type = FastNoiseLite.TYPE_PERLIN
 	continent_noise.frequency = world_map_data.noise_frequency * 0.3
 	continent_noise.fractal_octaves = 3
 	continent_noise.fractal_type = FastNoiseLite.FRACTAL_FBM
+	Logger.verbose("World/Generation", "MapGenerator._configure_noise() - Continent noise configured")
 	
 	temperature_noise.seed = world_map_data.seed + 2000
 	temperature_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
 	temperature_noise.frequency = world_map_data.biome_temperature_noise_frequency
+	Logger.verbose("World/Generation", "MapGenerator._configure_noise() - Temperature noise configured", {
+		"frequency": world_map_data.biome_temperature_noise_frequency
+	})
 	
 	moisture_noise.seed = world_map_data.seed + 3000
 	moisture_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
 	moisture_noise.frequency = world_map_data.biome_moisture_noise_frequency
+	Logger.verbose("World/Generation", "MapGenerator._configure_noise() - Moisture noise configured", {
+		"frequency": world_map_data.biome_moisture_noise_frequency
+	})
+	
+	Logger.verbose("World/Generation", "MapGenerator._configure_noise() - All noise generators configured")
 
 
 func _generate_heightmap(world_map_data: WorldMapData) -> void:
 	"""Generate base heightmap using multi-octave noise."""
+	Logger.verbose("World/Generation", "MapGenerator._generate_heightmap() called")
 	if world_map_data.heightmap_image == null:
+		Logger.debug("World/Generation", "Heightmap image is null, creating...")
 		world_map_data.create_heightmap(world_map_data.world_width, world_map_data.world_height)
 	
 	var img: Image = world_map_data.heightmap_image
+	if img == null:
+		Logger.error("World/Generation", "img is still null after create_heightmap!")
+		return
 	var size: Vector2i = img.get_size()
+	Logger.debug("World/Generation", "Generating heightmap", {"size": size})
 	
 	# Lock image for writing
 	img.lock()
@@ -156,7 +214,13 @@ func _generate_heightmap(world_map_data: WorldMapData) -> void:
 			img.set_pixel(x, size.y - 1 - y, color)  # Flip Y for proper orientation
 	
 	img.unlock()
-	print("MapGenerator: Heightmap generated (", size.x, "x", size.y, ")")
+	Logger.info("World/Generation", "Heightmap generated", {"size": size})
+	# Verify generation by sampling a few pixels
+	var test_pixels: Array[Vector2i] = [Vector2i(0, 0), Vector2i(size.x / 2, size.y / 2), Vector2i(size.x - 1, size.y - 1)]
+	for test_pos in test_pixels:
+		if test_pos.x < size.x and test_pos.y < size.y:
+			var test_color: Color = img.get_pixel(test_pos.x, test_pos.y)
+			Logger.verbose("World/Generation", "Heightmap sample", {"position": test_pos, "height": test_color.r})
 
 
 func _apply_erosion(world_map_data: WorldMapData) -> void:
@@ -203,9 +267,12 @@ func _apply_erosion(world_map_data: WorldMapData) -> void:
 		world_map_data.heightmap_image = img
 		
 		if iteration % 2 == 0:
-			print("MapGenerator: Erosion iteration ", iteration + 1, "/", world_map_data.erosion_iterations)
+			Logger.debug("World/Generation", "Erosion iteration", {
+				"current": iteration + 1,
+				"total": world_map_data.erosion_iterations
+			})
 	
-	print("MapGenerator: Erosion complete")
+	Logger.info("World/Generation", "Erosion complete", {"iterations": world_map_data.erosion_iterations})
 
 
 func _generate_rivers(world_map_data: WorldMapData) -> void:
