@@ -103,10 +103,50 @@ The project is configured in `project.godot`:
 
 ## Documentation
 
+### Essential Documentation
+
+- **[System Implementations](docs/SYSTEM_IMPLEMENTATIONS.md)** - **START HERE**: Complete documentation of all current system implementations
+- **[Architecture Overview](docs/architecture/overview.md)** - High-level system architecture and data flow
+- **[World Builder Wizard Guide](docs/WORLD_BUILDER_WIZARD_GUIDE.md)** - Complete guide to the wizard-style world builder
+- **[World Builder API Reference](docs/WORLD_BUILDER_API_REFERENCE.md)** - API documentation for world builder classes
+
+### Reference Documentation
+
 - **[Coding Standards](docs/CODING_STANDARDS.md)** - Detailed coding conventions and style guide
 - **[Project Structure](docs/PROJECT_STRUCTURE.md)** - Current folder structure and organization
+- **[API Reference](docs/api/API_REFERENCE.md)** - Complete API reference for all public classes
+- **[Data Schemas](docs/schemas/DATA_SCHEMAS.md)** - JSON schema documentation
 - **[Changelog](docs/CHANGELOG.md)** - Project change history
 - **[TODO](docs/TODO.md)** - Current tasks and future plans
+
+### Documentation Index
+
+See [docs/README.md](docs/README.md) for complete documentation directory structure and all available documentation.
+
+## Current System Implementations
+
+### ✅ Fully Implemented Systems
+
+1. **Core Singletons** - All 5 autoload singletons (Eryndor, Logger, WorldStreamer, EntitySim, FactionEconomy)
+2. **World Generation** - Complete procedural generation system with:
+   - MapGenerator: Noise-based heightmap generation with erosion and rivers
+   - MapRenderer: Shader-based rendering with multiple view modes
+   - MapEditor: Brush-based editing with multiple tools
+   - MarkerManager: Icon placement system
+3. **World Builder UI** - Complete 8-step wizard interface for world creation
+4. **Terrain3D Integration** - Full Terrain3D plugin integration for 3D terrain
+5. **Procedural World Map Addon** - Integrated 2D map display system
+6. **Data Management** - All JSON data files and loading systems
+
+### Key Features
+
+- **2D Map Editor**: Full-featured map editor with brush tools, presets, and real-time preview
+- **3D Terrain Generation**: Procedural terrain generation with Terrain3D integration
+- **Biome System**: Data-driven biome generation based on height, temperature, and moisture
+- **Wizard Interface**: Step-by-step world creation workflow
+- **Fantasy Archetypes**: Preset configurations for different fantasy world types
+
+For complete details, see [System Implementations Documentation](docs/SYSTEM_IMPLEMENTATIONS.md).
 
 ## Core Principles
 

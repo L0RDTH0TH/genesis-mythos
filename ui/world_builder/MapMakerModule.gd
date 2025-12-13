@@ -197,45 +197,36 @@ func _setup_parchment_overlay() -> void:
 	
 	# Add as first child (behind viewport container)
 	map_canvas.add_child(parchment_overlay)
-	parchment_overlay.move_to_back()  # Ensure it's behind viewport
+	# Move to back by setting z_index (lower z_index renders first/behind)
+	parchment_overlay.z_index = -1
 
 
 func _setup_ui() -> void:
 	"""Setup UI panels and controls."""
-	# Create main container with split layout
-	var main_container: HSplitContainer = HSplitContainer.new()
+	# Create main container (no split - params are in left sidebar now)
+	var main_container: VBoxContainer = VBoxContainer.new()
 	main_container.name = "MainContainer"
 	main_container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(main_container)
-	
-	# Create left side (map canvas)
-	var map_container: VBoxContainer = VBoxContainer.new()
-	map_container.name = "MapContainer"
-	main_container.add_child(map_container)
 	
 	# Create toolbar panel
 	toolbar_panel = Panel.new()
 	toolbar_panel.name = "ToolbarPanel"
 	toolbar_panel.custom_minimum_size = Vector2(0, 50)
-	map_container.add_child(toolbar_panel)
+	main_container.add_child(toolbar_panel)
 	
-	# Create map canvas
+	# Create map canvas (fills remaining space)
 	map_canvas = Control.new()
 	map_canvas.name = "MapCanvas"
 	map_canvas.mouse_filter = Control.MOUSE_FILTER_STOP
-	map_container.add_child(map_canvas)
+	map_canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	main_container.add_child(map_canvas)
 	
 	# Create parchment overlay (behind everything)
 	_setup_parchment_overlay()
 	
-	# Create right side (params panel)
-	params_panel = Panel.new()
-	params_panel.name = "ParamsPanel"
-	params_panel.custom_minimum_size = Vector2(300, 0)
-	main_container.add_child(params_panel)
-	
 	_create_toolbar()
-	_create_params_panel()
+	# Note: Parameter controls are now in WorldBuilderUI left sidebar, not here
 
 
 func _create_toolbar() -> void:
@@ -309,37 +300,10 @@ func _create_toolbar() -> void:
 
 
 func _create_params_panel() -> void:
-	"""Create parameters panel for generation settings."""
-	var params_scroll: ScrollContainer = ScrollContainer.new()
-	params_scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	params_panel.add_child(params_scroll)
-	
-	var params_vbox: VBoxContainer = VBoxContainer.new()
-	params_vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	params_scroll.add_child(params_vbox)
-	
-	# Noise frequency
-	_create_param_slider(params_vbox, "Noise Frequency", "noise_frequency", 0.001, 0.1, 0.0005, 0.0001)
-	
-	# Octaves
-	_create_param_spinbox(params_vbox, "Octaves", "noise_octaves", 1, 8, 4)
-	
-	# Persistence
-	_create_param_slider(params_vbox, "Persistence", "noise_persistence", 0.0, 1.0, 0.5, 0.01)
-	
-	# Lacunarity
-	_create_param_slider(params_vbox, "Lacunarity", "noise_lacunarity", 1.0, 4.0, 2.0, 0.1)
-	
-	# Sea level
-	_create_param_slider(params_vbox, "Sea Level", "sea_level", 0.0, 1.0, 0.4, 0.01)
-	
-	# Erosion
-	var erosion_check: CheckBox = CheckBox.new()
-	erosion_check.text = "Enable Erosion"
-	erosion_check.button_pressed = true
-	erosion_check.toggled.connect(func(pressed): _on_param_changed("erosion_enabled", pressed))
-	params_vbox.add_child(erosion_check)
-	param_controls["erosion_enabled"] = erosion_check
+	"""Create parameters panel for generation settings - DEPRECATED: Controls now in left sidebar."""
+	# This function is kept for compatibility but no longer creates UI
+	# Parameter controls are now created in WorldBuilderUI._create_step_map_gen_editor()
+	pass
 
 
 func _create_param_slider(parent: VBoxContainer, label_text: String, param_name: String, min_val: float, max_val: float, default_val: float, step: float) -> void:
@@ -406,8 +370,8 @@ func initialize_from_step_data(seed_value: int, width: int, height: int) -> void
 	world_map_data.world_height = height
 	
 	# Create heightmap image (use power-of-2 for better performance, but match aspect ratio)
-	var map_size_x: int = max(512, next_power_of_2(int(width)))
-	var map_size_y: int = max(512, next_power_of_2(int(height)))
+	var map_size_x: int = max(512, _next_power_of_2(int(width)))
+	var map_size_y: int = max(512, _next_power_of_2(int(height)))
 	print("DEBUG: Creating heightmap image size:", map_size_x, "x", map_size_y)
 	world_map_data.create_heightmap(map_size_x, map_size_y)
 	print("DEBUG: Heightmap created, image is null:", world_map_data.heightmap_image == null)
@@ -510,13 +474,20 @@ func _on_param_changed(param_name: String, value: Variant) -> void:
 		"erosion_enabled":
 			world_map_data.erosion_enabled = bool(value)
 	
-	# Update value label if it exists
+	# Update value label if it exists (for external controls)
 	var value_label: Label = param_controls.get(param_name + "_value") as Label
 	if value_label != null:
 		value_label.text = str(value)
 	
 	# Auto-regenerate if parameter changed (optional - can be disabled)
 	# generate_map()
+
+
+func connect_external_param_control(param_name: String, control: Control, value_label: Label = null) -> void:
+	"""Connect an external control (from WorldBuilderUI) to parameter change handler."""
+	param_controls[param_name] = control
+	if value_label != null:
+		param_controls[param_name + "_value"] = value_label
 
 
 func get_world_map_data() -> WorldMapData:
@@ -699,6 +670,16 @@ func _setup_keyboard_shortcuts() -> void:
 	"""Setup keyboard shortcuts for map editor."""
 	# Ctrl+Enter to generate 3D world
 	# This will be handled in _unhandled_key_input()
+
+
+func _next_power_of_2(value: int) -> int:
+	"""Calculate the next power of 2 greater than or equal to value."""
+	if value <= 0:
+		return 1
+	var power: int = 1
+	while power < value:
+		power *= 2
+	return power
 
 
 func _unhandled_key_input(event: InputEvent) -> void:

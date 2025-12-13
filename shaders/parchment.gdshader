@@ -2,6 +2,7 @@ shader_type canvas_item;
 render_mode blend_mix, unshaded;
 
 uniform sampler2D parchment_texture : source_color, filter_linear;
+uniform sampler2D SCREEN_TEXTURE : hint_screen_texture, filter_linear_mipmap;
 uniform float curl_strength : hint_range(0.0, 0.15) = 0.06;
 uniform float stain_intensity : hint_range(0.0, 1.0) = 0.65;
 uniform float edge_darken : hint_range(0.0, 1.0) = 0.5;

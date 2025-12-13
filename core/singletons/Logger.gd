@@ -317,7 +317,7 @@ func _output_to_console(level: LogLevel, message: String) -> void:
 
 func _force_console_log(system: String, level: LogLevel, message: String) -> void:
 	"""Force log to console bypassing all checks - used for Logger internal messages."""
-	var formatted: String = "[%s] [%s] [%s]: %s" % [_get_timestamp(), system, LogLevel.keys()[level], message]
+	var formatted: String = "[%s] [%s] [%s]: %s" % [_get_timestamp(), system, _log_level_to_string(level), message]
 	_output_to_console(level, formatted)
 
 func _output_to_file(message: String) -> void:
@@ -395,4 +395,21 @@ func get_log_file_path() -> String:
 	
 	var filename: String = "%s%s.txt" % [log_file_prefix, current_log_date]
 	return log_dir + filename if log_dir.ends_with("/") else log_dir + "/" + filename
+
+
+func _log_level_to_string(level: LogLevel) -> String:
+	"""Convert LogLevel enum to string."""
+	match level:
+		LogLevel.ERROR:
+			return "ERROR"
+		LogLevel.WARN:
+			return "WARN"
+		LogLevel.INFO:
+			return "INFO"
+		LogLevel.DEBUG:
+			return "DEBUG"
+		LogLevel.VERBOSE:
+			return "VERBOSE"
+		_:
+			return "UNKNOWN"
 

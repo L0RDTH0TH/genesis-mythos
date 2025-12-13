@@ -738,6 +738,166 @@ func _create_step_map_gen_editor(parent: VBoxContainer) -> void:
 	container.add_child(bake_button)
 	control_references["Map Gen/bake"] = bake_button
 	
+	# Separator
+	var separator1: HSeparator = HSeparator.new()
+	container.add_child(separator1)
+	
+	# Noise Parameters Section
+	var noise_header: Label = Label.new()
+	noise_header.text = "Noise Parameters"
+	noise_header.add_theme_font_size_override("font_size", 16)
+	noise_header.add_theme_color_override("font_color", Color(1, 0.843137, 0, 1))
+	container.add_child(noise_header)
+	
+	# Noise Frequency
+	var noise_freq_container: HBoxContainer = HBoxContainer.new()
+	var noise_freq_label: Label = Label.new()
+	noise_freq_label.text = "Noise Frequency:"
+	noise_freq_label.custom_minimum_size = Vector2(150, 0)
+	noise_freq_container.add_child(noise_freq_label)
+	
+	var noise_freq_slider: HSlider = HSlider.new()
+	noise_freq_slider.name = "noise_frequency"
+	noise_freq_slider.min_value = 0.001
+	noise_freq_slider.max_value = 0.1
+	noise_freq_slider.step = 0.0001
+	noise_freq_slider.value = 0.0005
+	noise_freq_slider.value_changed.connect(_on_map_gen_param_changed.bind("noise_frequency"))
+	noise_freq_container.add_child(noise_freq_slider)
+	
+	var noise_freq_value_label: Label = Label.new()
+	noise_freq_value_label.name = "noise_frequency_value"
+	noise_freq_value_label.custom_minimum_size = Vector2(80, 0)
+	noise_freq_value_label.text = "0.0005"
+	noise_freq_container.add_child(noise_freq_value_label)
+	container.add_child(noise_freq_container)
+	control_references["Map Gen/noise_frequency"] = noise_freq_slider
+	control_references["Map Gen/noise_frequency_value"] = noise_freq_value_label
+	step_data["Map Gen"]["noise_frequency"] = 0.0005
+	
+	# Octaves
+	var octaves_container: HBoxContainer = HBoxContainer.new()
+	var octaves_label: Label = Label.new()
+	octaves_label.text = "Octaves:"
+	octaves_label.custom_minimum_size = Vector2(150, 0)
+	octaves_container.add_child(octaves_label)
+	
+	var octaves_spinbox: SpinBox = SpinBox.new()
+	octaves_spinbox.name = "noise_octaves"
+	octaves_spinbox.min_value = 1
+	octaves_spinbox.max_value = 8
+	octaves_spinbox.value = 4
+	octaves_spinbox.value_changed.connect(_on_map_gen_param_changed.bind("noise_octaves"))
+	octaves_container.add_child(octaves_spinbox)
+	container.add_child(octaves_container)
+	control_references["Map Gen/noise_octaves"] = octaves_spinbox
+	step_data["Map Gen"]["noise_octaves"] = 4
+	
+	# Persistence
+	var persistence_container: HBoxContainer = HBoxContainer.new()
+	var persistence_label: Label = Label.new()
+	persistence_label.text = "Persistence:"
+	persistence_label.custom_minimum_size = Vector2(150, 0)
+	persistence_container.add_child(persistence_label)
+	
+	var persistence_slider: HSlider = HSlider.new()
+	persistence_slider.name = "noise_persistence"
+	persistence_slider.min_value = 0.0
+	persistence_slider.max_value = 1.0
+	persistence_slider.step = 0.01
+	persistence_slider.value = 0.5
+	persistence_slider.value_changed.connect(_on_map_gen_param_changed.bind("noise_persistence"))
+	persistence_container.add_child(persistence_slider)
+	
+	var persistence_value_label: Label = Label.new()
+	persistence_value_label.name = "noise_persistence_value"
+	persistence_value_label.custom_minimum_size = Vector2(80, 0)
+	persistence_value_label.text = "0.50"
+	persistence_container.add_child(persistence_value_label)
+	container.add_child(persistence_container)
+	control_references["Map Gen/noise_persistence"] = persistence_slider
+	control_references["Map Gen/noise_persistence_value"] = persistence_value_label
+	step_data["Map Gen"]["noise_persistence"] = 0.5
+	
+	# Lacunarity
+	var lacunarity_container: HBoxContainer = HBoxContainer.new()
+	var lacunarity_label: Label = Label.new()
+	lacunarity_label.text = "Lacunarity:"
+	lacunarity_label.custom_minimum_size = Vector2(150, 0)
+	lacunarity_container.add_child(lacunarity_label)
+	
+	var lacunarity_slider: HSlider = HSlider.new()
+	lacunarity_slider.name = "noise_lacunarity"
+	lacunarity_slider.min_value = 1.0
+	lacunarity_slider.max_value = 4.0
+	lacunarity_slider.step = 0.1
+	lacunarity_slider.value = 2.0
+	lacunarity_slider.value_changed.connect(_on_map_gen_param_changed.bind("noise_lacunarity"))
+	lacunarity_container.add_child(lacunarity_slider)
+	
+	var lacunarity_value_label: Label = Label.new()
+	lacunarity_value_label.name = "noise_lacunarity_value"
+	lacunarity_value_label.custom_minimum_size = Vector2(80, 0)
+	lacunarity_value_label.text = "2.00"
+	lacunarity_container.add_child(lacunarity_value_label)
+	container.add_child(lacunarity_container)
+	control_references["Map Gen/noise_lacunarity"] = lacunarity_slider
+	control_references["Map Gen/noise_lacunarity_value"] = lacunarity_value_label
+	step_data["Map Gen"]["noise_lacunarity"] = 2.0
+	
+	# Separator
+	var separator2: HSeparator = HSeparator.new()
+	container.add_child(separator2)
+	
+	# World Parameters Section
+	var world_header: Label = Label.new()
+	world_header.text = "World Parameters"
+	world_header.add_theme_font_size_override("font_size", 16)
+	world_header.add_theme_color_override("font_color", Color(1, 0.843137, 0, 1))
+	container.add_child(world_header)
+	
+	# Sea Level
+	var sea_level_container: HBoxContainer = HBoxContainer.new()
+	var sea_level_label: Label = Label.new()
+	sea_level_label.text = "Sea Level:"
+	sea_level_label.custom_minimum_size = Vector2(150, 0)
+	sea_level_container.add_child(sea_level_label)
+	
+	var sea_level_slider: HSlider = HSlider.new()
+	sea_level_slider.name = "sea_level"
+	sea_level_slider.min_value = 0.0
+	sea_level_slider.max_value = 1.0
+	sea_level_slider.step = 0.01
+	sea_level_slider.value = 0.4
+	sea_level_slider.value_changed.connect(_on_map_gen_param_changed.bind("sea_level"))
+	sea_level_container.add_child(sea_level_slider)
+	
+	var sea_level_value_label: Label = Label.new()
+	sea_level_value_label.name = "sea_level_value"
+	sea_level_value_label.custom_minimum_size = Vector2(80, 0)
+	sea_level_value_label.text = "0.40"
+	sea_level_container.add_child(sea_level_value_label)
+	container.add_child(sea_level_container)
+	control_references["Map Gen/sea_level"] = sea_level_slider
+	control_references["Map Gen/sea_level_value"] = sea_level_value_label
+	step_data["Map Gen"]["sea_level"] = 0.4
+	
+	# Enable Erosion
+	var erosion_container: HBoxContainer = HBoxContainer.new()
+	var erosion_label: Label = Label.new()
+	erosion_label.text = "Enable Erosion:"
+	erosion_label.custom_minimum_size = Vector2(150, 0)
+	erosion_container.add_child(erosion_label)
+	
+	var erosion_check: CheckBox = CheckBox.new()
+	erosion_check.name = "erosion_enabled"
+	erosion_check.button_pressed = true
+	erosion_check.toggled.connect(_on_map_gen_param_changed.bind("erosion_enabled"))
+	erosion_container.add_child(erosion_check)
+	container.add_child(erosion_container)
+	control_references["Map Gen/erosion_enabled"] = erosion_check
+	step_data["Map Gen"]["erosion_enabled"] = true
+	
 	# MapMakerModule will be added to center panel when step is shown
 	# Store reference for later initialization
 	control_references["Map Gen/step_panel"] = step_panel
@@ -1363,8 +1523,31 @@ func _initialize_map_maker_module() -> void:
 			print("DEBUG: WorldBuilderUI: MapMakerModule initialized")
 		else:
 			print("DEBUG: WorldBuilderUI: MapMakerModule does not have initialize_from_step_data method")
+		
+		# Connect parameter controls to MapMakerModule
+		if map_maker_module.has_method("connect_external_param_control"):
+			_connect_map_gen_controls_to_module()
 	else:
 		print("DEBUG: WorldBuilderUI: MapMakerModule not available, using ProceduralWorldMap only")
+
+
+func _connect_map_gen_controls_to_module() -> void:
+	"""Connect all map generation parameter controls to MapMakerModule."""
+	if map_maker_module == null or not map_maker_module.has_method("connect_external_param_control"):
+		return
+	
+	# Connect each parameter control
+	var param_names: Array[String] = ["noise_frequency", "noise_octaves", "noise_persistence", "noise_lacunarity", "sea_level", "erosion_enabled"]
+	for param_name: String in param_names:
+		var control: Control = control_references.get("Map Gen/" + param_name) as Control
+		var value_label: Label = control_references.get("Map Gen/" + param_name + "_value") as Label
+		if control != null:
+			map_maker_module.connect_external_param_control(param_name, control, value_label)
+			# Also set initial value if world_map_data exists
+			if map_maker_module.has_method("_on_param_changed"):
+				var initial_value: Variant = step_data.get("Map Gen", {}).get(param_name, null)
+				if initial_value != null:
+					map_maker_module._on_param_changed(param_name, initial_value)
 
 
 func _export_map_data_to_terrain() -> void:
@@ -1407,6 +1590,34 @@ func _on_step_button_pressed(step_index: int) -> void:
 	if step_index <= current_step:
 		current_step = step_index
 		_update_step_display()
+
+
+func _on_map_gen_param_changed(param_name: String, value: Variant) -> void:
+	"""Handle map generation parameter changes and forward to MapMakerModule."""
+	step_data["Map Gen"][param_name] = value
+	
+	# Update value labels
+	match param_name:
+		"noise_frequency":
+			var label: Label = control_references.get("Map Gen/noise_frequency_value") as Label
+			if label != null:
+				label.text = "%.4f" % value
+		"noise_persistence":
+			var label: Label = control_references.get("Map Gen/noise_persistence_value") as Label
+			if label != null:
+				label.text = "%.2f" % value
+		"noise_lacunarity":
+			var label: Label = control_references.get("Map Gen/noise_lacunarity_value") as Label
+			if label != null:
+				label.text = "%.2f" % value
+		"sea_level":
+			var label: Label = control_references.get("Map Gen/sea_level_value") as Label
+			if label != null:
+				label.text = "%.2f" % value
+	
+	# Forward to MapMakerModule if it exists
+	if map_maker_module != null and map_maker_module.has_method("_on_param_changed"):
+		map_maker_module._on_param_changed(param_name, value)
 
 
 func _on_terrain_param_changed(param_name: String, value: Variant) -> void:

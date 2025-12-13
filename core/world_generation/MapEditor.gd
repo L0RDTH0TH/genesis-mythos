@@ -41,9 +41,9 @@ func set_world_map_data(data: WorldMapData) -> void:
 
 func set_tool(tool: EditTool) -> void:
 	"""Set current editing tool."""
-	Logger.verbose("World/Editor", "set_tool() called", {"tool": EditTool.keys()[tool]})
+	Logger.verbose("World/Editor", "set_tool() called", {"tool": _edit_tool_to_string(tool)})
 	current_tool = tool
-	Logger.debug("World/Editor", "Tool set", {"tool": EditTool.keys()[tool]})
+	Logger.debug("World/Editor", "Tool set", {"tool": _edit_tool_to_string(tool)})
 
 
 func set_brush_radius(radius: float) -> void:
@@ -291,3 +291,26 @@ func undo() -> bool:
 		return false
 	
 	return world_map_data.undo_heightmap()
+
+
+func _edit_tool_to_string(tool: EditTool) -> String:
+	"""Convert EditTool enum to string."""
+	match tool:
+		EditTool.RAISE:
+			return "RAISE"
+		EditTool.LOWER:
+			return "LOWER"
+		EditTool.SMOOTH:
+			return "SMOOTH"
+		EditTool.SHARPEN:
+			return "SHARPEN"
+		EditTool.RIVER:
+			return "RIVER"
+		EditTool.MOUNTAIN:
+			return "MOUNTAIN"
+		EditTool.CRATER:
+			return "CRATER"
+		EditTool.ISLAND:
+			return "ISLAND"
+		_:
+			return "UNKNOWN"

@@ -120,7 +120,7 @@ func _get_timestamp() -> String:
 	]
 
 func _should_log(level: LOG_LEVEL, module: String) -> bool:
-	var level_name: String = LOG_LEVEL.keys()[level]
+	var level_name: String = _log_level_to_string(level)
 	
 	# Check if level is enabled globally
 	var levels_enabled: Dictionary = log_config.get("levels_enabled", {})
@@ -152,7 +152,7 @@ func _parse_level_string(level_str: String) -> LOG_LEVEL:
 			return LOG_LEVEL.DEBUG
 
 func _format_message(level: LOG_LEVEL, message: String, module: String) -> String:
-	var level_name: String = LOG_LEVEL.keys()[level]
+	var level_name: String = _log_level_to_string(level)
 	var timestamp: String = _get_timestamp()
 	var module_str: String = "[%s]" % module if module != "" else ""
 	return "[%s] %s %s: %s" % [timestamp, level_name, module_str, message]
@@ -330,4 +330,19 @@ func log_validation(field: String, passed: bool, message: String = "", module: S
 		for key in details.keys():
 			data[key] = details[key]
 	log_structured(level, "Validation", module, data)
+
+
+func _log_level_to_string(level: LOG_LEVEL) -> String:
+	"""Convert LOG_LEVEL enum to string."""
+	match level:
+		LOG_LEVEL.DEBUG:
+			return "DEBUG"
+		LOG_LEVEL.INFO:
+			return "INFO"
+		LOG_LEVEL.WARNING:
+			return "WARNING"
+		LOG_LEVEL.ERROR:
+			return "ERROR"
+		_:
+			return "UNKNOWN"
 

@@ -107,7 +107,8 @@ func _update_textures() -> void:
 	else:
 		# Generate biome preview if not exists
 		Logger.verbose("World/Rendering", "Generating biome preview image")
-		var generator: MapGenerator = MapGenerator.new()
+		# Remove type hint to avoid parse-time dependency on MapGenerator
+		var generator = MapGenerator.new()
 		var biome_img: Image = generator.generate_biome_preview(world_map_data)
 		if biome_img != null:
 			if biome_texture == null:
@@ -134,7 +135,7 @@ func _update_textures() -> void:
 	if shader_material != null:
 		Logger.verbose("World/Rendering", "Applying textures to shader material")
 		shader_material.set_shader_parameter("heightmap_texture", heightmap_texture)
-		shader_material.set_shader_parameter("biome_texture", biome_texture != null ? biome_texture : heightmap_texture)
+		shader_material.set_shader_parameter("biome_texture", biome_texture if biome_texture != null else heightmap_texture)
 		shader_material.set_shader_parameter("rivers_texture", rivers_texture)
 		shader_material.set_shader_parameter("sea_level", world_map_data.sea_level)
 		shader_material.set_shader_parameter("light_direction", light_direction)
@@ -154,7 +155,15 @@ func _update_textures() -> void:
 
 func set_view_mode(mode: ViewMode) -> void:
 	"""Change view mode (heightmap, biomes, political)."""
-	Logger.verbose("World/Rendering", "set_view_mode() called", {"mode": ViewMode.keys()[mode]})
+	var mode_name: String
+	match mode:
+		ViewMode.HEIGHTMAP:
+			mode_name = "HEIGHTMAP"
+		ViewMode.BIOMES:
+			mode_name = "BIOMES"
+		ViewMode.POLITICAL:
+			mode_name = "POLITICAL"
+	Logger.verbose("World/Rendering", "set_view_mode() called", {"mode": mode_name})
 	current_view_mode = mode
 	
 	if shader_material != null:
@@ -183,7 +192,7 @@ func set_rivers_visible(visible: bool) -> void:
 
 func set_light_direction(direction: Vector2) -> void:
 	"""Set light direction for hillshading (normalized 0-1)."""
-	light_direction = direction.clamped(Vector2(0.0, 0.0), Vector2(1.0, 1.0))
+	light_direction = Vector2(clamp(direction.x, 0.0, 1.0), clamp(direction.y, 0.0, 1.0))
 	if shader_material != null:
 		shader_material.set_shader_parameter("light_direction", light_direction)
 

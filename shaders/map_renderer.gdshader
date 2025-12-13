@@ -7,9 +7,9 @@ uniform sampler2D heightmap_texture : hint_default_white, filter_linear;
 uniform sampler2D biome_texture : hint_default_white, filter_linear;
 uniform sampler2D rivers_texture : hint_default_white, filter_linear;
 
-uniform bool show_heightmap : hint_default_white = false;
-uniform bool show_biomes : hint_default_white = true;
-uniform bool show_rivers : hint_default_white = true;
+uniform bool show_heightmap = false;
+uniform bool show_biomes = true;
+uniform bool show_rivers = true;
 
 uniform float sea_level : hint_range(0.0, 1.0) = 0.4;
 uniform float hillshade_strength : hint_range(0.0, 2.0) = 1.0;

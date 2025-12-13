@@ -41,7 +41,7 @@ func generate_map(world_map_data: WorldMapData, use_thread: bool = true) -> void
 		"use_thread": use_thread
 	})
 	
-		if world_map_data == null:
+	if world_map_data == null:
 		Logger.error("World/Generation", "MapGenerator.generate_map() - world_map_data is null")
 		return
 	
@@ -107,9 +107,9 @@ func _thread_generate(world_map_data: WorldMapData) -> void:
 		Logger.verbose("World/Generation", "MapGenerator._thread_generate() - Generating rivers in thread")
 		_generate_rivers(world_map_data)
 	
-	Logger.verbose("World/Generation", "MapGenerator._thread_generate() - Thread generation complete, signaling completion")
-	# Signal completion via call_deferred
-	call_deferred("_on_generation_complete", world_map_data)
+	Logger.verbose("World/Generation", "MapGenerator._thread_generate() - Thread generation complete")
+	# Note: Since MapGenerator extends RefCounted (not Node), we can't use call_deferred
+	# The caller should check thread status or handle completion via other means
 
 
 func _on_generation_complete(world_map_data: WorldMapData) -> void:
@@ -179,10 +179,7 @@ func _generate_heightmap(world_map_data: WorldMapData) -> void:
 	var size: Vector2i = img.get_size()
 	Logger.debug("World/Generation", "Generating heightmap", {"size": size})
 	
-	# Lock image for writing
-	img.lock()
-	
-	# Generate noise values
+	# Generate noise values (Images are thread-safe in Godot 4.3, no lock needed)
 	for y in range(size.y):
 		for x in range(size.x):
 			# Normalize coordinates to world space
@@ -213,7 +210,6 @@ func _generate_heightmap(world_map_data: WorldMapData) -> void:
 			var color: Color = Color(height_value, height_value, height_value, 1.0)
 			img.set_pixel(x, size.y - 1 - y, color)  # Flip Y for proper orientation
 	
-	img.unlock()
 	Logger.info("World/Generation", "Heightmap generated", {"size": size})
 	# Verify generation by sampling a few pixels
 	var test_pixels: Array[Vector2i] = [Vector2i(0, 0), Vector2i(size.x / 2, size.y / 2), Vector2i(size.x - 1, size.y - 1)]
@@ -230,9 +226,7 @@ func _apply_erosion(world_map_data: WorldMapData) -> void:
 	
 	# Simple erosion: simulate water flow downhill
 	for iteration in range(world_map_data.erosion_iterations):
-		img.lock()
 		var new_img: Image = img.duplicate()
-		new_img.lock()
 		
 		for y in range(1, size.y - 1):
 			for x in range(1, size.x - 1):
@@ -261,8 +255,6 @@ func _apply_erosion(world_map_data: WorldMapData) -> void:
 					var new_height: float = clamp(current_height - erosion_amount, 0.0, 1.0)
 					new_img.set_pixel(x, y, Color(new_height, new_height, new_height, 1.0))
 		
-		new_img.unlock()
-		img.unlock()
 		img = new_img
 		world_map_data.heightmap_image = img
 		
@@ -296,9 +288,7 @@ func generate_biome_preview(world_map_data: WorldMapData) -> Image:
 	var size: Vector2i = height_img.get_size()
 	var biome_img: Image = Image.create(size.x, size.y, false, Image.FORMAT_RGB8)
 	
-	height_img.lock()
-	biome_img.lock()
-	
+	# Generate biome colors (Images are thread-safe in Godot 4.3, no lock needed)
 	for y in range(size.y):
 		for x in range(size.x):
 			# Get world position
@@ -315,9 +305,6 @@ func generate_biome_preview(world_map_data: WorldMapData) -> Image:
 			# Determine biome color based on height, temperature, moisture
 			var biome_color: Color = _get_biome_color(height, temperature, moisture)
 			biome_img.set_pixel(x, size.y - 1 - y, biome_color)
-	
-	biome_img.unlock()
-	height_img.unlock()
 	
 	world_map_data.biome_preview_image = biome_img
 	return biome_img
