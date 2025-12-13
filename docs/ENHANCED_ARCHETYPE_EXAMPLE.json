@@ -1,0 +1,161 @@
+{
+  "_comment": "Enhanced Archetype Example - Complete structure with all features",
+  "_description": "This example demonstrates the enhanced archetype format with all optional features enabled",
+  
+  "High Fantasy Complete": {
+    "description": "A vibrant world of magic, with lush forests, towering mountains, and mystical landscapes teeming with wonder and adventure.",
+    "recommended_size": "Large",
+    "default_landmass": "Continents",
+    
+    "noise": {
+      "noise_type": "TYPE_SIMPLEX",
+      "frequency": 0.004,
+      "octaves": 6,
+      "gain": 0.5,
+      "lacunarity": 2.0,
+      "height_scale": 0.8
+    },
+    
+    "terrain": {
+      "sea_level": 0.35,
+      "erosion": {
+        "enabled": false,
+        "strength": 0.3,
+        "iterations": 5
+      },
+      "rivers": {
+        "enabled": false,
+        "count": 15,
+        "start_elevation": 0.7
+      }
+    },
+    
+    "climate": {
+      "temperature_noise_frequency": 0.002,
+      "moisture_noise_frequency": 0.002,
+      "temperature_bias": 0.0,
+      "moisture_bias": 0.1
+    },
+    
+    "biomes": {
+      "colors": {
+        "water": "#2a6d9e",
+        "beach": "#d4b56a",
+        "grass": "#3d8c40",
+        "forest": "#2d5a3d",
+        "hill": "#8b7355",
+        "mountain": "#c0c0c0",
+        "snow": "#ffffff",
+        "enchanted_forest": "#4b0082",
+        "ancient_ruins": "#808080",
+        "crystal_lake": "#00ffff"
+      },
+      "thresholds": {
+        "water": 0.35,
+        "beach": 0.38,
+        "grass": 0.5,
+        "forest": 0.65,
+        "hill": 0.8,
+        "mountain": 0.95,
+        "snow": 1.0,
+        "enchanted_forest": 0.55,
+        "ancient_ruins": 0.7,
+        "crystal_lake": 0.3
+      },
+      "generation_mode": "height_and_climate",
+      "fantasy_biomes": {
+        "enchanted_forest": {
+          "height_range": [0.5, 0.65],
+          "temperature_range": [0.3, 0.7],
+          "moisture_range": [0.6, 1.0],
+          "spawn_chance": 0.15
+        },
+        "ancient_ruins": {
+          "height_range": [0.6, 0.8],
+          "temperature_range": [0.0, 1.0],
+          "moisture_range": [0.0, 0.5],
+          "spawn_chance": 0.05
+        },
+        "crystal_lake": {
+          "height_range": [0.25, 0.35],
+          "temperature_range": [0.0, 1.0],
+          "moisture_range": [0.8, 1.0],
+          "spawn_chance": 0.1
+        }
+      }
+    },
+    
+    "additional_params": {
+      "magic_density": "high",
+      "creature_diversity": "abundant",
+      "weather_variety": ["sunny", "rainy", "mystical fog"]
+    }
+  },
+  
+  "_backward_compatibility_note": "The old flat format is still supported. Example:",
+  
+  "Old Format Example": {
+    "description": "Old format still works",
+    "recommended_size": "Medium",
+    "default_landmass": "Continents",
+    "noise_type": "TYPE_SIMPLEX",
+    "frequency": 0.004,
+    "octaves": 6,
+    "gain": 0.5,
+    "lacunarity": 2.0,
+    "height_scale": 0.8,
+    "biome_colors": {
+      "water": "#2a6d9e",
+      "beach": "#d4b56a",
+      "grass": "#3d8c40",
+      "forest": "#2d5a3d",
+      "hill": "#8b7355",
+      "mountain": "#c0c0c0",
+      "snow": "#ffffff"
+    }
+  },
+  
+  "_field_descriptions": {
+    "noise": {
+      "noise_type": "One of: TYPE_SIMPLEX, TYPE_SIMPLEX_SMOOTH, TYPE_PERLIN, TYPE_VALUE, TYPE_CELLULAR",
+      "frequency": "Base noise frequency (0.001-0.02 recommended)",
+      "octaves": "Fractal detail levels (3-8 recommended)",
+      "gain": "Amplitude multiplier per octave (0.3-0.6 recommended)",
+      "lacunarity": "Frequency multiplier per octave (1.8-2.2 recommended)",
+      "height_scale": "Overall heightmap scaling (0.2-0.9 recommended)"
+    },
+    "terrain": {
+      "sea_level": "Normalized height threshold for water (0.0-1.0)",
+      "erosion": {
+        "enabled": "Enable erosion post-processing (computationally expensive)",
+        "strength": "Erosion intensity (0.0-1.0)",
+        "iterations": "Number of erosion passes (3-10 recommended)"
+      },
+      "rivers": {
+        "enabled": "Enable river generation (computationally expensive)",
+        "count": "Number of rivers to generate",
+        "start_elevation": "Height threshold where rivers start (0.5-0.9)"
+      }
+    },
+    "climate": {
+      "temperature_noise_frequency": "Temperature noise frequency (0.001-0.005 recommended)",
+      "moisture_noise_frequency": "Moisture noise frequency (0.001-0.005 recommended)",
+      "temperature_bias": "Global temperature shift (-0.5 to 0.5)",
+      "moisture_bias": "Global moisture shift (-0.5 to 0.5)"
+    },
+    "biomes": {
+      "colors": "Dictionary mapping biome names to hex colors",
+      "thresholds": "Dictionary mapping biome names to height thresholds (0.0-1.0)",
+      "generation_mode": "One of: height_only, height_and_climate",
+      "fantasy_biomes": {
+        "biome_name": {
+          "height_range": "Array [min, max] normalized height",
+          "temperature_range": "Array [min, max] normalized temperature",
+          "moisture_range": "Array [min, max] normalized moisture",
+          "spawn_chance": "Probability of spawning when conditions met (0.0-1.0)"
+        }
+      }
+    },
+    "additional_params": "Optional metadata for UI/descriptions (not used in generation)"
+  }
+}

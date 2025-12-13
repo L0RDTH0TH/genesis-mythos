@@ -1,24 +1,248 @@
 {
   "High Fantasy": {
-    "description": "Epic tales with abundant magic, mythical races, and grand quests.",
+    "description": "A vibrant world of magic, with lush forests, towering mountains, and mystical landscapes teeming with wonder and adventure.",
     "recommended_size": "Large",
     "default_landmass": "Continents",
-    "noise_type": "TYPE_SIMPLEX",
-    "frequency": 0.004,
-    "octaves": 6,
-    "gain": 0.5,
-    "lacunarity": 2.0,
-    "height_scale": 0.8,
-    "biome_colors": {
-      "water": "#2a6d9e",
-      "beach": "#d4b56a",
-      "grass": "#3d8c40",
-      "forest": "#2d5a3d",
-      "hill": "#8b7355",
-      "mountain": "#c0c0c0",
-      "snow": "#ffffff"
+    
+    "noise": {
+      "noise_type": "TYPE_SIMPLEX",
+      "frequency": 0.004,
+      "octaves": 6,
+      "gain": 0.5,
+      "lacunarity": 2.0,
+      "height_scale": 0.8
+    },
+    
+    "terrain": {
+      "sea_level": 0.35,
+      "erosion": {
+        "enabled": false,
+        "strength": 0.3,
+        "iterations": 5
+      },
+      "rivers": {
+        "enabled": false,
+        "count": 15,
+        "start_elevation": 0.7
+      }
+    },
+    
+    "climate": {
+      "temperature_noise_frequency": 0.002,
+      "moisture_noise_frequency": 0.002,
+      "temperature_bias": 0.0,
+      "moisture_bias": 0.1
+    },
+    
+    "biomes": {
+      "colors": {
+        "water": "#2a6d9e",
+        "beach": "#d4b56a",
+        "grass": "#3d8c40",
+        "forest": "#2d5a3d",
+        "hill": "#8b7355",
+        "mountain": "#c0c0c0",
+        "snow": "#ffffff",
+        "enchanted_forest": "#4b0082",
+        "ancient_ruins": "#808080",
+        "crystal_lake": "#00ffff"
+      },
+      "thresholds": {
+        "water": 0.35,
+        "beach": 0.38,
+        "grass": 0.5,
+        "forest": 0.65,
+        "hill": 0.8,
+        "mountain": 0.95,
+        "snow": 1.0,
+        "enchanted_forest": 0.55,
+        "ancient_ruins": 0.7,
+        "crystal_lake": 0.3
+      },
+      "generation_mode": "height_and_climate",
+      "fantasy_biomes": {
+        "enchanted_forest": {
+          "height_range": [0.5, 0.65],
+          "temperature_range": [0.3, 0.7],
+          "moisture_range": [0.6, 1.0],
+          "spawn_chance": 0.15
+        },
+        "ancient_ruins": {
+          "height_range": [0.6, 0.8],
+          "temperature_range": [0.0, 1.0],
+          "moisture_range": [0.0, 0.5],
+          "spawn_chance": 0.05
+        },
+        "crystal_lake": {
+          "height_range": [0.25, 0.35],
+          "temperature_range": [0.0, 1.0],
+          "moisture_range": [0.8, 1.0],
+          "spawn_chance": 0.1
+        }
+      }
+    },
+    
+    "additional_params": {
+      "magic_density": "high",
+      "creature_diversity": "abundant",
+      "weather_variety": ["sunny", "rainy", "mystical fog"]
     }
   },
+  
+  "Grimdark": {
+    "description": "A bleak, unforgiving world shrouded in darkness, with barren wastelands, plague-ridden forests, and crumbling ruins where hope is scarce and survival is brutal.",
+    "recommended_size": "Large",
+    "default_landmass": "Continents",
+    
+    "noise": {
+      "noise_type": "TYPE_PERLIN",
+      "frequency": 0.005,
+      "octaves": 5,
+      "gain": 0.4,
+      "lacunarity": 2.2,
+      "height_scale": 0.7
+    },
+    
+    "terrain": {
+      "sea_level": 0.3,
+      "erosion": {
+        "enabled": false,
+        "strength": 0.5,
+        "iterations": 8
+      },
+      "rivers": {
+        "enabled": false,
+        "count": 10,
+        "start_elevation": 0.65
+      }
+    },
+    
+    "climate": {
+      "temperature_noise_frequency": 0.002,
+      "moisture_noise_frequency": 0.002,
+      "temperature_bias": -0.2,
+      "moisture_bias": -0.1
+    },
+    
+    "biomes": {
+      "colors": {
+        "water": "#1c1c1c",
+        "beach": "#4d4d4d",
+        "grass": "#333333",
+        "forest": "#262626",
+        "hill": "#404040",
+        "mountain": "#595959",
+        "snow": "#b3b3b3",
+        "wasteland": "#8c8c8c",
+        "plagued_land": "#556b2f",
+        "ruined_city": "#696969"
+      },
+      "thresholds": {
+        "water": 0.3,
+        "beach": 0.35,
+        "grass": 0.45,
+        "forest": 0.6,
+        "hill": 0.75,
+        "mountain": 0.9,
+        "snow": 1.0,
+        "wasteland": 0.5,
+        "plagued_land": 0.65,
+        "ruined_city": 0.8
+      },
+      "generation_mode": "height_and_climate",
+      "fantasy_biomes": {
+        "wasteland": {
+          "height_range": [0.4, 0.55],
+          "temperature_range": [0.5, 1.0],
+          "moisture_range": [0.0, 0.3],
+          "spawn_chance": 0.2
+        },
+        "plagued_land": {
+          "height_range": [0.55, 0.7],
+          "temperature_range": [0.2, 0.6],
+          "moisture_range": [0.4, 0.8],
+          "spawn_chance": 0.15
+        },
+        "ruined_city": {
+          "height_range": [0.7, 0.85],
+          "temperature_range": [0.0, 1.0],
+          "moisture_range": [0.0, 0.5],
+          "spawn_chance": 0.08
+        }
+      }
+    },
+    
+    "additional_params": {
+      "magic_density": "low_corrupted",
+      "creature_diversity": "hostile_mutated",
+      "weather_variety": ["stormy", "ashfall", "eternal dusk"]
+    }
+  },
+  
+  "Default": {
+    "description": "Standard fantasy world with balanced terrain and climate.",
+    "recommended_size": "Medium",
+    "default_landmass": "Continents",
+    
+    "noise": {
+      "noise_type": "TYPE_SIMPLEX",
+      "frequency": 0.004,
+      "octaves": 6,
+      "gain": 0.5,
+      "lacunarity": 2.0,
+      "height_scale": 0.8
+    },
+    
+    "terrain": {
+      "sea_level": 0.4,
+      "erosion": {
+        "enabled": false,
+        "strength": 0.3,
+        "iterations": 5
+      },
+      "rivers": {
+        "enabled": false,
+        "count": 12,
+        "start_elevation": 0.7
+      }
+    },
+    
+    "climate": {
+      "temperature_noise_frequency": 0.002,
+      "moisture_noise_frequency": 0.002,
+      "temperature_bias": 0.0,
+      "moisture_bias": 0.0
+    },
+    
+    "biomes": {
+      "colors": {
+        "water": "#2a6d9e",
+        "beach": "#d4b56a",
+        "grass": "#3d8c40",
+        "forest": "#2d5a3d",
+        "hill": "#8b7355",
+        "mountain": "#c0c0c0",
+        "snow": "#ffffff"
+      },
+      "thresholds": {
+        "water": 0.35,
+        "beach": 0.38,
+        "grass": 0.5,
+        "forest": 0.65,
+        "hill": 0.8,
+        "mountain": 0.95,
+        "snow": 1.0
+      },
+      "generation_mode": "height_only"
+    },
+    
+    "additional_params": {
+      "magic_density": "moderate",
+      "creature_diversity": "standard",
+      "weather_variety": ["sunny", "cloudy", "rainy"]
+    }
+  },
+  
   "Low Fantasy": {
     "description": "Rare magic, muddy villages, and human intrigue in a grounded world.",
     "recommended_size": "Medium",
@@ -37,26 +261,6 @@
       "hill": "#6b5a47",
       "mountain": "#8c7b6b",
       "snow": "#d4d4d4"
-    }
-  },
-  "Grimdark": {
-    "description": "Bleak wastelands, betrayal, and suffering under gray skies.",
-    "recommended_size": "Large",
-    "default_landmass": "Continents",
-    "noise_type": "TYPE_SIMPLEX",
-    "frequency": 0.006,
-    "octaves": 7,
-    "gain": 0.55,
-    "lacunarity": 1.9,
-    "height_scale": 0.7,
-    "biome_colors": {
-      "water": "#2d1b1b",
-      "beach": "#5c4033",
-      "grass": "#3f3f3f",
-      "forest": "#2b2b2b",
-      "hill": "#4a4a4a",
-      "mountain": "#666666",
-      "snow": "#8c8c8c"
     }
   },
   "Dark Fantasy": {

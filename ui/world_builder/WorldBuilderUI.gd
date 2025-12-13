@@ -16,8 +16,7 @@ var current_step: int = 0
 
 ## Step definitions
 const STEPS: Array[String] = [
-	"Seed & Size",
-	"2D Map Maker",
+	"Map Generation & Editing",
 	"Terrain",
 	"Climate",
 	"Biomes",
@@ -56,7 +55,7 @@ var current_icon_group_index: int = 0
 @onready var left_nav: Panel = $BackgroundPanel/MainContainer/LeftNav
 @onready var center_panel: Panel = $BackgroundPanel/MainContainer/RightSplit/CenterPanel
 @onready var map_2d_scroll_container: ScrollContainer = $BackgroundPanel/MainContainer/RightSplit/CenterPanel/Map2DScrollContainer
-@onready var map_2d_texture: TextureRect = $BackgroundPanel/MainContainer/RightSplit/CenterPanel/Map2DScrollContainer/Map2DTexture
+@onready var procedural_world_map = $BackgroundPanel/MainContainer/RightSplit/CenterPanel/Map2DScrollContainer/ProceduralWorldMap  # ProceduralWorldMap - type hint removed for addon compatibility
 @onready var terrain_3d_view: SubViewportContainer = $BackgroundPanel/MainContainer/RightSplit/CenterPanel/Terrain3DView
 @onready var preview_viewport: SubViewport = $BackgroundPanel/MainContainer/RightSplit/CenterPanel/Terrain3DView/PreviewViewport
 @onready var preview_world: Node3D = $BackgroundPanel/MainContainer/RightSplit/CenterPanel/Terrain3DView/PreviewViewport/PreviewWorld
@@ -71,6 +70,7 @@ var current_icon_group_index: int = 0
 ## 2D map viewport for rendering map to texture
 var map_2d_viewport: SubViewport = null
 var map_2d_camera: Camera2D = null
+var map_2d_texture: TextureRect = null
 
 ## Preview terrain reference (will be set when terrain manager is connected)
 var preview_terrain: Node = null
@@ -103,7 +103,7 @@ func _ready() -> void:
 	_setup_navigation()
 	_setup_step_content()
 	_setup_buttons()
-	_setup_2d_map_viewport()
+	_setup_procedural_world_map_controls()
 	_update_step_display()
 	Logger.info("UI/WorldBuilder", "Wizard-style UI ready")
 
@@ -252,13 +252,13 @@ func _setup_step_content() -> void:
 	for step_name: String in STEPS:
 		step_data[step_name] = {}
 	
-	# Create step 1: Seed & Size
-	_create_step_seed_size(step_container)
+	# Initialize merged step data (Map Gen is used internally, not in STEPS)
+	step_data["Map Gen"] = {}
 	
-	# Create step 2: 2D Map Maker
-	_create_step_map_maker(step_container)
+	# Create step 1: Map Generation & Editing (merged)
+	_create_step_map_gen_editor(step_container)
 	
-	# Create step 3: Terrain
+	# Create step 2: Terrain
 	_create_step_terrain(step_container)
 	
 	# Create step 4: Climate
@@ -297,14 +297,50 @@ func _setup_preview_camera() -> void:
 	preview_camera.current = true
 
 
-func _setup_2d_map_viewport() -> void:
-	"""Setup 2D map viewport for rendering map to texture with Camera2D."""
-	if map_2d_texture == null:
+func _setup_procedural_world_map_controls() -> void:
+	"""Setup pan/zoom controls for ProceduralWorldMap."""
+	if procedural_world_map == null:
 		return
 	
+	# Connect input handling to the ScrollContainer parent
+	if map_2d_scroll_container != null:
+		map_2d_scroll_container.gui_input.connect(_on_map_scroll_container_input)
+
+
+func _on_map_scroll_container_input(event: InputEvent) -> void:
+	"""Handle input for pan/zoom controls on ProceduralWorldMap."""
+	if procedural_world_map == null or current_step != 0:
+		return
+	
+	# Handle mouse wheel for zoom
+	if event is InputEventMouseButton:
+		var mouse_event: InputEventMouseButton = event as InputEventMouseButton
+		if mouse_event.pressed:
+			if mouse_event.button_index == MOUSE_BUTTON_WHEEL_UP:
+				procedural_world_map.zoom = min(procedural_world_map.zoom * 1.2, 100.0)
+				get_viewport().set_input_as_handled()
+			elif mouse_event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+				procedural_world_map.zoom = max(procedural_world_map.zoom / 1.2, 0.01)
+				get_viewport().set_input_as_handled()
+	
+	# Handle mouse drag for panning
+	elif event is InputEventMouseMotion:
+		var mouse_event: InputEventMouseMotion = event as InputEventMouseMotion
+		if Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE) or (Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and Input.is_key_pressed(KEY_SPACE)):
+			var pan_speed: float = 1.0 / procedural_world_map.zoom
+			procedural_world_map.coordinates -= mouse_event.relative * pan_speed
+			get_viewport().set_input_as_handled()
+
+
+func _setup_2d_map_viewport() -> void:
+	"""Setup 2D map viewport for rendering map to texture with Camera2D (legacy - kept for compatibility)."""
+	if procedural_world_map == null:
+		return
+	# Old viewport system no longer needed - ProceduralWorldMap handles display
+	
 	# Get initial world size
-	var world_width: int = step_data.get("Seed & Size", {}).get("width", 1024)
-	var world_height: int = step_data.get("Seed & Size", {}).get("height", 1024)
+	var world_width: int = step_data.get("Map Gen", {}).get("width", 1024)
+	var world_height: int = step_data.get("Map Gen", {}).get("height", 1024)
 	
 	# Create SubViewport for 2D map rendering
 	# Use fixed viewport size (2048) for performance, scale content via camera
@@ -339,6 +375,17 @@ func _setup_2d_map_viewport() -> void:
 	
 	# Add viewport as child and connect texture
 	add_child(map_2d_viewport)
+	
+	# Create TextureRect if it doesn't exist
+	if map_2d_texture == null:
+		map_2d_texture = TextureRect.new()
+		map_2d_texture.name = "Map2DTexture"
+		map_2d_texture.anchor_left = 0.5
+		map_2d_texture.anchor_top = 0.5
+		map_2d_texture.anchor_right = 0.5
+		map_2d_texture.anchor_bottom = 0.5
+		add_child(map_2d_texture)
+	
 	map_2d_texture.texture = map_2d_viewport.get_texture()
 	
 	# Setup 2D map layer content
@@ -351,8 +398,8 @@ func _setup_2d_map_layer_content(parent: Node2D) -> void:
 		return
 	
 	# Get world size for background
-	var world_width: float = float(step_data.get("Seed & Size", {}).get("width", 1000))
-	var world_height: float = float(step_data.get("Seed & Size", {}).get("height", 1000))
+	var world_width: float = float(step_data.get("Map Gen", {}).get("width", 1000))
+	var world_height: float = float(step_data.get("Map Gen", {}).get("height", 1000))
 	
 	# Create parchment background using Sprite2D with colored quad
 	# We'll use a simple approach: create a large colored rectangle using Polygon2D
@@ -398,7 +445,7 @@ func _setup_2d_map_layer() -> void:
 
 
 func _create_map_grid_in_parent(parent: Node2D) -> void:
-	"""Create grid lines for the 2D map in the specified parent."""
+	"""Create grid lines for the 2D map in the specified parent with even divisions."""
 	if parent == null:
 		return
 	
@@ -407,14 +454,30 @@ func _create_map_grid_in_parent(parent: Node2D) -> void:
 	parent.add_child(grid_container)
 	
 	# Get world size from step data
-	var world_width: float = float(step_data.get("Seed & Size", {}).get("width", 1000))
-	var world_height: float = float(step_data.get("Seed & Size", {}).get("height", 1000))
+	var world_width: float = float(step_data.get("Map Gen", {}).get("width", 1000))
+	var world_height: float = float(step_data.get("Map Gen", {}).get("height", 1000))
 	
-	# Create horizontal grid lines
-	var grid_spacing: float = 100.0
+	# Calculate optimal spacing for even division (same logic as _draw_grid_on_image)
+	const TARGET_SECTIONS: int = 10  # Target number of grid sections per dimension
+	var width_int: int = int(world_width)
+	var height_int: int = int(world_height)
+	
+	var num_sections_x: int = TARGET_SECTIONS
+	var num_sections_y: int = TARGET_SECTIONS
+	
+	# Adjust to ensure even division (minimum 4 sections to maintain readability)
+	while width_int % num_sections_x != 0 and num_sections_x > 4:
+		num_sections_x -= 1
+	while height_int % num_sections_y != 0 and num_sections_y > 4:
+		num_sections_y -= 1
+	
+	var grid_spacing_x: float = float(width_int / num_sections_x)
+	var grid_spacing_y: float = float(height_int / num_sections_y)
+	
 	var grid_color: Color = Color(0.6, 0.5, 0.4, 0.3)  # Light ink color
 	
-	for y in range(0, int(world_height) + 1, int(grid_spacing)):
+	# Create horizontal grid lines
+	for y in range(0, height_int + 1, int(grid_spacing_y)):
 		var line: Line2D = Line2D.new()
 		line.add_point(Vector2(-world_width / 2, y - world_height / 2))
 		line.add_point(Vector2(world_width / 2, y - world_height / 2))
@@ -423,7 +486,7 @@ func _create_map_grid_in_parent(parent: Node2D) -> void:
 		grid_container.add_child(line)
 	
 	# Create vertical grid lines
-	for x in range(0, int(world_width) + 1, int(grid_spacing)):
+	for x in range(0, width_int + 1, int(grid_spacing_x)):
 		var line: Line2D = Line2D.new()
 		line.add_point(Vector2(x - world_width / 2, -world_height / 2))
 		line.add_point(Vector2(x - world_width / 2, world_height / 2))
@@ -527,8 +590,8 @@ func update_camera_for_step(step: int) -> void:
 				preview_camera.projection = Camera3D.PROJECTION_PERSPECTIVE
 				preview_camera.fov = 70.0
 				# Position camera to view terrain
-				var world_width: float = float(step_data.get("Seed & Size", {}).get("width", 1000))
-				var world_height: float = float(step_data.get("Seed & Size", {}).get("height", 1000))
+				var world_width: float = float(step_data.get("Map Gen", {}).get("width", 1000))
+				var world_height: float = float(step_data.get("Map Gen", {}).get("height", 1000))
 				var max_dim: float = max(world_width, world_height)
 				preview_camera.transform.origin = Vector3(max_dim * 0.5, max_dim * 0.3, max_dim * 0.5)
 				preview_camera.look_at(Vector3(world_width / 2, 0, world_height / 2), Vector3.UP)
@@ -566,10 +629,10 @@ func _ensure_terrain_in_preview() -> void:
 	print("WorldBuilderUI: Terrain preview ready for Step 3+")
 
 
-func _create_step_seed_size(parent: VBoxContainer) -> void:
-	"""Create Step 1: Seed & Size content with fantasy archetypes."""
+func _create_step_map_gen_editor(parent: VBoxContainer) -> void:
+	"""Create Step 1: Map Generation & Editing (merged Map Gen + 2D Map Maker)."""
 	var step_panel: Panel = Panel.new()
-	step_panel.name = "StepSeedSize"
+	step_panel.name = "StepMapGenEditor"
 	step_panel.visible = (current_step == 0)
 	parent.add_child(step_panel)
 	
@@ -577,6 +640,12 @@ func _create_step_seed_size(parent: VBoxContainer) -> void:
 	container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	container.add_theme_constant_override("separation", 10)
 	step_panel.add_child(container)
+	
+	# Info label
+	var info_label: Label = Label.new()
+	info_label.text = "Procedural Map Generation & Editing - Configure parameters and generate your world map.\nLeft-click to paint terrain, scroll to zoom, drag to pan."
+	info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	container.add_child(info_label)
 	
 	# Seed input with random button
 	var seed_container: HBoxContainer = HBoxContainer.new()
@@ -597,8 +666,8 @@ func _create_step_seed_size(parent: VBoxContainer) -> void:
 	random_seed_button.pressed.connect(_on_random_seed_pressed)
 	seed_container.add_child(random_seed_button)
 	container.add_child(seed_container)
-	control_references["Seed & Size/seed"] = seed_input
-	step_data["Seed & Size"]["seed"] = 12345
+	control_references["Map Gen/seed"] = seed_input
+	step_data["Map Gen"]["seed"] = 12345
 	
 	# Fantasy Style dropdown
 	var style_label: Label = Label.new()
@@ -612,8 +681,8 @@ func _create_step_seed_size(parent: VBoxContainer) -> void:
 	style_dropdown.selected = 0
 	style_dropdown.item_selected.connect(_on_fantasy_style_selected)
 	container.add_child(style_dropdown)
-	control_references["Seed & Size/style"] = style_dropdown
-	step_data["Seed & Size"]["style"] = fantasy_archetypes.keys()[0] if fantasy_archetypes.size() > 0 else ""
+	control_references["Map Gen/style"] = style_dropdown
+	step_data["Map Gen"]["style"] = fantasy_archetypes.keys()[0] if fantasy_archetypes.size() > 0 else ""
 	
 	# Initialize with first style's recommendations
 	if fantasy_archetypes.size() > 0:
@@ -632,13 +701,12 @@ func _create_step_seed_size(parent: VBoxContainer) -> void:
 	size_dropdown.selected = 1  # Default to Small
 	size_dropdown.item_selected.connect(_on_size_selected)
 	container.add_child(size_dropdown)
-	control_references["Seed & Size/size"] = size_dropdown
-	step_data["Seed & Size"]["size"] = "Small"
-	step_data["Seed & Size"]["width"] = size_map["Small"]
-	step_data["Seed & Size"]["height"] = size_map["Small"]
+	control_references["Map Gen/size"] = size_dropdown
+	step_data["Map Gen"]["size"] = "Small"
+	step_data["Map Gen"]["width"] = size_map["Small"]
+	step_data["Map Gen"]["height"] = size_map["Small"]
 	
-	# Show initial placeholder for default size
-	call_deferred("_update_map_preview_placeholder", size_map["Small"], size_map["Small"])
+	# ProceduralWorldMap will handle display automatically - no placeholder needed
 	
 	# Landmass dropdown
 	var landmass_label: Label = Label.new()
@@ -653,45 +721,33 @@ func _create_step_seed_size(parent: VBoxContainer) -> void:
 	landmass_dropdown.selected = 0
 	landmass_dropdown.item_selected.connect(_on_landmass_selected)
 	container.add_child(landmass_dropdown)
-	control_references["Seed & Size/landmass"] = landmass_dropdown
-	step_data["Seed & Size"]["landmass"] = "Continents"
+	control_references["Map Gen/landmass"] = landmass_dropdown
+	step_data["Map Gen"]["landmass"] = "Continents"
 	
 	# Generate button
 	var generate_button: Button = Button.new()
 	generate_button.text = "Generate Map"
 	generate_button.pressed.connect(_on_generate_map_pressed)
 	container.add_child(generate_button)
-	control_references["Seed & Size/generate"] = generate_button
-
-
-func _create_step_map_maker(parent: VBoxContainer) -> void:
-	"""Create Step 2: 2D Map Maker content with MapMakerModule."""
-	var step_panel: Panel = Panel.new()
-	step_panel.name = "StepMapMaker"
-	step_panel.visible = (current_step == 1)
-	parent.add_child(step_panel)
+	control_references["Map Gen/generate"] = generate_button
 	
-	var container: VBoxContainer = VBoxContainer.new()
-	container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	container.add_theme_constant_override("separation", 10)
-	step_panel.add_child(container)
-	
-	# Info label
-	var info_label: Label = Label.new()
-	info_label.text = "Procedural 2D Map Maker - Generate and edit your world map.\nLeft-click to paint terrain, scroll to zoom, drag to pan."
-	info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	container.add_child(info_label)
+	# Bake to 3D button
+	var bake_button: Button = Button.new()
+	bake_button.text = "Bake to 3D"
+	bake_button.pressed.connect(_on_bake_to_3d_pressed)
+	container.add_child(bake_button)
+	control_references["Map Gen/bake"] = bake_button
 	
 	# MapMakerModule will be added to center panel when step is shown
 	# Store reference for later initialization
-	control_references["2D Map Maker/step_panel"] = step_panel
+	control_references["Map Gen/step_panel"] = step_panel
 
 
 func _create_step_terrain(parent: VBoxContainer) -> void:
-	"""Create Step 3: Terrain content with full controls."""
+	"""Create Step 2: Terrain content with full controls."""
 	var step_panel: Panel = Panel.new()
 	step_panel.name = "StepTerrain"
-	step_panel.visible = (current_step == 2)
+	step_panel.visible = (current_step == 1)
 	parent.add_child(step_panel)
 	
 	var container: VBoxContainer = VBoxContainer.new()
@@ -711,12 +767,12 @@ func _create_step_terrain(parent: VBoxContainer) -> void:
 	seed_spinbox.editable = false  # Read-only
 	seed_spinbox.min_value = 0
 	seed_spinbox.max_value = 999999
-	seed_spinbox.value = step_data.get("Seed & Size", {}).get("seed", 12345)
+	seed_spinbox.value = step_data.get("Map Gen", {}).get("seed", 12345)
 	seed_container.add_child(seed_spinbox)
 	container.add_child(seed_container)
 	control_references["Terrain/seed"] = seed_spinbox
 	step_data["Terrain"] = {}
-	step_data["Terrain"]["seed"] = step_data.get("Seed & Size", {}).get("seed", 12345)
+	step_data["Terrain"]["seed"] = step_data.get("Map Gen", {}).get("seed", 12345)
 	
 	# Height Scale
 	var height_container: HBoxContainer = HBoxContainer.new()
@@ -1043,7 +1099,7 @@ func _create_step_biomes(parent: VBoxContainer) -> void:
 	"""Create Step 5: Biomes content."""
 	var step_panel: Panel = Panel.new()
 	step_panel.name = "StepBiomes"
-	step_panel.visible = (current_step == 4)
+	step_panel.visible = (current_step == 3)
 	parent.add_child(step_panel)
 	
 	var container: VBoxContainer = VBoxContainer.new()
@@ -1218,18 +1274,18 @@ func _update_step_display() -> void:
 	# Update camera for current step
 	update_camera_for_step(current_step)
 	
-	# Initialize MapMakerModule when entering Step 2
-	if current_step == 1:
+	# Initialize MapMakerModule when entering Step 1
+	if current_step == 0:
 		_initialize_map_maker_module()
 	
-	# Update seed in Step 3 when entering terrain step
-	if current_step == 2:
+	# Update seed in Step 2 when entering terrain step
+	if current_step == 1:
 		_update_terrain_seed_from_step1()
-		# Export map data from Step 2 to Step 3
+		# Export map data from Step 1 to Step 2
 		_export_map_data_to_terrain()
 	
 	# Update export summary when entering export step
-	if current_step == 8:
+	if current_step == 7:
 		_update_export_summary()
 
 
@@ -1247,51 +1303,68 @@ func _initialize_map_maker_module() -> void:
 		print("DEBUG: map_2d_texture visible after:", map_2d_texture.visible)
 	
 	# Create MapMakerModule instance using load() at runtime
-	var module_script: GDScript = load("res://ui/world_builder/MapMakerModule.gd") as GDScript
-	if module_script != null:
-		map_maker_module = module_script.new()
-		print("DEBUG: MapMakerModule instance created")
-	else:
-		push_error("WorldBuilderUI: Failed to load MapMakerModule script")
-		return
-	map_maker_module.name = "MapMakerModule"
-	map_maker_module.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	map_maker_module.visible = true
-	print("DEBUG: MapMakerModule configured, visible:", map_maker_module.visible)
-	
-	# Add to center panel (replacing map_2d_texture view)
-	if center_panel != null:
-		print("DEBUG: Adding MapMakerModule to center_panel, children before:", center_panel.get_child_count())
-		center_panel.add_child(map_maker_module)
-		print("DEBUG: Children after:", center_panel.get_child_count())
-		
-		# Get MapCanvas from module
-		var map_canvas: Control = map_maker_module.get_node_or_null("MapCanvas")
-		if map_canvas == null:
-			print("DEBUG: MapCanvas not found, creating...")
-			# Create MapCanvas if it doesn't exist
-			map_canvas = Control.new()
-			map_canvas.name = "MapCanvas"
-			map_canvas.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-			map_maker_module.add_child(map_canvas)
+	# Note: MapMakerModule is optional - ProceduralWorldMap is the primary system
+	var module_script = load("res://ui/world_builder/MapMakerModule.gd")
+	if module_script != null and module_script is GDScript:
+		# Check if script can be instantiated (no parse errors)
+		if module_script.can_instantiate():
+			map_maker_module = module_script.new()
+			print("DEBUG: MapMakerModule instance created")
+			
+			map_maker_module.name = "MapMakerModule"
+			map_maker_module.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+			map_maker_module.visible = true
+			print("DEBUG: MapMakerModule configured, visible:", map_maker_module.visible)
+			
+			# Add to center panel (replacing map_2d_texture view)
+			if center_panel != null:
+				print("DEBUG: Adding MapMakerModule to center_panel, children before:", center_panel.get_child_count())
+				center_panel.add_child(map_maker_module)
+				print("DEBUG: Children after:", center_panel.get_child_count())
+				
+				# Get MapCanvas from module
+				var map_canvas: Control = map_maker_module.get_node_or_null("MapCanvas")
+				if map_canvas == null:
+					print("DEBUG: MapCanvas not found, creating...")
+					# Create MapCanvas if it doesn't exist
+					map_canvas = Control.new()
+					map_canvas.name = "MapCanvas"
+					map_canvas.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+					map_maker_module.add_child(map_canvas)
+				else:
+					print("DEBUG: MapCanvas found, visible:", map_canvas.visible)
+			else:
+				print("DEBUG: ERROR - center_panel is null!")
 		else:
-			print("DEBUG: MapCanvas found, visible:", map_canvas.visible)
+			Logger.warn("UI/WorldBuilder", "MapMakerModule script has parse errors, using ProceduralWorldMap only")
+			# Keep map_2d_texture visible for ProceduralWorldMap preview
+			if map_2d_texture != null:
+				map_2d_texture.visible = true
 	else:
-		print("DEBUG: ERROR - center_panel is null!")
+		Logger.warn("UI/WorldBuilder", "Failed to load MapMakerModule script, using ProceduralWorldMap only")
+		# Keep map_2d_texture visible for ProceduralWorldMap preview
+		if map_2d_texture != null:
+			map_2d_texture.visible = true
 	
-	# Initialize with seed and size from Step 1
-	var seed_value: int = step_data.get("Seed & Size", {}).get("seed", 12345)
-	var width: int = step_data.get("Seed & Size", {}).get("width", 1000)
-	var height: int = step_data.get("Seed & Size", {}).get("height", 1000)
-	print("DEBUG: Calling initialize_from_step_data with seed:", seed_value, " width:", width, " height:", height)
-	
-	# Pass terrain manager to MapMakerModule
-	if terrain_manager != null:
-		map_maker_module.set_terrain_manager(terrain_manager)
-		print("DEBUG: WorldBuilderUI: Terrain manager passed to MapMakerModule")
-	
-	map_maker_module.initialize_from_step_data(seed_value, width, height)
-	print("DEBUG: WorldBuilderUI: MapMakerModule initialized")
+	# Initialize with seed and size from Step 1 (only if MapMakerModule was created)
+	if map_maker_module != null:
+		var seed_value: int = step_data.get("Map Gen", {}).get("seed", 12345)
+		var width: int = step_data.get("Map Gen", {}).get("width", 1000)
+		var height: int = step_data.get("Map Gen", {}).get("height", 1000)
+		print("DEBUG: Calling initialize_from_step_data with seed:", seed_value, " width:", width, " height:", height)
+		
+		# Pass terrain manager to MapMakerModule
+		if terrain_manager != null:
+			map_maker_module.set_terrain_manager(terrain_manager)
+			print("DEBUG: WorldBuilderUI: Terrain manager passed to MapMakerModule")
+		
+		if map_maker_module.has_method("initialize_from_step_data"):
+			map_maker_module.initialize_from_step_data(seed_value, width, height)
+			print("DEBUG: WorldBuilderUI: MapMakerModule initialized")
+		else:
+			print("DEBUG: WorldBuilderUI: MapMakerModule does not have initialize_from_step_data method")
+	else:
+		print("DEBUG: WorldBuilderUI: MapMakerModule not available, using ProceduralWorldMap only")
 
 
 func _export_map_data_to_terrain() -> void:
@@ -1313,8 +1386,8 @@ func _export_map_data_to_terrain() -> void:
 func _on_next_pressed() -> void:
 	"""Handle Next button press."""
 	if current_step < STEPS.size() - 1:
-		# Check if we're leaving step 2 (Map Maker) - trigger 3D conversion
-		if current_step == 1:
+		# Check if we're leaving step 1 (Map Gen) - trigger 3D conversion
+		if current_step == 0:
 			_start_3d_conversion()
 		else:
 			current_step += 1
@@ -1407,7 +1480,7 @@ func _on_regenerate_terrain_pressed() -> void:
 
 func _on_seed_changed(new_seed: int) -> void:
 	"""Handle seed change from Step 1."""
-	step_data["Seed & Size"]["seed"] = new_seed
+	step_data["Map Gen"]["seed"] = new_seed
 	# Update terrain step seed if it exists
 	if control_references.has("Terrain/seed"):
 		var terrain_seed: SpinBox = control_references["Terrain/seed"] as SpinBox
@@ -1420,7 +1493,7 @@ func _on_seed_changed(new_seed: int) -> void:
 
 func _update_terrain_seed_from_step1() -> void:
 	"""Update terrain step seed field from Step 1."""
-	var step1_seed: int = step_data.get("Seed & Size", {}).get("seed", 12345)
+	var step1_seed: int = step_data.get("Map Gen", {}).get("seed", 12345)
 	if control_references.has("Terrain/seed"):
 		var terrain_seed: SpinBox = control_references["Terrain/seed"] as SpinBox
 		if terrain_seed != null:
@@ -1437,20 +1510,20 @@ func _on_seed_text_changed(text: String) -> void:
 	"""Handle seed text change."""
 	if text.is_valid_int():
 		var seed_val: int = text.to_int()
-		step_data["Seed & Size"]["seed"] = seed_val
+		step_data["Map Gen"]["seed"] = seed_val
 		_on_seed_changed(seed_val)
 	else:
 		# Reset to current value if invalid
-		var seed_input: LineEdit = control_references.get("Seed & Size/seed") as LineEdit
+		var seed_input: LineEdit = control_references.get("Map Gen/seed") as LineEdit
 		if seed_input != null:
-			seed_input.text = str(step_data.get("Seed & Size", {}).get("seed", 12345))
+			seed_input.text = str(step_data.get("Map Gen", {}).get("seed", 12345))
 
 
 func _on_random_seed_pressed() -> void:
 	"""Generate a random seed."""
 	var seed_value: int = randi() % 999999 + 1
-	step_data["Seed & Size"]["seed"] = seed_value
-	var seed_input: LineEdit = control_references.get("Seed & Size/seed") as LineEdit
+	step_data["Map Gen"]["seed"] = seed_value
+	var seed_input: LineEdit = control_references.get("Map Gen/seed") as LineEdit
 	if seed_input != null:
 		seed_input.text = str(seed_value)
 	_on_seed_changed(seed_value)
@@ -1458,12 +1531,12 @@ func _on_random_seed_pressed() -> void:
 
 func _on_fantasy_style_selected(index: int) -> void:
 	"""Handle fantasy style selection - auto-update size and landmass."""
-	var style_dropdown: OptionButton = control_references.get("Seed & Size/style") as OptionButton
+	var style_dropdown: OptionButton = control_references.get("Map Gen/style") as OptionButton
 	if style_dropdown == null:
 		return
 	
 	var selected_style: String = style_dropdown.get_item_text(index)
-	step_data["Seed & Size"]["style"] = selected_style
+	step_data["Map Gen"]["style"] = selected_style
 	
 	var arch: Dictionary = fantasy_archetypes.get(selected_style, {})
 	if arch.is_empty():
@@ -1471,7 +1544,7 @@ func _on_fantasy_style_selected(index: int) -> void:
 	
 	# Set recommended size
 	var rec_size: String = arch.get("recommended_size", "Small")
-	var size_dropdown: OptionButton = control_references.get("Seed & Size/size") as OptionButton
+	var size_dropdown: OptionButton = control_references.get("Map Gen/size") as OptionButton
 	if size_dropdown != null:
 		var size_map: Dictionary = {"Tiny": 0, "Small": 1, "Medium": 2, "Large": 3, "Extra Large": 4}
 		var size_index: int = size_map.get(rec_size, 1)
@@ -1481,13 +1554,13 @@ func _on_fantasy_style_selected(index: int) -> void:
 	
 	# Set default landmass
 	var rec_land: String = arch.get("default_landmass", "Continents")
-	var landmass_dropdown: OptionButton = control_references.get("Seed & Size/landmass") as OptionButton
+	var landmass_dropdown: OptionButton = control_references.get("Map Gen/landmass") as OptionButton
 	if landmass_dropdown != null:
 		var landmass_types: Array[String] = ["Continents", "Island Chain", "Single Island", "Archipelago", "Pangea", "Coastal"]
 		var land_index: int = landmass_types.find(rec_land)
 		if land_index >= 0:
 			landmass_dropdown.selected = land_index
-			step_data["Seed & Size"]["landmass"] = rec_land
+			step_data["Map Gen"]["landmass"] = rec_land
 	
 	# Set tooltip with description
 	style_dropdown.tooltip_text = arch.get("description", "")
@@ -1495,7 +1568,7 @@ func _on_fantasy_style_selected(index: int) -> void:
 
 func _on_size_selected(index: int) -> void:
 	"""Handle size selection - update width/height and show placeholder immediately."""
-	var size_dropdown: OptionButton = control_references.get("Seed & Size/size") as OptionButton
+	var size_dropdown: OptionButton = control_references.get("Map Gen/size") as OptionButton
 	if size_dropdown == null:
 		return
 	
@@ -1503,9 +1576,9 @@ func _on_size_selected(index: int) -> void:
 	var size_map: Dictionary = {"Tiny": 512, "Small": 1024, "Medium": 2048, "Large": 4096, "Extra Large": 8192}
 	var map_size: int = size_map.get(size_name, 1024)
 	
-	step_data["Seed & Size"]["size"] = size_name
-	step_data["Seed & Size"]["width"] = map_size
-	step_data["Seed & Size"]["height"] = map_size
+	step_data["Map Gen"]["size"] = size_name
+	step_data["Map Gen"]["width"] = map_size
+	step_data["Map Gen"]["height"] = map_size
 	
 	# Immediately show placeholder to fill new container bounds
 	_update_map_preview_placeholder(map_size, map_size)
@@ -1515,21 +1588,21 @@ func _on_size_selected(index: int) -> void:
 
 func _on_landmass_selected(index: int) -> void:
 	"""Handle landmass selection."""
-	var landmass_dropdown: OptionButton = control_references.get("Seed & Size/landmass") as OptionButton
+	var landmass_dropdown: OptionButton = control_references.get("Map Gen/landmass") as OptionButton
 	if landmass_dropdown == null:
 		return
 	
 	var landmass: String = landmass_dropdown.get_item_text(index)
-	step_data["Seed & Size"]["landmass"] = landmass
+	step_data["Map Gen"]["landmass"] = landmass
 
 
 func _on_generate_map_pressed() -> void:
-	"""Generate procedural 2D map with archetype-based parameters."""
-	var seed_value: int = step_data.get("Seed & Size", {}).get("seed", 12345)
-	var style_name: String = step_data.get("Seed & Size", {}).get("style", "")
-	var map_width: int = step_data.get("Seed & Size", {}).get("width", 1024)
-	var map_height: int = step_data.get("Seed & Size", {}).get("height", 1024)
-	var landmass: String = step_data.get("Seed & Size", {}).get("landmass", "Continents")
+	"""Generate procedural 2D map using ProceduralWorldMap addon with archetype-based parameters."""
+	var seed_value: int = step_data.get("Map Gen", {}).get("seed", 12345)
+	var style_name: String = step_data.get("Map Gen", {}).get("style", "")
+	var map_width: int = step_data.get("Map Gen", {}).get("width", 1024)
+	var map_height: int = step_data.get("Map Gen", {}).get("height", 1024)
+	var landmass: String = step_data.get("Map Gen", {}).get("landmass", "Continents")
 	
 	if style_name.is_empty() or not fantasy_archetypes.has(style_name):
 		Logger.warn("UI/WorldBuilder", "Invalid fantasy style selected")
@@ -1537,84 +1610,126 @@ func _on_generate_map_pressed() -> void:
 	
 	var arch: Dictionary = fantasy_archetypes[style_name]
 	
-	# Generate heightmap and biome map
-	var height_img: Image = Image.create(map_width, map_height, false, Image.FORMAT_RF)
-	var biome_img: Image = Image.create(map_width, map_height, false, Image.FORMAT_RGB8)
+	# Create custom datasource
+	var datasource_script = load("res://data/ProceduralWorldDatasource.gd")
+	var ds = datasource_script.new()  # ProceduralWorldDatasource - type hint removed for addon compatibility
+	ds.configure_from_archetype(arch, landmass, seed_value)
 	
-	# Setup noise
-	var noise: FastNoiseLite = FastNoiseLite.new()
-	noise.seed = seed_value
+	# Use the ProceduralWorldMap node already in the scene
+	if procedural_world_map == null:
+		Logger.error("UI/WorldBuilder", "ProceduralWorldMap node not found in scene")
+		return
 	
-	# Map noise type string to enum
-	var noise_type_str: String = arch.get("noise_type", "TYPE_SIMPLEX")
-	var noise_type: FastNoiseLite.NoiseType = FastNoiseLite.NoiseType.TYPE_SIMPLEX
-	match noise_type_str:
-		"TYPE_SIMPLEX":
-			noise_type = FastNoiseLite.NoiseType.TYPE_SIMPLEX
-		"TYPE_SIMPLEX_SMOOTH":
-			noise_type = FastNoiseLite.NoiseType.TYPE_SIMPLEX_SMOOTH
-		"TYPE_PERLIN":
-			noise_type = FastNoiseLite.NoiseType.TYPE_PERLIN
-		"TYPE_VALUE":
-			noise_type = FastNoiseLite.NoiseType.TYPE_VALUE
-		"TYPE_CELLULAR":
-			noise_type = FastNoiseLite.NoiseType.TYPE_CELLULAR
+	# Configure ProceduralWorldMap
+	procedural_world_map.datasource = ds
+	procedural_world_map.camera_size = Vector2i(map_width, map_height)
+	procedural_world_map.coordinates = Vector2.ZERO
+	procedural_world_map.zoom = 1.0
+	procedural_world_map.incremental_quality = false  # Generate immediately
 	
-	noise.noise_type = noise_type
-	noise.frequency = arch.get("frequency", 0.004)
-	noise.fractal_octaves = arch.get("octaves", 6)
-	noise.fractal_gain = arch.get("gain", 0.5)
-	noise.fractal_lacunarity = arch.get("lacunarity", 2.0)
-	var height_scale: float = arch.get("height_scale", 0.8)
-	var colors: Dictionary = arch.get("biome_colors", {})
+	# Connect to update signal if not already connected
+	if not procedural_world_map.update.is_connected(_on_map_generation_complete):
+		procedural_world_map.update.connect(_on_map_generation_complete)
 	
-	# Generate heightmap
-	for y: int in map_height:
-		for x: int in map_width:
-			var val: float = (noise.get_noise_2d(x, y) + 1.0) / 2.0 * height_scale
-			val = clampf(val, 0.0, 1.0)
-			height_img.set_pixel(x, y, Color(val, val, val))
+	# Trigger generation
+	procedural_world_map.refresh()
 	
-	# Apply landmass-specific mask
-	match landmass:
-		"Single Island":
-			_apply_radial_mask(height_img, map_width, map_height, 0.5, 0.5, 0.35)
-		"Island Chain":
-			_apply_multi_radial_mask(height_img, map_width, map_height, 4, 0.25)
-		"Archipelago":
-			_apply_multi_radial_mask(height_img, map_width, map_height, 12, 0.15)
-		"Pangea":
-			_apply_radial_mask(height_img, map_width, map_height, 0.5, 0.5, 0.9, true)
-		"Coastal":
-			_apply_coastal_mask(height_img, map_width, map_height)
-		_:  # Continents: no mask
-			pass
+	# Store datasource reference for later use
+	step_data["Map Gen"]["datasource"] = ds
 	
-	# Auto-assign biomes based on height thresholds
-	for y: int in map_height:
-		for x: int in map_width:
-			var h: float = height_img.get_pixel(x, y).r
-			var col: Color
-			if h < 0.35:
-				col = Color(colors.get("water", "#2a6d9e"))
-			elif h < 0.38:
-				col = Color(colors.get("beach", "#d4b56a"))
-			elif h < 0.5:
-				col = Color(colors.get("grass", "#3d8c40"))
-			elif h < 0.65:
-				col = Color(colors.get("forest", "#2d5a3d"))
-			elif h < 0.8:
-				col = Color(colors.get("hill", "#8b7355"))
-			elif h < 0.95:
-				col = Color(colors.get("mountain", "#c0c0c0"))
-			else:
-				col = Color(colors.get("snow", "#ffffff"))
-			biome_img.set_pixel(x, y, col)
+	Logger.info("UI/WorldBuilder", "Started procedural map generation", {"style": style_name, "landmass": landmass, "size": str(map_width) + "x" + str(map_height)})
+
+
+func _on_map_generation_complete() -> void:
+	"""Handle map generation completion - extract images and update preview."""
+	var ds = step_data.get("Map Gen", {}).get("datasource", null)  # ProceduralWorldDatasource - type hint removed
+	if ds == null:
+		return
 	
-	# Update 2D map preview
-	_update_2d_map_preview(height_img, biome_img, map_width, map_height)
+	var map_width: int = step_data.get("Map Gen", {}).get("width", 1024)
+	var map_height: int = step_data.get("Map Gen", {}).get("height", 1024)
 	
-	Logger.info("UI/WorldBuilder", "Generated procedural map", {"style": style_name, "landmass": landmass, "size": str(map_width) + "x" + str(map_height)})
+	# Get height and biome images from datasource (uses configurable thresholds/climate/fantasy biomes)
+	var height_img: Image = ds.get_height_image()
+	var biome_img: Image = ds.get_cached_biome_image()
+	
+	if height_img == null:
+		Logger.warn("UI/WorldBuilder", "Height image not available from datasource")
+		return
+	
+	if biome_img == null:
+		Logger.warn("UI/WorldBuilder", "Biome image not available from datasource")
+		# Fallback: create a simple biome image from height
+		biome_img = Image.create(map_width, map_height, false, Image.FORMAT_RGB8)
+		var arch: Dictionary = fantasy_archetypes.get(step_data.get("Map Gen", {}).get("style", ""), {})
+		# Use backward-compatible color lookup
+		var colors: Dictionary
+		if arch.has("biomes"):
+			colors = arch["biomes"].get("colors", arch.get("biome_colors", {}))
+		else:
+			colors = arch.get("biome_colors", {})
+		
+		for y: int in map_height:
+			for x: int in map_width:
+				var h: float = height_img.get_pixel(x, y).r
+				var col: Color
+				if h < 0.35:
+					col = Color(colors.get("water", "#2a6d9e"))
+				elif h < 0.38:
+					col = Color(colors.get("beach", "#d4b56a"))
+				elif h < 0.5:
+					col = Color(colors.get("grass", "#3d8c40"))
+				elif h < 0.65:
+					col = Color(colors.get("forest", "#2d5a3d"))
+				elif h < 0.8:
+					col = Color(colors.get("hill", "#8b7355"))
+				elif h < 0.95:
+					col = Color(colors.get("mountain", "#c0c0c0"))
+				else:
+					col = Color(colors.get("snow", "#ffffff"))
+				biome_img.set_pixel(x, y, col)
+	
+	# Store images in step_data for later use (baking to 3D, etc.)
+	step_data["Map Gen"]["heightmap_image"] = height_img
+	step_data["Map Gen"]["biome_image"] = biome_img
+	
+	Logger.info("UI/WorldBuilder", "Map generation complete - preview updated via ProceduralWorldMap")
+
+
+func _on_bake_to_3d_pressed() -> void:
+	"""Bake generated map to Terrain3D."""
+	var height_img: Image = step_data.get("Map Gen", {}).get("heightmap_image", null)
+	var biome_img: Image = step_data.get("Map Gen", {}).get("biome_image", null)
+	
+	if height_img == null:
+		Logger.warn("UI/WorldBuilder", "Cannot bake to 3D - heightmap image not found. Generate map first.")
+		return
+	
+	if terrain_manager == null:
+		Logger.warn("UI/WorldBuilder", "Cannot bake to 3D - terrain manager not assigned")
+		return
+	
+	var map_width: int = step_data.get("Map Gen", {}).get("width", 1024)
+	var map_height: int = step_data.get("Map Gen", {}).get("height", 1024)
+	
+	# Convert height image to proper format if needed
+	if height_img.get_format() != Image.FORMAT_RF:
+		height_img.convert(Image.FORMAT_RF)
+	
+	# Use Terrain3DManager to generate terrain
+	# Height range: 0-300 units (adjustable)
+	var min_height: float = 0.0
+	var max_height: float = 300.0
+	var terrain_position: Vector3 = Vector3.ZERO
+	
+	if terrain_manager.has_method("generate_from_heightmap"):
+		terrain_manager.generate_from_heightmap(height_img, min_height, max_height, terrain_position)
+		Logger.info("UI/WorldBuilder", "Baked map to Terrain3D", {
+			"size": Vector2i(map_width, map_height),
+			"height_range": [min_height, max_height]
+		})
+	else:
+		Logger.error("UI/WorldBuilder", "Terrain3DManager does not have generate_from_heightmap method")
 
 
 func _apply_radial_mask(img: Image, width: int, height: int, cx: float, cy: float, radius: float, invert: bool = false) -> void:
@@ -1644,17 +1759,31 @@ func _apply_coastal_mask(img: Image, width: int, height: int) -> void:
 
 
 func _draw_grid_on_image(img: Image, width: int, height: int) -> void:
-	"""Draw grid lines directly on the image."""
-	var grid_spacing: int = 100
+	"""Draw grid lines directly on the image with even divisions."""
+	const TARGET_SECTIONS: int = 10  # Target number of grid sections per dimension
+	
+	# Calculate optimal spacing for even division
+	var num_sections_x: int = TARGET_SECTIONS
+	var num_sections_y: int = TARGET_SECTIONS
+	
+	# Adjust to ensure even division (minimum 4 sections to maintain readability)
+	while width % num_sections_x != 0 and num_sections_x > 4:
+		num_sections_x -= 1
+	while height % num_sections_y != 0 and num_sections_y > 4:
+		num_sections_y -= 1
+	
+	var grid_spacing_x: int = width / num_sections_x
+	var grid_spacing_y: int = height / num_sections_y
+	
 	var grid_color: Color = Color(0.6, 0.5, 0.4, 0.3)  # Light ink color, 30% opacity
 	
 	# Draw vertical lines
-	for x: int in range(0, width + 1, grid_spacing):
+	for x: int in range(0, width + 1, grid_spacing_x):
 		if x <= width:
 			img.fill_rect(Rect2i(x, 0, 1, height), grid_color)
 	
 	# Draw horizontal lines
-	for y: int in range(0, height + 1, grid_spacing):
+	for y: int in range(0, height + 1, grid_spacing_y):
 		if y <= height:
 			img.fill_rect(Rect2i(0, y, width, 1), grid_color)
 
@@ -1859,8 +1988,8 @@ func _update_2d_map_preview(height_img: Image, biome_img: Image, width: int, hei
 	map_2d_texture.visible = true
 	
 	# Store in step data for later use
-	step_data["Seed & Size"]["heightmap_image"] = height_img
-	step_data["Seed & Size"]["biome_image"] = biome_img
+	step_data["Map Gen"]["heightmap_image"] = height_img
+	step_data["Map Gen"]["biome_image"] = biome_img
 	
 	# Grid is now drawn directly on the Image, no need to update viewport grid
 	# call_deferred("_update_map_grid")  # Commented out - grid drawn on Image instead
@@ -2008,8 +2137,8 @@ func _screen_to_map_position(screen_pos: Vector2) -> Vector2:
 	var local_pos: Vector2 = screen_pos / texture_size if texture_size.length() > 0 else Vector2.ZERO
 	
 	# Get world size from step data
-	var world_width: float = float(step_data.get("Seed & Size", {}).get("width", 1000))
-	var world_height: float = float(step_data.get("Seed & Size", {}).get("height", 1000))
+	var world_width: float = float(step_data.get("Map Gen", {}).get("width", 1000))
+	var world_height: float = float(step_data.get("Map Gen", {}).get("height", 1000))
 	
 	# Convert to world coordinates (map center at 0,0, with world_width/height range)
 	var world_pos: Vector2 = Vector2(
@@ -2192,7 +2321,7 @@ func _generate_3d_world() -> void:
 		return
 	
 	# Use seed from step 1
-	var seed_value: int = step_data.get("Seed & Size", {}).get("seed", 12345)
+	var seed_value: int = step_data.get("Map Gen", {}).get("seed", 12345)
 	
 	# Generate terrain
 	if terrain_manager.has_method("generate_from_noise"):
@@ -2222,7 +2351,7 @@ func _create_step_environment(parent: VBoxContainer) -> void:
 	"""Create Step 7: Environment content."""
 	var step_panel: Panel = Panel.new()
 	step_panel.name = "StepEnvironment"
-	step_panel.visible = (current_step == 6)
+	step_panel.visible = (current_step == 5)
 	parent.add_child(step_panel)
 	
 	var container: VBoxContainer = VBoxContainer.new()
@@ -2444,7 +2573,7 @@ func _create_step_export(parent: VBoxContainer) -> void:
 	"""Create Step 9: Export content."""
 	var step_panel: Panel = Panel.new()
 	step_panel.name = "StepExport"
-	step_panel.visible = (current_step == 8)
+	step_panel.visible = (current_step == 7)
 	parent.add_child(step_panel)
 	
 	var container: VBoxContainer = VBoxContainer.new()
@@ -2918,8 +3047,8 @@ func _update_export_summary() -> void:
 		return
 	
 	var summary: String = "[b]World Summary[/b]\n\n"
-	summary += "Seed: " + str(step_data.get("Seed & Size", {}).get("seed", 12345)) + "\n"
-	summary += "Size: " + str(step_data.get("Seed & Size", {}).get("width", 1000)) + "x" + str(step_data.get("Seed & Size", {}).get("height", 1000)) + "\n"
+	summary += "Seed: " + str(step_data.get("Map Gen", {}).get("seed", 12345)) + "\n"
+	summary += "Size: " + str(step_data.get("Map Gen", {}).get("width", 1000)) + "x" + str(step_data.get("Map Gen", {}).get("height", 1000)) + "\n"
 	summary += "Icons Placed: " + str(placed_icons.size()) + "\n"
 	summary += "Cities: " + str(step_data.get("Structures & Civilizations", {}).get("cities", []).size()) + "\n"
 	summary_text.text = summary
