@@ -1,0 +1,242 @@
+{
+  "High Fantasy": {
+    "description": "Epic tales with abundant magic, mythical races, and grand quests.",
+    "recommended_size": "Large",
+    "default_landmass": "Continents",
+    "noise_type": "TYPE_SIMPLEX",
+    "frequency": 0.004,
+    "octaves": 6,
+    "gain": 0.5,
+    "lacunarity": 2.0,
+    "height_scale": 0.8,
+    "biome_colors": {
+      "water": "#2a6d9e",
+      "beach": "#d4b56a",
+      "grass": "#3d8c40",
+      "forest": "#2d5a3d",
+      "hill": "#8b7355",
+      "mountain": "#c0c0c0",
+      "snow": "#ffffff"
+    }
+  },
+  "Low Fantasy": {
+    "description": "Rare magic, muddy villages, and human intrigue in a grounded world.",
+    "recommended_size": "Medium",
+    "default_landmass": "Continents",
+    "noise_type": "TYPE_PERLIN",
+    "frequency": 0.008,
+    "octaves": 4,
+    "gain": 0.4,
+    "lacunarity": 2.2,
+    "height_scale": 0.4,
+    "biome_colors": {
+      "water": "#4a5568",
+      "beach": "#a0896b",
+      "grass": "#6b7a5e",
+      "forest": "#3e4b3a",
+      "hill": "#6b5a47",
+      "mountain": "#8c7b6b",
+      "snow": "#d4d4d4"
+    }
+  },
+  "Grimdark": {
+    "description": "Bleak wastelands, betrayal, and suffering under gray skies.",
+    "recommended_size": "Large",
+    "default_landmass": "Continents",
+    "noise_type": "TYPE_SIMPLEX",
+    "frequency": 0.006,
+    "octaves": 7,
+    "gain": 0.55,
+    "lacunarity": 1.9,
+    "height_scale": 0.7,
+    "biome_colors": {
+      "water": "#2d1b1b",
+      "beach": "#5c4033",
+      "grass": "#3f3f3f",
+      "forest": "#2b2b2b",
+      "hill": "#4a4a4a",
+      "mountain": "#666666",
+      "snow": "#8c8c8c"
+    }
+  },
+  "Dark Fantasy": {
+    "description": "Cursed forests, undead hordes, and eternal twilight horror.",
+    "recommended_size": "Medium",
+    "default_landmass": "Single Island",
+    "noise_type": "TYPE_CELLULAR",
+    "frequency": 0.007,
+    "octaves": 5,
+    "gain": 0.5,
+    "lacunarity": 2.1,
+    "height_scale": 0.6,
+    "biome_colors": {
+      "water": "#1a0033",
+      "beach": "#330033",
+      "grass": "#1a1a33",
+      "forest": "#002200",
+      "hill": "#2b1b2b",
+      "mountain": "#4c2f4c",
+      "snow": "#b3b3cc"
+    }
+  },
+  "Sword and Sorcery": {
+    "description": "Deserts, jungles, and ancient ruins full of treasure and danger.",
+    "recommended_size": "Small",
+    "default_landmass": "Island Chain",
+    "noise_type": "TYPE_SIMPLEX",
+    "frequency": 0.01,
+    "octaves": 5,
+    "gain": 0.45,
+    "lacunarity": 2.0,
+    "height_scale": 0.5,
+    "biome_colors": {
+      "water": "#1e90ff",
+      "beach": "#f4a460",
+      "grass": "#8fbc8f",
+      "forest": "#228b22",
+      "hill": "#cd853f",
+      "mountain": "#8b4513",
+      "snow": "#fffacd"
+    }
+  },
+  "Epic Fantasy": {
+    "description": "Vast kingdoms, divine mountains, and world-shaping rivers.",
+    "recommended_size": "Extra Large",
+    "default_landmass": "Pangea",
+    "noise_type": "TYPE_SIMPLEX",
+    "frequency": 0.003,
+    "octaves": 8,
+    "gain": 0.5,
+    "lacunarity": 2.0,
+    "height_scale": 0.9,
+    "biome_colors": {
+      "water": "#006994",
+      "beach": "#deb887",
+      "grass": "#228b22",
+      "forest": "#1a5f1a",
+      "hill": "#8fbc8f",
+      "mountain": "#a9a9a9",
+      "snow": "#f8f8ff"
+    }
+  },
+  "Urban Fantasy": {
+    "description": "Hidden magic in modern-style cities and enchanted alleys.",
+    "recommended_size": "Small",
+    "default_landmass": "Coastal",
+    "noise_type": "TYPE_VALUE",
+    "frequency": 0.015,
+    "octaves": 3,
+    "gain": 0.3,
+    "lacunarity": 2.0,
+    "height_scale": 0.2,
+    "biome_colors": {
+      "water": "#4682b4",
+      "beach": "#808080",
+      "grass": "#556b2f",
+      "forest": "#2f4f2f",
+      "hill": "#696969",
+      "mountain": "#778899",
+      "snow": "#b0c4de"
+    }
+  },
+  "Steampunk Fantasy": {
+    "description": "Clockwork cities, airship docks, and brass highlands.",
+    "recommended_size": "Medium",
+    "default_landmass": "Continents",
+    "noise_type": "TYPE_PERLIN",
+    "frequency": 0.009,
+    "octaves": 5,
+    "gain": 0.45,
+    "lacunarity": 2.1,
+    "height_scale": 0.6,
+    "biome_colors": {
+      "water": "#3b444b",
+      "beach": "#cd7f32",
+      "grass": "#808000",
+      "forest": "#556b2f",
+      "hill": "#b87333",
+      "mountain": "#8b6914",
+      "snow": "#f5f5dc"
+    }
+  },
+  "Weird Fantasy": {
+    "description": "Surreal dreamscapes with floating crystals and impossible colors.",
+    "recommended_size": "Medium",
+    "default_landmass": "Archipelago",
+    "noise_type": "TYPE_CELLULAR",
+    "frequency": 0.012,
+    "octaves": 6,
+    "gain": 0.6,
+    "lacunarity": 1.8,
+    "height_scale": 0.7,
+    "biome_colors": {
+      "water": "#ff00ff",
+      "beach": "#00ffff",
+      "grass": "#ff00ff",
+      "forest": "#00ff00",
+      "hill": "#ffff00",
+      "mountain": "#ff0000",
+      "snow": "#00ff00"
+    }
+  },
+  "Fairy Tale Fantasy": {
+    "description": "Candy groves, gingerbread hills, and golden-hour enchantment.",
+    "recommended_size": "Small",
+    "default_landmass": "Single Island",
+    "noise_type": "TYPE_SIMPLEX_SMOOTH",
+    "frequency": 0.01,
+    "octaves": 4,
+    "gain": 0.4,
+    "lacunarity": 2.2,
+    "height_scale": 0.4,
+    "biome_colors": {
+      "water": "#87ceeb",
+      "beach": "#ffb6c1",
+      "grass": "#ff69b4",
+      "forest": "#ff1493",
+      "hill": "#ffa07a",
+      "mountain": "#ffd700",
+      "snow": "#fff0f5"
+    }
+  },
+  "Heroic Fantasy": {
+    "description": "Dragon lairs, heroic passes, and sunlit savannas.",
+    "recommended_size": "Large",
+    "default_landmass": "Continents",
+    "noise_type": "TYPE_SIMPLEX",
+    "frequency": 0.005,
+    "octaves": 6,
+    "gain": 0.5,
+    "lacunarity": 2.0,
+    "height_scale": 0.8,
+    "biome_colors": {
+      "water": "#1e90ff",
+      "beach": "#f4a460",
+      "grass": "#32cd32",
+      "forest": "#228b22",
+      "hill": "#9acd32",
+      "mountain": "#ffd700",
+      "snow": "#ffffff"
+    }
+  },
+  "Mythic Fantasy": {
+    "description": "God-forged islands, divine stairways, and sacred rivers.",
+    "recommended_size": "Large",
+    "default_landmass": "Archipelago",
+    "noise_type": "TYPE_SIMPLEX",
+    "frequency": 0.004,
+    "octaves": 7,
+    "gain": 0.5,
+    "lacunarity": 2.0,
+    "height_scale": 0.9,
+    "biome_colors": {
+      "water": "#00ced1",
+      "beach": "#f0e68c",
+      "grass": "#adff2f",
+      "forest": "#006400",
+      "hill": "#daa520",
+      "mountain": "#b0c4de",
+      "snow": "#e0ffff"
+    }
+  }
+}

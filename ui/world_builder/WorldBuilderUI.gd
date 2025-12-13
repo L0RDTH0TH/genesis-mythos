@@ -55,7 +55,8 @@ var current_icon_group_index: int = 0
 @onready var background_rect: ColorRect = $BackgroundRect
 @onready var left_nav: Panel = $BackgroundPanel/MainContainer/LeftNav
 @onready var center_panel: Panel = $BackgroundPanel/MainContainer/RightSplit/CenterPanel
-@onready var map_2d_texture: TextureRect = $BackgroundPanel/MainContainer/RightSplit/CenterPanel/Map2DTexture
+@onready var map_2d_scroll_container: ScrollContainer = $BackgroundPanel/MainContainer/RightSplit/CenterPanel/Map2DScrollContainer
+@onready var map_2d_texture: TextureRect = $BackgroundPanel/MainContainer/RightSplit/CenterPanel/Map2DScrollContainer/Map2DTexture
 @onready var terrain_3d_view: SubViewportContainer = $BackgroundPanel/MainContainer/RightSplit/CenterPanel/Terrain3DView
 @onready var preview_viewport: SubViewport = $BackgroundPanel/MainContainer/RightSplit/CenterPanel/Terrain3DView/PreviewViewport
 @onready var preview_world: Node3D = $BackgroundPanel/MainContainer/RightSplit/CenterPanel/Terrain3DView/PreviewViewport/PreviewWorld
@@ -69,6 +70,7 @@ var current_icon_group_index: int = 0
 
 ## 2D map viewport for rendering map to texture
 var map_2d_viewport: SubViewport = null
+var map_2d_camera: Camera2D = null
 
 ## Preview terrain reference (will be set when terrain manager is connected)
 var preview_terrain: Node = null
@@ -296,14 +298,20 @@ func _setup_preview_camera() -> void:
 
 
 func _setup_2d_map_viewport() -> void:
-	"""Setup 2D map viewport for rendering map to texture."""
+	"""Setup 2D map viewport for rendering map to texture with Camera2D."""
 	if map_2d_texture == null:
 		return
 	
+	# Get initial world size
+	var world_width: int = step_data.get("Seed & Size", {}).get("width", 1024)
+	var world_height: int = step_data.get("Seed & Size", {}).get("height", 1024)
+	
 	# Create SubViewport for 2D map rendering
+	# Use fixed viewport size (2048) for performance, scale content via camera
+	var viewport_size: int = 2048
 	map_2d_viewport = SubViewport.new()
 	map_2d_viewport.name = "Map2DViewport"
-	map_2d_viewport.size = Vector2i(1920, 1080)
+	map_2d_viewport.size = Vector2i(viewport_size, viewport_size)
 	map_2d_viewport.transparent_bg = false
 	map_2d_viewport.handle_input_locally = false
 	map_2d_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
@@ -312,6 +320,22 @@ func _setup_2d_map_viewport() -> void:
 	var map_root: Node2D = Node2D.new()
 	map_root.name = "MapRoot"
 	map_2d_viewport.add_child(map_root)
+	
+	# Create Camera2D for proper viewport rendering
+	var max_viewport_size: int = 4096
+	var viewport_w: int = min(world_width, max_viewport_size)
+	var viewport_h: int = min(world_height, max_viewport_size)
+	map_2d_camera = Camera2D.new()
+	map_2d_camera.name = "Map2DCamera"
+	map_2d_camera.position = Vector2.ZERO
+	if world_width <= max_viewport_size and world_height <= max_viewport_size:
+		map_2d_camera.zoom = Vector2(1.0, 1.0)
+	else:
+		var scale_x: float = float(viewport_w) / float(world_width)
+		var scale_y: float = float(viewport_h) / float(world_height)
+		map_2d_camera.zoom = Vector2(scale_x, scale_y)
+	map_2d_camera.enabled = true
+	map_root.add_child(map_2d_camera)
 	
 	# Add viewport as child and connect texture
 	add_child(map_2d_viewport)
@@ -612,6 +636,9 @@ func _create_step_seed_size(parent: VBoxContainer) -> void:
 	step_data["Seed & Size"]["size"] = "Small"
 	step_data["Seed & Size"]["width"] = size_map["Small"]
 	step_data["Seed & Size"]["height"] = size_map["Small"]
+	
+	# Show initial placeholder for default size
+	call_deferred("_update_map_preview_placeholder", size_map["Small"], size_map["Small"])
 	
 	# Landmass dropdown
 	var landmass_label: Label = Label.new()
@@ -1467,7 +1494,7 @@ func _on_fantasy_style_selected(index: int) -> void:
 
 
 func _on_size_selected(index: int) -> void:
-	"""Handle size selection - update width/height."""
+	"""Handle size selection - update width/height and show placeholder immediately."""
 	var size_dropdown: OptionButton = control_references.get("Seed & Size/size") as OptionButton
 	if size_dropdown == null:
 		return
@@ -1479,6 +1506,10 @@ func _on_size_selected(index: int) -> void:
 	step_data["Seed & Size"]["size"] = size_name
 	step_data["Seed & Size"]["width"] = map_size
 	step_data["Seed & Size"]["height"] = map_size
+	
+	# Immediately show placeholder to fill new container bounds
+	_update_map_preview_placeholder(map_size, map_size)
+	
 	call_deferred("_update_map_grid")
 
 
@@ -1612,17 +1643,151 @@ func _apply_coastal_mask(img: Image, width: int, height: int) -> void:
 	_apply_radial_mask(img, width, height, 0.5, 0.5, 0.7, true)
 
 
-func _update_2d_map_preview(height_img: Image, biome_img: Image, width: int, height: int) -> void:
-	"""Update the 2D map preview with generated terrain - robust scaling fix."""
-	if map_2d_viewport == null:
-		return
+func create_placeholder_image(map_width: int, map_height: int) -> Image:
+	"""Create a placeholder parchment image that fills the preview immediately on size change."""
+	var img: Image = Image.create(map_width, map_height, false, Image.FORMAT_RGBA8)
 	
-	# Update viewport size to match generated map
-	map_2d_viewport.size = Vector2i(width, height)
+	# Base parchment color (light beige/tan) - matches existing parchment color
+	var parchment_color: Color = Color(0.85, 0.75, 0.65, 1.0)
+	img.fill(parchment_color)
+	
+	# Add subtle noise for texture feel (optional but nice)
+	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	rng.randomize()
+	for x: int in range(0, map_width, 4):  # Sample every 4 pixels for performance
+		for y: int in range(0, map_height, 4):
+			var noise: float = rng.randf_range(-0.025, 0.025)  # Small variation
+			var pixel: Color = parchment_color
+			var noisy_color: Color = Color(
+				clampf(pixel.r + noise, 0.0, 1.0),
+				clampf(pixel.g + noise, 0.0, 1.0),
+				clampf(pixel.b + noise, 0.0, 1.0),
+				1.0
+			)
+			# Fill a small area for better performance
+			img.fill_rect(Rect2i(x, y, min(4, map_width - x), min(4, map_height - y)), noisy_color)
+	
+	return img
+
+
+func _update_map_preview_placeholder(width: int, height: int) -> void:
+	"""Update map preview with placeholder parchment rendered in viewport at native pixel size."""
+	if map_2d_texture == null or map_2d_viewport == null:
+		return
 	
 	var map_root: Node2D = map_2d_viewport.get_node_or_null("MapRoot")
 	if map_root == null:
 		return
+	
+	# Update viewport size to match world size (native pixel rendering)
+	# Limit max viewport size to 4096 for performance
+	var max_viewport_size: int = 4096
+	var viewport_size: Vector2i = Vector2i(
+		min(width, max_viewport_size),
+		min(height, max_viewport_size)
+	)
+	map_2d_viewport.size = viewport_size
+	
+	# Update camera zoom to fit content (if using fixed viewport, scale via zoom)
+	if map_2d_camera != null:
+		if width <= max_viewport_size and height <= max_viewport_size:
+			# Native pixel size - camera shows 1:1
+			map_2d_camera.zoom = Vector2(1.0, 1.0)
+		else:
+			# Scale down large maps via camera zoom
+			var scale_x: float = float(viewport_size.x) / float(width)
+			var scale_y: float = float(viewport_size.y) / float(height)
+			map_2d_camera.zoom = Vector2(scale_x, scale_y)
+	
+	# Remove existing placeholder sprite if it exists
+	var old_placeholder: Node = map_root.get_node_or_null("PlaceholderSprite")
+	if old_placeholder != null:
+		old_placeholder.queue_free()
+	
+	# Create placeholder image
+	var placeholder_img: Image = create_placeholder_image(width, height)
+	var placeholder_texture: ImageTexture = ImageTexture.create_from_image(placeholder_img)
+	
+	# Create Sprite2D in viewport to display placeholder
+	var placeholder_sprite: Sprite2D = Sprite2D.new()
+	placeholder_sprite.name = "PlaceholderSprite"
+	placeholder_sprite.texture = placeholder_texture
+	placeholder_sprite.position = Vector2.ZERO
+	placeholder_sprite.centered = true
+	map_root.add_child(placeholder_sprite)
+	
+	# Update parchment background polygon to match size
+	var parchment_bg: Polygon2D = map_root.get_node_or_null("ParchmentBackground")
+	if parchment_bg != null:
+		parchment_bg.polygon = PackedVector2Array([
+			Vector2(-width / 2, -height / 2),
+			Vector2(width / 2, -height / 2),
+			Vector2(width / 2, height / 2),
+			Vector2(-width / 2, height / 2)
+		])
+	
+	# Update grid to match new size (deferred to ensure viewport is ready)
+	call_deferred("_update_map_grid")
+	
+	# Set TextureRect to use viewport texture with native pixel sizing
+	map_2d_texture.texture = map_2d_viewport.get_texture()
+	map_2d_texture.stretch_mode = TextureRect.STRETCH_KEEP
+	map_2d_texture.expand_mode = TextureRect.EXPAND_KEEP_SIZE
+	
+	# Set TextureRect size to match viewport size (actual rendered size)
+	# For maps larger than max_viewport_size, viewport is capped but camera zooms out to show full content
+	map_2d_texture.size = Vector2(viewport_size.x, viewport_size.y)
+	map_2d_texture.custom_minimum_size = Vector2(viewport_size.x, viewport_size.y)
+	
+	# Center the TextureRect (anchors already set to CENTER in scene)
+	map_2d_texture.position = Vector2(-viewport_size.x / 2, -viewport_size.y / 2)
+	
+	map_2d_texture.visible = true
+	
+	Logger.debug("UI/WorldBuilder", "Placeholder preview updated", {
+		"width": width,
+		"height": height,
+		"viewport_size": viewport_size,
+		"texture_rect_size": map_2d_texture.size
+	})
+
+
+func _update_2d_map_preview(height_img: Image, biome_img: Image, width: int, height: int) -> void:
+	"""Update the 2D map preview with generated terrain rendered in viewport at native pixel size."""
+	if map_2d_viewport == null or map_2d_texture == null:
+		return
+	
+	var map_root: Node2D = map_2d_viewport.get_node_or_null("MapRoot")
+	if map_root == null:
+		return
+	
+	# Update viewport size to match world size (native pixel rendering)
+	# Limit max viewport size to 4096 for performance
+	var max_viewport_size: int = 4096
+	var viewport_size: Vector2i = Vector2i(
+		min(width, max_viewport_size),
+		min(height, max_viewport_size)
+	)
+	map_2d_viewport.size = viewport_size
+	
+	# Update camera zoom to fit content
+	if map_2d_camera != null:
+		if width <= max_viewport_size and height <= max_viewport_size:
+			# Native pixel size - camera shows 1:1
+			map_2d_camera.zoom = Vector2(1.0, 1.0)
+		else:
+			# Scale down large maps via camera zoom
+			var scale_x: float = float(viewport_size.x) / float(width)
+			var scale_y: float = float(viewport_size.y) / float(height)
+			map_2d_camera.zoom = Vector2(scale_x, scale_y)
+	
+	# Remove existing map sprite and placeholder if they exist
+	var old_map_sprite: Node = map_root.get_node_or_null("MapSprite")
+	if old_map_sprite != null:
+		old_map_sprite.queue_free()
+	var old_placeholder: Node = map_root.get_node_or_null("PlaceholderSprite")
+	if old_placeholder != null:
+		old_placeholder.queue_free()
 	
 	# Create combined texture from height and biome
 	var combined: Image = Image.create(width, height, false, Image.FORMAT_RGBA8)
@@ -1635,32 +1800,116 @@ func _update_2d_map_preview(height_img: Image, biome_img: Image, width: int, hei
 			var col: Color = combined.get_pixel(x, y)
 			combined.set_pixel(x, y, Color(col.r, col.g, col.b, h))
 	
-	# Update the persistent ImageTexture resource (key fix for scaling)
-	map_preview_texture.set_image(combined)
+	# Create ImageTexture from combined image
+	var map_texture: ImageTexture = ImageTexture.create_from_image(combined)
 	
-	# Assign once - never loses reference
-	if map_2d_texture != null:
-		map_2d_texture.texture = map_preview_texture
-		map_2d_texture.visible = true
-		
-		# Dynamically scale to fit screen beautifully
-		var viewport_size: Vector2 = get_viewport_rect().size
-		var scale_factor: float = min(
-			(viewport_size.x * 0.85) / width,
-			(viewport_size.y * 0.75) / height
-		)
-		scale_factor = max(scale_factor, 0.1)  # Prevent collapse
-		
-		# Ensure proper centering and scaling
-		map_2d_texture.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-		map_2d_texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	# Create Sprite2D in viewport to display generated map
+	var map_sprite: Sprite2D = Sprite2D.new()
+	map_sprite.name = "MapSprite"
+	map_sprite.texture = map_texture
+	map_sprite.position = Vector2.ZERO
+	map_sprite.centered = true
+	map_root.add_child(map_sprite)
+	
+	# Update parchment background polygon to match size
+	var parchment_bg: Polygon2D = map_root.get_node_or_null("ParchmentBackground")
+	if parchment_bg != null:
+		parchment_bg.polygon = PackedVector2Array([
+			Vector2(-width / 2, -height / 2),
+			Vector2(width / 2, -height / 2),
+			Vector2(width / 2, height / 2),
+			Vector2(-width / 2, height / 2)
+		])
+	
+	# Set TextureRect to use viewport texture with native pixel sizing
+	map_2d_texture.texture = map_2d_viewport.get_texture()
+	map_2d_texture.stretch_mode = TextureRect.STRETCH_KEEP
+	map_2d_texture.expand_mode = TextureRect.EXPAND_KEEP_SIZE
+	
+	# Set TextureRect size to match viewport size (actual rendered size)
+	# For maps larger than max_viewport_size, viewport is capped but camera zooms out to show full content
+	map_2d_texture.size = Vector2(viewport_size.x, viewport_size.y)
+	map_2d_texture.custom_minimum_size = Vector2(viewport_size.x, viewport_size.y)
+	
+	# Center the TextureRect (anchors already set to CENTER in scene)
+	map_2d_texture.position = Vector2(-viewport_size.x / 2, -viewport_size.y / 2)
+	
+	map_2d_texture.visible = true
 	
 	# Store in step data for later use
 	step_data["Seed & Size"]["heightmap_image"] = height_img
 	step_data["Seed & Size"]["biome_image"] = biome_img
 	
-	# Update grid to match new size
+	# Update grid to match new size (deferred to ensure viewport is ready)
 	call_deferred("_update_map_grid")
+	
+	Logger.debug("UI/WorldBuilder", "Generated map preview updated", {
+		"width": width,
+		"height": height,
+		"viewport_size": viewport_size,
+		"texture_rect_size": map_2d_texture.size
+	})
+
+
+func _diagnostic_check_texture_rect_after_layout(texture_rect: TextureRect, expected_width: int, expected_height: int) -> void:
+	"""DIAGNOSTIC: Check TextureRect state after layout has been processed."""
+	if texture_rect == null:
+		return
+	
+	var texture_rect_size: Vector2 = texture_rect.size
+	var custom_min_size: Vector2 = texture_rect.custom_minimum_size
+	var parent: Control = texture_rect.get_parent()
+	var parent_size: Vector2 = parent.size if parent != null else Vector2.ZERO
+	var texture_size: Vector2i = texture_rect.texture.get_size() if texture_rect.texture != null else Vector2i.ZERO
+	
+	# Calculate aspect ratios
+	var texture_aspect: float = float(texture_size.x) / float(texture_size.y) if texture_size.y > 0 else 0.0
+	var rect_aspect: float = texture_rect_size.x / texture_rect_size.y if texture_rect_size.y > 0 else 0.0
+	var parent_aspect: float = parent_size.x / parent_size.y if parent_size.y > 0 else 0.0
+	
+	# Calculate what EXPAND_FIT_WIDTH_PROPORTIONAL should produce
+	# According to docs: "The minimum width is adjusted to match the height, maintaining the texture's aspect ratio"
+	var expected_min_width: float = texture_rect_size.y * texture_aspect if texture_aspect > 0 else 0.0
+	
+	Logger.debug("UI/WorldBuilder", "AFTER LAYOUT COMPLETE (one frame later)", {
+		"texture_rect_size": texture_rect_size,
+		"texture_rect_size_percent_of_parent": Vector2(
+			(texture_rect_size.x / parent_size.x * 100.0) if parent_size.x > 0 else 0.0,
+			(texture_rect_size.y / parent_size.y * 100.0) if parent_size.y > 0 else 0.0
+		),
+		"custom_minimum_size": custom_min_size,
+		"texture_size": texture_size,
+		"parent_size": parent_size,
+		"expand_mode": texture_rect.expand_mode,
+		"stretch_mode": texture_rect.stretch_mode,
+		"texture_aspect_ratio": texture_aspect,
+		"rect_aspect_ratio": rect_aspect,
+		"parent_aspect_ratio": parent_aspect,
+		"expected_min_width_from_expand_mode": expected_min_width,
+		"is_filling_parent": texture_rect_size.x >= parent_size.x * 0.95 and texture_rect_size.y >= parent_size.y * 0.95,
+		"is_stuck_at_texture_size": texture_rect_size.x <= texture_size.x * 1.1 and texture_rect_size.y <= texture_size.y * 1.1
+	})
+	
+	# Check for potential issues
+	if texture_rect_size.x <= texture_size.x * 1.1 and texture_rect_size.y <= texture_size.y * 1.1:
+		Logger.warn("UI/WorldBuilder", "⚠️ ISSUE DETECTED: TextureRect is stuck at texture's native size", {
+			"texture_rect_size": texture_rect_size,
+			"texture_size": texture_size,
+			"expand_mode": texture_rect.expand_mode,
+			"custom_minimum_size": custom_min_size
+		})
+	
+	if texture_rect_size.x < parent_size.x * 0.5 or texture_rect_size.y < parent_size.y * 0.5:
+		Logger.warn("UI/WorldBuilder", "⚠️ ISSUE DETECTED: TextureRect is much smaller than parent", {
+			"texture_rect_size": texture_rect_size,
+			"parent_size": parent_size,
+			"fill_percentage": Vector2(
+				(texture_rect_size.x / parent_size.x * 100.0) if parent_size.x > 0 else 0.0,
+				(texture_rect_size.y / parent_size.y * 100.0) if parent_size.y > 0 else 0.0
+			)
+		})
+	
+	Logger.debug("UI/WorldBuilder", "=== MAP PREVIEW DIAGNOSTIC END ===")
 
 
 func _on_icon_toolbar_selected(icon_id: String) -> void:

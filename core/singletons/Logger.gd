@@ -36,6 +36,8 @@ var log_dir: String = "user://logs/"
 var log_file_prefix: String = "mythos_log_"
 var current_log_file: FileAccess = null
 var current_log_date: String = ""
+var file: FileAccess = null
+var dev_path: String = ""
 
 ## Timestamp format
 var timestamp_format: String = "%Y-%m-%d %H:%M:%S"
@@ -151,65 +153,95 @@ func _parse_level_string(level_str: String) -> LogLevel:
 
 func _setup_file_logging() -> void:
 	"""Setup file logging directory and initial file."""
-	if not log_to_file:
+	if not config.get("log_to_file", true):
+		_force_console_log("Logger", LogLevel.INFO, "File logging disabled by config")
 		return
-	
-	# Ensure log directory exists
-	var dir := DirAccess.open("user://")
-	if not dir:
-		push_error("Logger: Failed to open user:// directory")
-		return
-	
-	var log_dir_path: String = log_dir.trim_suffix("/")
-	if log_dir_path.begins_with("user://"):
-		log_dir_path = log_dir_path.replace("user://", "")
-	
-	if not dir.dir_exists(log_dir_path):
-		var err: Error = dir.make_dir_recursive(log_dir_path)
-		if err != OK:
-			push_error("Logger: Failed to create log directory: %s" % log_dir_path)
-			return
-	
-	# Open or create today's log file
-	_open_log_file()
 
-func _open_log_file() -> void:
-	"""Open or create the log file for today."""
-	var datetime: Dictionary = Time.get_datetime_dict_from_system()
-	var date_str: String = "%04d-%02d-%02d" % [int(datetime.year), int(datetime.month), int(datetime.day)]
+	var log_dir_path: String = config.get("log_dir", "user://logs/")
+	var prefix: String = config.get("log_file_prefix", "mythos_log_")
+	var timestamp_dict: Dictionary = Time.get_datetime_dict_from_system()
+	var date_str: String = "%04d-%02d-%02d" % [int(timestamp_dict.year), int(timestamp_dict.month), int(timestamp_dict.day)]
+	var filename: String = prefix + date_str + ".txt"
+	var full_path: String = log_dir_path + filename if log_dir_path.ends_with("/") else log_dir_path + "/" + filename
+	dev_path = "/home/darth/Documents/Mythos-gen/Final-Approach/" + filename
+
+	_force_console_log("Logger", LogLevel.DEBUG, "Setting up file logging - path: " + full_path + ", dev: " + dev_path)
+
+	# Force create/ensure directories
+	var dir_access: DirAccess = DirAccess.open("user://")
+	if dir_access and not dir_access.dir_exists("logs"):
+		var err: Error = dir_access.make_dir("logs")
+		if err != OK:
+			_force_console_log("Logger", LogLevel.ERROR, "Failed to create user://logs/ - err: " + str(err))
 	
-	# If we already have today's file open, don't reopen
-	if current_log_file and current_log_date == date_str:
+	# Create dev directory using absolute path
+	var dev_dir: String = "/home/darth/Documents/Mythos-gen/Final-Approach"
+	dir_access = DirAccess.open(dev_dir)
+	if dir_access == null:
+		# Try to create parent directory first
+		var parent_dir: String = "/home/darth/Documents/Mythos-gen"
+		var parent_access: DirAccess = DirAccess.open(parent_dir)
+		if parent_access == null:
+			# Create parent if it doesn't exist
+			parent_access = DirAccess.open("/home/darth/Documents")
+			if parent_access:
+				var err: Error = parent_access.make_dir("Mythos-gen")
+				if err != OK:
+					_force_console_log("Logger", LogLevel.ERROR, "Failed to create dev parent dir - err: " + str(err))
+				parent_access = DirAccess.open(parent_dir)
+		if parent_access:
+			var err: Error = parent_access.make_dir("Final-Approach")
+			if err != OK:
+				_force_console_log("Logger", LogLevel.ERROR, "Failed to create dev log dir - err: " + str(err))
+
+	# Nuclear open: Always create/truncate first, then reopen for append
+	var log_file: FileAccess = FileAccess.open(full_path, FileAccess.WRITE)
+	if log_file == null:
+		_force_console_log("Logger", LogLevel.ERROR, "Failed to create/truncate log file: " + full_path + " - err: " + str(FileAccess.get_open_error()))
 		return
-	
-	# Close previous file if open
-	_close_log_file()
-	
-	# Build file path
-	var filename: String = "%s%s.txt" % [log_file_prefix, date_str]
-	var file_path: String = log_dir.path_join(filename) if log_dir.ends_with("/") else log_dir + "/" + filename
-	
-	current_log_file = FileAccess.open(file_path, FileAccess.WRITE)
-	if not current_log_file:
-		push_error("Logger: Failed to open log file: %s" % file_path)
+	log_file.close()
+
+	log_file = FileAccess.open(full_path, FileAccess.READ_WRITE)
+	if log_file == null:
+		_force_console_log("Logger", LogLevel.ERROR, "Failed to reopen log file for append: " + full_path + " - err: " + str(FileAccess.get_open_error()))
 		return
+	log_file.seek_end()
+
+	# Add header if file is empty
+	if log_file.get_length() == 0:
+		var header: String = "=== Log session started at " + Time.get_datetime_string_from_system() + " ===\n"
+		log_file.store_string(header)
+		log_file.flush()
 	
-	current_log_date = date_str
-	
-	# Write header
-	var header: String = "=== Log session started at %s ===\n" % _get_timestamp()
-	current_log_file.store_string(header)
-	current_log_file.flush()
+	file = log_file
+
+	_force_console_log("Logger", LogLevel.INFO, "File logging setup complete - ready to append")
+
 
 func _close_log_file() -> void:
 	"""Close the current log file."""
-	if current_log_file:
-		var footer: String = "=== Log session ended at %s ===\n" % _get_timestamp()
-		current_log_file.store_string(footer)
-		current_log_file.flush()
-		current_log_file.close()
-		current_log_file = null
-		current_log_date = ""
+	var footer: String = "=== Log session ended at " + Time.get_datetime_string_from_system() + " ===\n"
+	
+	if file:
+		file.seek_end()
+		file.store_string(footer)
+		file.flush()
+		file.close()
+		file = null
+	
+	# Also close dev mirror if open
+	if config.get("dev_mode", true) and dev_path != "":
+		var dev_file: FileAccess = FileAccess.open(dev_path, FileAccess.READ_WRITE)
+		if dev_file == null:
+			dev_file = FileAccess.open(dev_path, FileAccess.WRITE)
+		if dev_file != null:
+			dev_file.seek_end()
+			dev_file.store_string(footer)
+			dev_file.flush()
+			dev_file.close()
+	
+	current_log_file = null
+	current_log_date = ""
 
 func _get_timestamp() -> String:
 	"""Get formatted timestamp string."""
@@ -283,18 +315,35 @@ func _output_to_console(level: LogLevel, message: String) -> void:
 		LogLevel.INFO, LogLevel.DEBUG, LogLevel.VERBOSE:
 			print(message)
 
+func _force_console_log(system: String, level: LogLevel, message: String) -> void:
+	"""Force log to console bypassing all checks - used for Logger internal messages."""
+	var formatted: String = "[%s] [%s] [%s]: %s" % [_get_timestamp(), system, LogLevel.keys()[level], message]
+	_output_to_console(level, formatted)
+
 func _output_to_file(message: String) -> void:
 	"""Output message to log file."""
-	# Ensure we have a file open (check if date changed)
-	var datetime: Dictionary = Time.get_datetime_dict_from_system()
-	var date_str: String = "%04d-%02d-%02d" % [int(datetime.year), int(datetime.month), int(datetime.day)]
+	var entry: String = message + "\n"
 	
-	if current_log_date != date_str:
-		_open_log_file()
-	
-	if current_log_file and current_log_file.is_open():
-		current_log_file.store_string(message + "\n")
-		current_log_file.flush()
+	# File output - nuclear append
+	if config.get("log_to_file", true) and file != null:
+		file.seek_end()
+		file.store_string(entry)
+		file.flush()
+		if FileAccess.get_open_error() != OK:
+			push_error("Log file write failed mid-session: " + str(FileAccess.get_open_error()))
+
+	# Dev mirror - independent open/write/close each time to avoid locks
+	if config.get("dev_mode", true):
+		var dev_file: FileAccess = FileAccess.open(dev_path, FileAccess.READ_WRITE)
+		if dev_file == null:
+			dev_file = FileAccess.open(dev_path, FileAccess.WRITE)
+		if dev_file != null:
+			dev_file.seek_end()
+			dev_file.store_string(entry)
+			dev_file.flush()
+			dev_file.close()
+		else:
+			push_warning("Failed to write to dev mirror: " + dev_path + " - err: " + str(FileAccess.get_open_error()))
 
 ## Convenience methods for each log level
 

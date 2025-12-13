@@ -6,6 +6,6 @@
 extends Node2D
 
 func _ready() -> void:
-	Logger.verbose("Core/Main", "_ready() called")
-	Logger.info("Core/Main", "Main scene initialized")
+	Logger.verbose("Bootstrap", "Main _ready() started - testing log write")
+	Logger.info("Bootstrap", "Main _ready() complete")
 

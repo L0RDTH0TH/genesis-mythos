@@ -1,17 +1,8 @@
 {
-	"global_default_level": "INFO",
+	"global_default_level": "VERBOSE",
 	"systems": {
-		"Combat": "VERBOSE",
-		"UI": "DEBUG",
-		"AI": "INFO",
-		"Inventory": "INFO",
-		"Networking": "WARN",
-		"CharacterCreation": "DEBUG",
-		"WorldGeneration": "INFO",
-		"Terrain": "INFO",
-		"EntitySim": "INFO",
-		"FactionEconomy": "INFO",
-		"Logger": "INFO"
+		"Logger": "VERBOSE",
+		"Bootstrap": "VERBOSE"
 	},
 	"dev_mode": true,
 	"log_to_console": true,

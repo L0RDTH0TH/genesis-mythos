@@ -116,21 +116,29 @@ func update_canvas() -> void:
 			var col: Color = combined.get_pixel(x, y)
 			combined.set_pixel(x, y, Color(col.r, col.g, col.b, h))
 	
-	# Update the persistent ImageTexture resource
-	canvas_texture.set_image(combined)
+	# BULLETPROOF FIX: Recreate ImageTexture entirely to avoid all caching issues
+	canvas_texture = ImageTexture.create_from_image(combined)
 	
-	# Assign once – never loses reference
+	# Assign to TextureRect with proper refresh
 	if canvas != null:
+		# Step 1: Break old reference to force TextureRect to re-read size
+		canvas.texture = null
+		
+		# Step 2: Assign new texture
 		canvas.texture = canvas_texture
 		
-		# Dynamically scale to fit screen beautifully
-		var viewport_size: Vector2 = get_viewport_rect().size
-		var scale_factor: float = min(
-			(viewport_size.x * 0.85) / map_width,
-			(viewport_size.y * 0.75) / map_height
-		)
-		scale_factor = max(scale_factor, 0.1)  # Prevent collapse
-		canvas.scale = Vector2(scale_factor, scale_factor)
+		# Step 3: Force layout recalculation by resetting minimum size
+		canvas.custom_minimum_size = Vector2.ZERO
+		
+		# Step 4: Set stretch mode explicitly (defensive)
+		canvas.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		canvas.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+		
+		# Step 5: Force redraw and parent container update
+		canvas.queue_redraw()
+		var parent: Control = canvas.get_parent()
+		if parent != null:
+			parent.update_minimum_size()
 
 func _on_size_selected(_index: int) -> void:
 	_resize_images()  # This now fully refreshes everything
