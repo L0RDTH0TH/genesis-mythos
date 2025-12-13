@@ -44,6 +44,9 @@ var is_initialized: bool = false
 ## Map root node
 var map_root: Node2D
 
+## Terrain3DManager reference
+var terrain_3d_manager = null  # Terrain3DManager - type hint removed
+
 
 func _ready() -> void:
 	"""Initialize MapMakerModule."""
@@ -530,9 +533,13 @@ func _on_generate_3d_button_pressed() -> void:
 	"""Handle Generate 3D World button press."""
 	if world_map_data == null or world_map_data.heightmap_image == null:
 		push_error("MapMakerModule: No heightmap to generate from!")
-		# Show notification if possible
-		if has_method("_show_notification"):
-			_show_notification("No heightmap available! Generate a map first.", Color.RED)
+		# Try to show notification via parent WorldBuilderUI if available
+		var parent_ui: Node = get_parent()
+		while parent_ui != null:
+			if parent_ui.has_method("_show_notification"):
+				parent_ui._show_notification("No heightmap available! Generate a map first.", Color.RED)
+				break
+			parent_ui = parent_ui.get_parent()
 		return
 	
 	if terrain_3d_manager == null:
