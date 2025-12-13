@@ -381,8 +381,8 @@ func _setup_2d_map_layer_content(parent: Node2D) -> void:
 			parchment_sprite.modulate = Color(1, 1, 1, 0.7)  # Semi-transparent overlay
 			parent.add_child(parchment_sprite)
 	
-	# Create grid lines (using Line2D nodes)
-	_create_map_grid_in_parent(parent)
+	# Grid lines are now drawn directly on the Image, not in viewport
+	# _create_map_grid_in_parent(parent)  # Commented out - grid drawn on Image instead
 	
 	# Create compass rose placeholder (will be added later)
 	_create_compass_rose_in_parent(parent)
@@ -1643,8 +1643,24 @@ func _apply_coastal_mask(img: Image, width: int, height: int) -> void:
 	_apply_radial_mask(img, width, height, 0.5, 0.5, 0.7, true)
 
 
+func _draw_grid_on_image(img: Image, width: int, height: int) -> void:
+	"""Draw grid lines directly on the image."""
+	var grid_spacing: int = 100
+	var grid_color: Color = Color(0.6, 0.5, 0.4, 0.3)  # Light ink color, 30% opacity
+	
+	# Draw vertical lines
+	for x: int in range(0, width + 1, grid_spacing):
+		if x <= width:
+			img.fill_rect(Rect2i(x, 0, 1, height), grid_color)
+	
+	# Draw horizontal lines
+	for y: int in range(0, height + 1, grid_spacing):
+		if y <= height:
+			img.fill_rect(Rect2i(0, y, width, 1), grid_color)
+
+
 func create_placeholder_image(map_width: int, map_height: int) -> Image:
-	"""Create a placeholder parchment image that fills the preview immediately on size change."""
+	"""Create a placeholder parchment image with grid lines that fills the preview immediately on size change."""
 	var img: Image = Image.create(map_width, map_height, false, Image.FORMAT_RGBA8)
 	
 	# Base parchment color (light beige/tan) - matches existing parchment color
@@ -1666,6 +1682,9 @@ func create_placeholder_image(map_width: int, map_height: int) -> Image:
 			)
 			# Fill a small area for better performance
 			img.fill_rect(Rect2i(x, y, min(4, map_width - x), min(4, map_height - y)), noisy_color)
+	
+	# Draw grid lines on top of the parchment
+	_draw_grid_on_image(img, map_width, map_height)
 	
 	return img
 
@@ -1726,8 +1745,8 @@ func _update_map_preview_placeholder(width: int, height: int) -> void:
 			Vector2(-width / 2, height / 2)
 		])
 	
-	# Update grid to match new size (deferred to ensure viewport is ready)
-	call_deferred("_update_map_grid")
+	# Grid is now drawn directly on the Image, no need to update viewport grid
+	# call_deferred("_update_map_grid")  # Commented out - grid drawn on Image instead
 	
 	# Set TextureRect to use viewport texture with native pixel sizing
 	map_2d_texture.texture = map_2d_viewport.get_texture()
@@ -1800,6 +1819,9 @@ func _update_2d_map_preview(height_img: Image, biome_img: Image, width: int, hei
 			var col: Color = combined.get_pixel(x, y)
 			combined.set_pixel(x, y, Color(col.r, col.g, col.b, h))
 	
+	# Draw grid lines on top of the combined map image
+	_draw_grid_on_image(combined, width, height)
+	
 	# Create ImageTexture from combined image
 	var map_texture: ImageTexture = ImageTexture.create_from_image(combined)
 	
@@ -1840,8 +1862,8 @@ func _update_2d_map_preview(height_img: Image, biome_img: Image, width: int, hei
 	step_data["Seed & Size"]["heightmap_image"] = height_img
 	step_data["Seed & Size"]["biome_image"] = biome_img
 	
-	# Update grid to match new size (deferred to ensure viewport is ready)
-	call_deferred("_update_map_grid")
+	# Grid is now drawn directly on the Image, no need to update viewport grid
+	# call_deferred("_update_map_grid")  # Commented out - grid drawn on Image instead
 	
 	Logger.debug("UI/WorldBuilder", "Generated map preview updated", {
 		"width": width,
