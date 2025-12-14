@@ -27,7 +27,7 @@ var signal_timeouts: Dictionary = {}  # signal_name -> timeout_time
 var active_threads: Array[Thread] = []
 
 ## Singleton instance
-static var instance: TestErrorListener = null
+static var instance = null
 
 func _init() -> void:
 	"""Initialize error listener."""
@@ -140,8 +140,9 @@ func get_all_errors() -> String:
 	
 	return "\n".join(all_errors)
 
-static func get_instance() -> TestErrorListener:
+static func get_instance():
 	"""Get or create singleton instance."""
 	if instance == null:
-		instance = TestErrorListener.new()
+		var script = load("res://tests/helpers/TestErrorListener.gd")
+		instance = script.new()
 	return instance

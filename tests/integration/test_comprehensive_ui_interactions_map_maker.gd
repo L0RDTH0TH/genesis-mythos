@@ -6,6 +6,9 @@
 
 extends GutTest
 
+## Preload TestErrorListener
+const TestErrorListener = preload("res://tests/helpers/TestErrorListener.gd")
+
 ## Test fixture: MapMakerModule instance
 var map_maker_module: MapMakerModule
 

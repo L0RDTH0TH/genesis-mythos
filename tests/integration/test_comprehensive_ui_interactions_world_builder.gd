@@ -6,6 +6,9 @@
 
 extends GutTest
 
+## Preload TestErrorListener
+const TestErrorListener = preload("res://tests/helpers/TestErrorListener.gd")
+
 ## Test fixture: WorldBuilderUI instance
 var world_builder_ui: Control
 
