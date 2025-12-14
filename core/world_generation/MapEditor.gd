@@ -41,9 +41,9 @@ func set_world_map_data(data: WorldMapData) -> void:
 
 func set_tool(tool: EditTool) -> void:
 	"""Set current editing tool."""
-	Logger.verbose("World/Editor", "set_tool() called", {"tool": _edit_tool_to_string(tool)})
+	MythosLogger.verbose("World/Editor", "set_tool() called", {"tool": _edit_tool_to_string(tool)})
 	current_tool = tool
-	Logger.debug("World/Editor", "Tool set", {"tool": _edit_tool_to_string(tool)})
+	MythosLogger.debug("World/Editor", "Tool set", {"tool": _edit_tool_to_string(tool)})
 
 
 func set_brush_radius(radius: float) -> void:
@@ -116,7 +116,7 @@ func _apply_paint(world_position: Vector2) -> void:
 	var min_y: int = max(0, center_pixel.y - radius_pixels)
 	var max_y: int = min(size.y - 1, center_pixel.y + radius_pixels)
 	
-	img.lock()
+	# Note: Image operations in Godot 4.x are automatically thread-safe, no lock/unlock needed
 	
 	match current_tool:
 		EditTool.RAISE:
@@ -135,8 +135,6 @@ func _apply_paint(world_position: Vector2) -> void:
 			_paint_crater(img, center_pixel, min_x, max_x, min_y, max_y, radius_pixels)
 		EditTool.ISLAND:
 			_paint_island(img, center_pixel, min_x, max_x, min_y, max_y, radius_pixels)
-	
-	img.unlock()
 
 
 func _paint_raise(img: Image, center: Vector2i, min_x: int, max_x: int, min_y: int, max_y: int, radius: int) -> void:
@@ -176,8 +174,7 @@ func _paint_lower(img: Image, center: Vector2i, min_x: int, max_x: int, min_y: i
 func _paint_smooth(img: Image, center: Vector2i, min_x: int, max_x: int, min_y: int, max_y: int, radius: int) -> void:
 	"""Smooth terrain in brush area."""
 	var temp_img: Image = img.duplicate()
-	temp_img.lock()
-	img.lock()
+	# Note: Image operations in Godot 4.x are automatically thread-safe, no lock/unlock needed
 	
 	for y in range(min_y + 1, max_y):
 		for x in range(min_x + 1, max_x):
@@ -203,8 +200,6 @@ func _paint_smooth(img: Image, center: Vector2i, min_x: int, max_x: int, min_y: 
 			var current_height: float = temp_img.get_pixel(x, y).r
 			var new_height: float = lerp(current_height, avg_height, brush_strength * falloff)
 			img.set_pixel(x, y, Color(new_height, new_height, new_height, 1.0))
-	
-	temp_img.unlock()
 
 
 func _paint_sharpen(img: Image, center: Vector2i, min_x: int, max_x: int, min_y: int, max_y: int, radius: int) -> void:

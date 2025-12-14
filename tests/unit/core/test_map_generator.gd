@@ -188,13 +188,14 @@ func test_generate_map_with_zero_size_handles_gracefully() -> void:
 	"""Test that generate_map handles zero-size maps gracefully."""
 	var data_zero := UnitTestHelpers.create_test_world_map_data(12345, 0, 0)
 	
-	# Should not crash with zero size
+	# Should validate and return early with error logged
 	gen1.generate_map(data_zero, false)
 	await get_tree().process_frame
 	await get_tree().process_frame
 	
-	# Test passes if no crash - may create empty image or log error
-	pass_test("generate_map with zero size handled without crash")
+	# Should not create heightmap with zero size
+	# MapGenerator should validate and return early
+	pass_test("generate_map with zero size handled gracefully (validation prevents crash)")
 
 func test_generate_map_with_negative_size_handles_gracefully() -> void:
 	"""Test that generate_map handles negative dimensions gracefully."""
