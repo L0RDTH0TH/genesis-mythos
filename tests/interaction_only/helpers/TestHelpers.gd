@@ -7,6 +7,12 @@
 class_name TestHelpers
 extends RefCounted
 
+## Check if running in headless mode
+static var is_headless: bool = DisplayServer.get_name() == "headless"
+
+## Visual delay for manual debugging (1.0s) or fast for CI (0.0s)
+static var visual_delay: float = 1.0 if not is_headless else 0.0
+
 ## Wait for UI to update (process frames)
 static func wait_for_ui_update(tree: SceneTree, frames: int = 2) -> void:
 	"""Wait for UI to update by processing frames"""
@@ -14,10 +20,21 @@ static func wait_for_ui_update(tree: SceneTree, frames: int = 2) -> void:
 		await tree.process_frame
 
 ## Wait for visual confirmation (configurable delay)
-static func wait_visual(delay: float) -> void:
-	"""Wait for visual confirmation delay"""
-	if delay > 0.0:
-		await Engine.get_main_loop().create_timer(delay).timeout
+static func wait_visual(delay: float = -1.0) -> void:
+	"""Wait for visual confirmation delay. Uses visual_delay if delay < 0."""
+	var actual_delay: float = delay if delay >= 0.0 else visual_delay
+	if actual_delay > 0.0:
+		await Engine.get_main_loop().create_timer(actual_delay).timeout
+
+## Verbose assert with detailed failure message
+static func verbose_assert(p_condition: bool, p_msg: String) -> bool:
+	"""Verbose assert for detailed failures. Returns true if condition passes."""
+	if not p_condition:
+		push_error("TEST FAIL: " + p_msg)
+		if not is_headless:
+			print_rich("[color=RED]TEST FAIL: " + p_msg + "[/color]")
+		return false
+	return true
 
 ## Simulate button click
 static func simulate_button_click(button: Button) -> void:

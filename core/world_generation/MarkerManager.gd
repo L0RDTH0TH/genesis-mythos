@@ -22,11 +22,11 @@ var visible_groups: Array[String] = []  # Empty = all visible
 
 func _init() -> void:
 	"""Initialize MarkerManager."""
-	Logger.verbose("World/Markers", "MarkerManager._init() called")
+	MythosLogger.verbose("World/Markers", "MarkerManager._init() called")
 	markers_container = Node2D.new()
 	markers_container.name = "MarkersContainer"
 	add_child(markers_container)
-	Logger.info("World/Markers", "MarkerManager initialized")
+	MythosLogger.info("World/Markers", "MarkerManager initialized")
 
 
 func set_world_map_data(data: WorldMapData) -> void:
@@ -37,9 +37,9 @@ func set_world_map_data(data: WorldMapData) -> void:
 
 func add_marker(position: Vector2, icon_type: String, label: String = "", note: String = "") -> void:
 	"""Add a new marker to the map."""
-	Logger.verbose("World/Markers", "add_marker() called", {"position": position, "icon_type": icon_type, "label": label})
+	MythosLogger.verbose("World/Markers", "add_marker() called", {"position": position, "icon_type": icon_type, "label": label})
 	if world_map_data == null:
-		Logger.error("World/Markers", "world_map_data is null")
+		MythosLogger.error("World/Markers", "world_map_data is null")
 		return
 	
 	# Add to data
@@ -47,7 +47,7 @@ func add_marker(position: Vector2, icon_type: String, label: String = "", note: 
 	
 	# Create visual marker node
 	_create_marker_node(position, icon_type, label, world_map_data.markers.size() - 1)
-	Logger.info("World/Markers", "Marker added", {"icon_type": icon_type, "label": label, "total_markers": world_map_data.markers.size()})
+	MythosLogger.info("World/Markers", "Marker added", {"icon_type": icon_type, "label": label, "total_markers": world_map_data.markers.size()})
 
 
 func remove_marker(index: int) -> void:

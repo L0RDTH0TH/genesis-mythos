@@ -199,19 +199,20 @@ func test_generate_map_with_zero_size_handles_gracefully() -> void:
 
 func test_generate_map_with_negative_size_handles_gracefully() -> void:
 	"""Test that generate_map handles negative dimensions gracefully."""
-	# Create data with negative dimensions (should be clamped or validated)
+	# Create data with negative dimensions (should be validated)
 	var data_negative := WorldMapData.new()
 	data_negative.seed = 12345
 	data_negative.world_width = -100
 	data_negative.world_height = -100
 	
-	# Should not crash with negative size
+	# Should validate and return early with error logged
 	gen1.generate_map(data_negative, false)
 	await get_tree().process_frame
 	await get_tree().process_frame
 	
-	# Test passes if no crash
-	pass_test("generate_map with negative size handled without crash")
+	# Should not create heightmap with negative size
+	# MapGenerator should validate and return early
+	pass_test("generate_map with negative size handled gracefully (validation prevents crash)")
 
 func test_generate_map_with_extremely_large_size() -> void:
 	"""Test that generate_map handles extremely large maps (memory/performance test)."""

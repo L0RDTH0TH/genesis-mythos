@@ -34,79 +34,79 @@ var light_direction: Vector2 = Vector2(0.5, 0.5)
 
 func _init() -> void:
 	"""Initialize MapRenderer."""
-	Logger.verbose("World/Rendering", "MapRenderer._init() called")
+	MythosLogger.verbose("World/Rendering", "MapRenderer._init() called")
 	# Create shader material
 	var shader: Shader = load("res://shaders/map_renderer.gdshader")
-	Logger.debug("World/Rendering", "Shader loaded", {"loaded": shader != null})
+	MythosLogger.debug("World/Rendering", "Shader loaded", {"loaded": shader != null})
 	if shader != null:
 		shader_material = ShaderMaterial.new()
 		shader_material.shader = shader
-		Logger.info("World/Rendering", "Shader material created and assigned")
+		MythosLogger.info("World/Rendering", "Shader material created and assigned")
 	else:
-		Logger.error("World/Rendering", "Failed to load map_renderer shader from res://shaders/map_renderer.gdshader")
+		MythosLogger.error("World/Rendering", "Failed to load map_renderer shader from res://shaders/map_renderer.gdshader")
 
 
 func setup_render_target(target: Node) -> void:
 	"""Setup rendering target (TextureRect, ColorRect, or Sprite2D)."""
-	Logger.verbose("World/Rendering", "setup_render_target() called", {"target_type": target.get_class() if target else "null"})
+	MythosLogger.verbose("World/Rendering", "setup_render_target() called", {"target_type": target.get_class() if target else "null"})
 	render_target = target
 	
 	if render_target != null and shader_material != null:
 		if render_target is TextureRect:
 			(render_target as TextureRect).material = shader_material
-			Logger.debug("World/Rendering", "Shader material applied to TextureRect")
+			MythosLogger.debug("World/Rendering", "Shader material applied to TextureRect")
 		elif render_target is ColorRect:
 			(render_target as ColorRect).material = shader_material
-			Logger.debug("World/Rendering", "Shader material applied to ColorRect")
+			MythosLogger.debug("World/Rendering", "Shader material applied to ColorRect")
 		elif render_target is Sprite2D:
 			(render_target as Sprite2D).material = shader_material
-			Logger.debug("World/Rendering", "Shader material applied to Sprite2D")
+			MythosLogger.debug("World/Rendering", "Shader material applied to Sprite2D")
 		elif render_target.has_method("set_material"):
 			render_target.set("material", shader_material)
-			Logger.debug("World/Rendering", "Shader material applied via set_material()")
+			MythosLogger.debug("World/Rendering", "Shader material applied via set_material()")
 	else:
 		if render_target == null:
-			Logger.warn("World/Rendering", "Cannot setup render target - target is null")
+			MythosLogger.warn("World/Rendering", "Cannot setup render target - target is null")
 		if shader_material == null:
-			Logger.warn("World/Rendering", "Cannot setup render target - shader_material is null")
+			MythosLogger.warn("World/Rendering", "Cannot setup render target - shader_material is null")
 
 
 func set_world_map_data(data: WorldMapData) -> void:
 	"""Set world map data and update textures."""
-	Logger.verbose("World/Rendering", "set_world_map_data() called")
+	MythosLogger.verbose("World/Rendering", "set_world_map_data() called")
 	world_map_data = data
 	_update_textures()
 
 
 func _update_textures() -> void:
 	"""Update shader textures from world_map_data."""
-	Logger.verbose("World/Rendering", "_update_textures() called")
+	MythosLogger.verbose("World/Rendering", "_update_textures() called")
 	if world_map_data == null:
-		Logger.error("World/Rendering", "world_map_data is null")
+		MythosLogger.error("World/Rendering", "world_map_data is null")
 		return
 	if world_map_data.heightmap_image == null:
-		Logger.error("World/Rendering", "heightmap_image is null")
+		MythosLogger.error("World/Rendering", "heightmap_image is null")
 		return
 	
 	var image_size: Vector2i = world_map_data.heightmap_image.get_size()
-	Logger.debug("World/Rendering", "Updating textures", {"heightmap_size": image_size})
+	MythosLogger.debug("World/Rendering", "Updating textures", {"heightmap_size": image_size})
 	
 	# Update heightmap texture
 	if heightmap_texture == null:
 		heightmap_texture = ImageTexture.new()
 	
 	heightmap_texture.set_image(world_map_data.heightmap_image)
-	Logger.debug("World/Rendering", "Heightmap texture created", {"size": heightmap_texture.get_size()})
+	MythosLogger.debug("World/Rendering", "Heightmap texture created", {"size": heightmap_texture.get_size()})
 	
 	# Update biome texture
 	if world_map_data.biome_preview_image != null:
 		if biome_texture == null:
 			biome_texture = ImageTexture.new()
 		biome_texture.set_image(world_map_data.biome_preview_image)
-		Logger.debug("World/Rendering", "Biome texture updated from preview image")
+		MythosLogger.debug("World/Rendering", "Biome texture updated from preview image")
 	else:
 		# Generate biome preview if not exists
-		Logger.verbose("World/Rendering", "Generating biome preview image")
+		MythosLogger.verbose("World/Rendering", "Generating biome preview image")
 		# Remove type hint to avoid parse-time dependency on MapGenerator
 		var generator = MapGenerator.new()
 		var biome_img: Image = generator.generate_biome_preview(world_map_data)
@@ -114,9 +114,9 @@ func _update_textures() -> void:
 			if biome_texture == null:
 				biome_texture = ImageTexture.new()
 			biome_texture.set_image(biome_img)
-			Logger.debug("World/Rendering", "Biome texture generated", {"size": biome_img.get_size()})
+			MythosLogger.debug("World/Rendering", "Biome texture generated", {"size": biome_img.get_size()})
 		else:
-			Logger.warn("World/Rendering", "Failed to generate biome preview image")
+			MythosLogger.warn("World/Rendering", "Failed to generate biome preview image")
 	
 	# Create empty rivers texture (for now)
 	if rivers_texture == null:
@@ -129,28 +129,28 @@ func _update_textures() -> void:
 		)
 		rivers_img.fill(Color.BLACK)
 		rivers_texture.set_image(rivers_img)
-		Logger.debug("World/Rendering", "Rivers texture created", {"size": rivers_img.get_size()})
+		MythosLogger.debug("World/Rendering", "Rivers texture created", {"size": rivers_img.get_size()})
 	
 	# Apply textures to shader
 	if shader_material != null:
-		Logger.verbose("World/Rendering", "Applying textures to shader material")
+		MythosLogger.verbose("World/Rendering", "Applying textures to shader material")
 		shader_material.set_shader_parameter("heightmap_texture", heightmap_texture)
 		shader_material.set_shader_parameter("biome_texture", biome_texture if biome_texture != null else heightmap_texture)
 		shader_material.set_shader_parameter("rivers_texture", rivers_texture)
 		shader_material.set_shader_parameter("sea_level", world_map_data.sea_level)
 		shader_material.set_shader_parameter("light_direction", light_direction)
-		Logger.debug("World/Rendering", "Shader parameters set", {
+		MythosLogger.debug("World/Rendering", "Shader parameters set", {
 			"render_target": render_target != null,
 			"render_target_type": render_target.get_class() if render_target else "null"
 		})
 		if render_target != null and render_target is Sprite2D:
 			var sprite: Sprite2D = render_target as Sprite2D
-			Logger.verbose("World/Rendering", "Sprite2D render target", {
+			MythosLogger.verbose("World/Rendering", "Sprite2D render target", {
 				"has_material": sprite.material != null,
 				"has_texture": sprite.texture != null
 			})
 	else:
-		Logger.error("World/Rendering", "shader_material is null!")
+		MythosLogger.error("World/Rendering", "shader_material is null!")
 
 
 func set_view_mode(mode: ViewMode) -> void:
@@ -163,7 +163,7 @@ func set_view_mode(mode: ViewMode) -> void:
 			mode_name = "BIOMES"
 		ViewMode.POLITICAL:
 			mode_name = "POLITICAL"
-	Logger.verbose("World/Rendering", "set_view_mode() called", {"mode": mode_name})
+	MythosLogger.verbose("World/Rendering", "set_view_mode() called", {"mode": mode_name})
 	current_view_mode = mode
 	
 	if shader_material != null:
@@ -171,17 +171,17 @@ func set_view_mode(mode: ViewMode) -> void:
 			ViewMode.HEIGHTMAP:
 				shader_material.set_shader_parameter("show_heightmap", true)
 				shader_material.set_shader_parameter("show_biomes", false)
-				Logger.debug("World/Rendering", "View mode set to HEIGHTMAP")
+				MythosLogger.debug("World/Rendering", "View mode set to HEIGHTMAP")
 			ViewMode.BIOMES:
 				shader_material.set_shader_parameter("show_heightmap", false)
 				shader_material.set_shader_parameter("show_biomes", true)
-				Logger.debug("World/Rendering", "View mode set to BIOMES")
+				MythosLogger.debug("World/Rendering", "View mode set to BIOMES")
 			ViewMode.POLITICAL:
 				shader_material.set_shader_parameter("show_heightmap", false)
 				shader_material.set_shader_parameter("show_biomes", true)  # Placeholder
-				Logger.debug("World/Rendering", "View mode set to POLITICAL (placeholder)")
+				MythosLogger.debug("World/Rendering", "View mode set to POLITICAL (placeholder)")
 	else:
-		Logger.warn("World/Rendering", "Cannot set view mode - shader_material is null")
+		MythosLogger.warn("World/Rendering", "Cannot set view mode - shader_material is null")
 
 
 func set_rivers_visible(visible: bool) -> void:
@@ -199,28 +199,28 @@ func set_light_direction(direction: Vector2) -> void:
 
 func refresh() -> void:
 	"""Refresh rendering (call after map data changes)."""
-	Logger.verbose("World/Rendering", "refresh() called")
+	MythosLogger.verbose("World/Rendering", "refresh() called")
 	_update_textures()
 	
 	if render_target != null:
 		var target_type: String = render_target.get_class()
-		Logger.debug("World/Rendering", "Render target exists", {
+		MythosLogger.debug("World/Rendering", "Render target exists", {
 			"type": target_type,
 			"visible": render_target.visible if render_target.has_method("is_visible_in_tree") else "N/A"
 		})
 		# Update texture if using Sprite2D
 		if render_target is Sprite2D:
 			var sprite: Sprite2D = render_target as Sprite2D
-			Logger.verbose("World/Rendering", "Updating Sprite2D texture", {"has_material": sprite.material != null})
+			MythosLogger.verbose("World/Rendering", "Updating Sprite2D texture", {"has_material": sprite.material != null})
 			# Sprite2D uses the material for shader, but we still need a base texture
 			# The shader will use the textures we set in the material
 			if biome_texture != null:
 				sprite.texture = biome_texture
-				Logger.debug("World/Rendering", "Set sprite texture to biome_texture", {"size": biome_texture.get_size()})
+				MythosLogger.debug("World/Rendering", "Set sprite texture to biome_texture", {"size": biome_texture.get_size()})
 			elif heightmap_texture != null:
 				sprite.texture = heightmap_texture
-				Logger.debug("World/Rendering", "Set sprite texture to heightmap_texture", {"size": heightmap_texture.get_size()})
-			Logger.verbose("World/Rendering", "Sprite2D updated", {
+				MythosLogger.debug("World/Rendering", "Set sprite texture to heightmap_texture", {"size": heightmap_texture.get_size()})
+			MythosLogger.verbose("World/Rendering", "Sprite2D updated", {
 				"position": sprite.position,
 				"scale": sprite.scale
 			})
@@ -229,6 +229,6 @@ func refresh() -> void:
 			var tex: TextureRect = render_target as TextureRect
 			if heightmap_texture != null:
 				tex.texture = heightmap_texture
-				Logger.debug("World/Rendering", "TextureRect texture updated")
+				MythosLogger.debug("World/Rendering", "TextureRect texture updated")
 	else:
-		Logger.error("World/Rendering", "render_target is null!")
+		MythosLogger.error("World/Rendering", "render_target is null!")

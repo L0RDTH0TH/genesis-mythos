@@ -7,5 +7,5 @@
 extends Node
 
 func _ready() -> void:
-	Logger.verbose("Sim/Economy", "_ready() called")
-	Logger.info("Sim/Economy", "Faction economy system initialized")
+	MythosLogger.verbose("Sim/Economy", "_ready() called")
+	MythosLogger.info("Sim/Economy", "Faction economy system initialized")

@@ -16,13 +16,13 @@ const TERRAIN_CONFIG_PATH: String = "res://data/config/terrain_generation.json"
 
 func _remove_splash_screen() -> void:
 	"""Search for and remove any splash screen labels."""
-	Logger.verbose("World", "_remove_splash_screen() called")
+	MythosLogger.verbose("World", "_remove_splash_screen() called")
 	var labels: Array[Node] = []
 	_find_labels_recursive(self, labels)
 	
 	for label: Label in labels:
 		if label.text.contains("Baldur") or label.text.contains("Character Creation"):
-			Logger.debug("World", "Removing splash label: %s" % label.text)
+			MythosLogger.debug("World", "Removing splash label: %s" % label.text)
 			label.queue_free()
 
 
@@ -37,11 +37,11 @@ func _find_labels_recursive(node: Node, labels: Array) -> void:
 
 func _ensure_lighting_and_camera() -> void:
 	"""Ensure proper lighting and camera setup for visibility."""
-	Logger.verbose("World", "_ensure_lighting_and_camera() called")
+	MythosLogger.verbose("World", "_ensure_lighting_and_camera() called")
 	# Check if camera exists and is current
 	var camera: Camera3D = get_node_or_null("MainCamera")
 	if camera == null:
-		Logger.warn("World", "MainCamera not found, creating one")
+		MythosLogger.warn("World", "MainCamera not found, creating one")
 		camera = Camera3D.new()
 		camera.name = "MainCamera"
 		camera.transform.origin = Vector3(0, 10, 20)
@@ -51,16 +51,16 @@ func _ensure_lighting_and_camera() -> void:
 		camera.near = 0.05
 		camera.far = 5000.0
 		add_child(camera, true)
-		Logger.info("World", "Created MainCamera", {"position": camera.transform.origin})
+		MythosLogger.info("World", "Created MainCamera", {"position": camera.transform.origin})
 	else:
 		if not camera.current:
 			camera.current = true
-			Logger.debug("World", "Set MainCamera as current")
+			MythosLogger.debug("World", "Set MainCamera as current")
 	
 	# Check if light exists
 	var light: DirectionalLight3D = get_node_or_null("DirectionalLight3D")
 	if light == null:
-		Logger.warn("World", "DirectionalLight3D not found, creating one")
+		MythosLogger.warn("World", "DirectionalLight3D not found, creating one")
 		light = DirectionalLight3D.new()
 		light.name = "DirectionalLight3D"
 		light.transform.basis = Basis.from_euler(Vector3(deg_to_rad(-45), deg_to_rad(45), 0))
@@ -68,57 +68,57 @@ func _ensure_lighting_and_camera() -> void:
 		light.light_energy = 12.0
 		light.shadow_enabled = true
 		add_child(light, true)
-		Logger.info("World", "Created DirectionalLight3D")
+		MythosLogger.info("World", "Created DirectionalLight3D")
 	else:
 		# Ensure light is properly configured
 		if light.light_energy < 1.0:
 			light.light_energy = 12.0
 		if not light.shadow_enabled:
 			light.shadow_enabled = true
-		Logger.debug("World", "DirectionalLight3D verified", {"energy": light.light_energy})
+		MythosLogger.debug("World", "DirectionalLight3D verified", {"energy": light.light_energy})
 
 
 func _ready() -> void:
-	Logger.verbose("World", "_ready() called")
+	MythosLogger.verbose("World", "_ready() called")
 	_remove_splash_screen()
 	_ensure_lighting_and_camera()
 	# Terrain3DManager now creates and configures the terrain itself in its own _ready()
 	# Nothing else needed here unless you want to trigger procedural generation later
 	_setup_world_builder_ui()
-	Logger.info("World", "Setup complete - splash removed, terrain visible, UI added")
+	MythosLogger.info("World", "Setup complete - splash removed, terrain visible, UI added")
 
 
 # Optional: expose for later procedural calls
 func regenerate_world() -> void:
-	Logger.verbose("World", "regenerate_world() called")
+	MythosLogger.verbose("World", "regenerate_world() called")
 	if terrain_manager and terrain_manager.has_method("generate_initial_terrain"):
-		Logger.info("World", "Regenerating world terrain")
+		MythosLogger.info("World", "Regenerating world terrain")
 		terrain_manager.generate_initial_terrain()
 	else:
-		Logger.warn("World", "Cannot regenerate world - terrain_manager missing or invalid")
+		MythosLogger.warn("World", "Cannot regenerate world - terrain_manager missing or invalid")
 
 
 func _setup_world_builder_ui() -> void:
 	"""Setup and display the world builder UI overlay."""
-	Logger.verbose("World", "_setup_world_builder_ui() called")
-	Logger.debug("World", "Setting up WorldBuilderUI...")
+	MythosLogger.verbose("World", "_setup_world_builder_ui() called")
+	MythosLogger.debug("World", "Setting up WorldBuilderUI...")
 	
 	# Load and instance WorldBuilderUI scene
 	var ui_scene: PackedScene = load("res://ui/world_builder/WorldBuilderUI.tscn")
 	if ui_scene == null:
-		Logger.error("World", "Failed to load WorldBuilderUI scene")
+		MythosLogger.error("World", "Failed to load WorldBuilderUI scene")
 		return
 	
 	world_builder_ui = ui_scene.instantiate()
 	if world_builder_ui == null:
-		Logger.error("World", "Failed to instantiate WorldBuilderUI")
+		MythosLogger.error("World", "Failed to instantiate WorldBuilderUI")
 		return
 	
-	Logger.info("World", "WorldBuilderUI instantiated successfully")
+	MythosLogger.info("World", "WorldBuilderUI instantiated successfully")
 	
 	# Verify it's the correct type
 	if not world_builder_ui.has_method("set_terrain_manager"):
-		Logger.error("World", "Instantiated node is not WorldBuilderUI")
+		MythosLogger.error("World", "Instantiated node is not WorldBuilderUI")
 		return
 	
 	# Add UI to scene tree as a CanvasLayer child for proper overlay
@@ -127,22 +127,22 @@ func _setup_world_builder_ui() -> void:
 	add_child(canvas_layer, true)
 	canvas_layer.add_child(world_builder_ui, true)
 	
-	Logger.debug("World", "WorldBuilderUI added to scene tree")
+	MythosLogger.debug("World", "WorldBuilderUI added to scene tree")
 	
 	# Apply project theme
 	var theme: Theme = load("res://themes/bg3_theme.tres")
 	if theme != null:
 		world_builder_ui.theme = theme
-		Logger.debug("World", "Theme applied to WorldBuilderUI")
+		MythosLogger.debug("World", "Theme applied to WorldBuilderUI")
 	else:
-		Logger.warn("World", "Failed to load bg3_theme.tres")
+		MythosLogger.warn("World", "Failed to load bg3_theme.tres")
 	
 	# Connect UI to terrain manager
 	if terrain_manager:
 		world_builder_ui.set_terrain_manager(terrain_manager)
-		Logger.debug("World", "Terrain manager connected to WorldBuilderUI")
+		MythosLogger.debug("World", "Terrain manager connected to WorldBuilderUI")
 	else:
-		Logger.warn("World", "Terrain manager not available for WorldBuilderUI connection")
+		MythosLogger.warn("World", "Terrain manager not available for WorldBuilderUI connection")
 	
 	# Position UI - full screen
 	world_builder_ui.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -151,7 +151,7 @@ func _setup_world_builder_ui() -> void:
 	world_builder_ui.visible = true
 	world_builder_ui.mouse_filter = Control.MOUSE_FILTER_PASS
 	
-	Logger.debug("World", "WorldBuilderUI positioned and made visible", {
+	MythosLogger.debug("World", "WorldBuilderUI positioned and made visible", {
 		"size": world_builder_ui.size,
 		"position": world_builder_ui.position
 	})

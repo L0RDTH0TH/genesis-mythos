@@ -7,5 +7,5 @@
 extends Node
 
 func _ready() -> void:
-	Logger.verbose("Sim/Entity", "_ready() called")
-	Logger.info("Sim/Entity", "Entity simulation system initialized")
+	MythosLogger.verbose("Sim/Entity", "_ready() called")
+	MythosLogger.info("Sim/Entity", "Entity simulation system initialized")

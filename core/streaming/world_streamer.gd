@@ -7,5 +7,5 @@
 extends Node
 
 func _ready() -> void:
-	Logger.verbose("World/Streaming", "_ready() called")
-	Logger.info("World/Streaming", "World streaming system initialized")
+	MythosLogger.verbose("World/Streaming", "_ready() called")
+	MythosLogger.info("World/Streaming", "World streaming system initialized")

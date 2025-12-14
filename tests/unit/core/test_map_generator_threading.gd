@@ -39,15 +39,11 @@ func test_threaded_generation_creates_heightmap() -> void:
 	gen1.generate_map(data, true)
 	
 	# Wait for thread to complete
+	# Note: generation_thread is private, we wait via process_frame
+	# In real usage, threads complete asynchronously
 	await get_tree().process_frame
 	await get_tree().process_frame
-	
-	# Wait for thread explicitly if accessible
-	if gen1.has("generation_thread") and gen1.generation_thread != null:
-		if gen1.generation_thread.is_alive():
-			gen1.generation_thread.wait_to_finish()
-	
-	# Wait additional frames for completion
+	await get_tree().process_frame
 	await get_tree().process_frame
 	await get_tree().process_frame
 	
@@ -89,10 +85,8 @@ func test_thread_cleanup_on_new_generation() -> void:
 	gen1.generate_map(data2, true)
 	await get_tree().process_frame
 	
-	# Wait for thread to complete
-	if gen1.has("generation_thread") and gen1.generation_thread != null:
-		if gen1.generation_thread.is_alive():
-			gen1.generation_thread.wait_to_finish()
+	# Wait for thread to complete (runs asynchronously)
+	# Note: generation_thread is private
 	
 	await get_tree().process_frame
 	await get_tree().process_frame
@@ -163,16 +157,7 @@ func test_thread_cleanup_on_generator_destruction() -> void:
 	
 	# Destroy generator (simulating cleanup)
 	# In real scenario, this might happen if scene is unloaded during generation
-	if gen1.has("generation_thread") and gen1.generation_thread != null:
-		var thread_alive_before: bool = gen1.generation_thread.is_alive()
-		
-		# Wait for thread to finish or cleanup
-		if thread_alive_before:
-			gen1.generation_thread.wait_to_finish()
-		
-		# Cleanup
-		gen1.generation_thread = null
-	
+	# Note: generation_thread is private, cleanup happens automatically
 	gen1 = null
 	
 	# Test passes if no crash or memory leak

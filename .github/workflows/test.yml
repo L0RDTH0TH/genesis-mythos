@@ -1,0 +1,61 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        godot-version: ['4.3']
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Godot
+        uses: firebelley/godot-actions@v1
+        with:
+          godot_version: ${{ matrix.godot-version }}
+          godot_executable_download_path: './godot'
+      
+      - name: Verify GUT addon exists
+        run: |
+          if [ ! -d "addons/gut" ]; then
+            echo "WARNING: GUT addon not found. Please install GUT from AssetLib (Asset ID 1709, v9.3.0+)"
+            echo "Or download from: https://github.com/bitwes/Gut/archive/refs/tags/v9.3.0.zip"
+            echo "Extract to res://addons/gut/"
+            exit 1
+          fi
+      
+      - name: Run Unit Tests
+        run: |
+          ./godot --headless --script addons/gut/gut_cmdln.gd -gdir=res://tests/unit -gexit
+        continue-on-error: false
+      
+      - name: Run Integration Tests
+        run: |
+          ./godot --headless --script addons/gut/gut_cmdln.gd -gdir=res://tests/integration -gexit
+        continue-on-error: false
+      
+      - name: Run UI Tests (Interaction Only)
+        run: |
+          ./godot --headless --script res://tests/interaction_only/TestInteractionOnlyRunner.gd
+        continue-on-error: false
+      
+      - name: Generate Coverage Report (if available)
+        run: |
+          ./godot --headless --script addons/gut/gut_cmdln.gd -gdir=res://tests/unit -gcoverage || echo "Coverage generation not available in GUT"
+        continue-on-error: true
+      
+      - name: Upload Coverage to Codecov (if available)
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.lcov
+          fail_ci_if_error: false
+        continue-on-error: true

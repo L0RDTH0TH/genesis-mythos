@@ -60,11 +60,15 @@ func _init() -> void:
 
 
 func create_heightmap(size_x: int, size_y: int, format: Image.Format = Image.FORMAT_RF) -> Image:
-	"""Create a new heightmap Image with specified size and format."""
+	"""Create a new heightmap Image with specified size and format.
+	
+	Note: This function creates an image of the specified size. The world_width and world_height
+	should be set separately before calling this function if they differ from the image size.
+	"""
 	var img: Image = Image.create(size_x, size_y, false, format)
 	heightmap_image = img
-	world_width = size_x
-	world_height = size_y
+	# Don't overwrite world_width/height - they should be set by the caller
+	# This allows the image size to match world dimensions when explicitly set
 	return img
 
 

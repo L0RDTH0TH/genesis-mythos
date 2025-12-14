@@ -13,9 +13,9 @@ uniform bool show_rivers = true;
 
 uniform float sea_level : hint_range(0.0, 1.0) = 0.4;
 uniform float hillshade_strength : hint_range(0.0, 2.0) = 1.0;
-uniform vec2 light_direction : hint_default = vec2(0.5, 0.5);
+uniform vec2 light_direction = vec2(0.5, 0.5);
 
-uniform vec4 water_color : hint_color = vec4(0.1, 0.2, 0.4, 1.0);
+uniform vec4 water_color = vec4(0.1, 0.2, 0.4, 1.0);
 
 void fragment() {
 	vec2 uv = UV;

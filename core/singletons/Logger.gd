@@ -62,16 +62,16 @@ func _exit_tree() -> void:
 func _load_config() -> void:
 	"""Load configuration from JSON file."""
 	var config_path: String = "res://config/logging_config.json"
-	var file := FileAccess.open(config_path, FileAccess.READ)
+	var config_file := FileAccess.open(config_path, FileAccess.READ)
 	
-	if not file:
+	if not config_file:
 		push_warning("Logger: Could not load config from %s, using defaults" % config_path)
 		config = _get_default_config()
 		_apply_config()
 		return
 	
-	var content: String = file.get_as_text()
-	file.close()
+	var content: String = config_file.get_as_text()
+	config_file.close()
 	
 	var json := JSON.new()
 	var parse_result: Error = json.parse(content)

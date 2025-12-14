@@ -11,6 +11,7 @@ config_version=5
 [application]
 
 config/name="Eryndor 4.0 Final"
+config/version="1.0.0"
 run/main_scene="res://scenes/MainMenu.tscn"
 config/use_hidden_project_data_directory=false
 config/features=PackedStringArray("4.5", "Forward Plus")
@@ -22,6 +23,7 @@ MythosLogger="*res://core/singletons/Logger.gd"
 WorldStreamer="*res://core/streaming/world_streamer.gd"
 EntitySim="*res://core/sim/entity_sim.gd"
 FactionEconomy="*res://core/sim/faction_economy.gd"
+DebugMenu="*res://addons/debug_menu/debug_menu.tscn"
 
 [display]
 

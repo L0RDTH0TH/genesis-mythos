@@ -93,7 +93,7 @@ var map_preview_texture: ImageTexture = ImageTexture.new()
 
 
 func _ready() -> void:
-	Logger.verbose("UI/WorldBuilder", "_ready() called")
+	MythosLogger.verbose("UI/WorldBuilder", "_ready() called")
 	_load_map_icons()
 	_load_biomes()
 	_load_civilizations()
@@ -105,7 +105,7 @@ func _ready() -> void:
 	_setup_buttons()
 	_setup_procedural_world_map_controls()
 	_update_step_display()
-	Logger.info("UI/WorldBuilder", "Wizard-style UI ready")
+	MythosLogger.info("UI/WorldBuilder", "Wizard-style UI ready")
 
 
 func _load_map_icons() -> void:
@@ -130,10 +130,10 @@ func _load_map_icons() -> void:
 
 func _load_biomes() -> void:
 	"""Load biomes configuration from JSON."""
-	Logger.verbose("UI/WorldBuilder", "_load_biomes() called", {"path": BIOMES_PATH})
+	MythosLogger.verbose("UI/WorldBuilder", "_load_biomes() called", {"path": BIOMES_PATH})
 	var file: FileAccess = FileAccess.open(BIOMES_PATH, FileAccess.READ)
 	if file == null:
-		Logger.error("UI/WorldBuilder", "Failed to load biomes from %s" % BIOMES_PATH)
+		MythosLogger.error("UI/WorldBuilder", "Failed to load biomes from %s" % BIOMES_PATH)
 		return
 	
 	var json_string: String = file.get_as_text()
@@ -142,20 +142,20 @@ func _load_biomes() -> void:
 	var json: JSON = JSON.new()
 	var parse_result: Error = json.parse(json_string)
 	if parse_result != OK:
-		Logger.error("UI/WorldBuilder", "Failed to parse biomes JSON: %s" % json.get_error_message())
+		MythosLogger.error("UI/WorldBuilder", "Failed to parse biomes JSON: %s" % json.get_error_message())
 		return
 	
 	biomes_data = json.data
 	var biome_count: int = biomes_data.get("biomes", []).size()
-	Logger.info("UI/WorldBuilder", "Loaded biome definitions", {"count": biome_count})
+	MythosLogger.info("UI/WorldBuilder", "Loaded biome definitions", {"count": biome_count})
 
 
 func _load_civilizations() -> void:
 	"""Load civilizations configuration from JSON."""
-	Logger.verbose("UI/WorldBuilder", "_load_civilizations() called", {"path": CIVILIZATIONS_PATH})
+	MythosLogger.verbose("UI/WorldBuilder", "_load_civilizations() called", {"path": CIVILIZATIONS_PATH})
 	var file: FileAccess = FileAccess.open(CIVILIZATIONS_PATH, FileAccess.READ)
 	if file == null:
-		Logger.error("UI/WorldBuilder", "Failed to load civilizations from %s" % CIVILIZATIONS_PATH)
+		MythosLogger.error("UI/WorldBuilder", "Failed to load civilizations from %s" % CIVILIZATIONS_PATH)
 		return
 	
 	var json_string: String = file.get_as_text()
@@ -164,20 +164,20 @@ func _load_civilizations() -> void:
 	var json: JSON = JSON.new()
 	var parse_result: Error = json.parse(json_string)
 	if parse_result != OK:
-		Logger.error("UI/WorldBuilder", "Failed to parse civilizations JSON: %s" % json.get_error_message())
+		MythosLogger.error("UI/WorldBuilder", "Failed to parse civilizations JSON: %s" % json.get_error_message())
 		return
 	
 	civilizations_data = json.data
 	var civ_count: int = civilizations_data.get("civilizations", []).size()
-	Logger.info("UI/WorldBuilder", "Loaded civilization definitions", {"count": civ_count})
+	MythosLogger.info("UI/WorldBuilder", "Loaded civilization definitions", {"count": civ_count})
 
 
 func _load_fantasy_archetypes() -> void:
 	"""Load fantasy archetypes configuration from JSON."""
-	Logger.verbose("UI/WorldBuilder", "_load_fantasy_archetypes() called", {"path": FANTASY_ARCHETYPES_PATH})
+	MythosLogger.verbose("UI/WorldBuilder", "_load_fantasy_archetypes() called", {"path": FANTASY_ARCHETYPES_PATH})
 	var file: FileAccess = FileAccess.open(FANTASY_ARCHETYPES_PATH, FileAccess.READ)
 	if file == null:
-		Logger.error("UI/WorldBuilder", "Failed to load fantasy archetypes from %s" % FANTASY_ARCHETYPES_PATH)
+		MythosLogger.error("UI/WorldBuilder", "Failed to load fantasy archetypes from %s" % FANTASY_ARCHETYPES_PATH)
 		return
 	
 	var json_string: String = file.get_as_text()
@@ -186,12 +186,12 @@ func _load_fantasy_archetypes() -> void:
 	var json: JSON = JSON.new()
 	var parse_result: Error = json.parse(json_string)
 	if parse_result != OK:
-		Logger.error("UI/WorldBuilder", "Failed to parse fantasy archetypes JSON: %s" % json.get_error_message())
+		MythosLogger.error("UI/WorldBuilder", "Failed to parse fantasy archetypes JSON: %s" % json.get_error_message())
 		return
 	
 	fantasy_archetypes = json.data
 	var arch_count: int = fantasy_archetypes.size()
-	Logger.info("UI/WorldBuilder", "Loaded fantasy archetype definitions", {"count": arch_count})
+	MythosLogger.info("UI/WorldBuilder", "Loaded fantasy archetype definitions", {"count": arch_count})
 
 
 func _apply_theme() -> void:
@@ -1496,12 +1496,12 @@ func _initialize_map_maker_module() -> void:
 			else:
 				print("DEBUG: ERROR - center_panel is null!")
 		else:
-			Logger.warn("UI/WorldBuilder", "MapMakerModule script has parse errors, using ProceduralWorldMap only")
+			MythosLogger.warn("UI/WorldBuilder", "MapMakerModule script has parse errors, using ProceduralWorldMap only")
 			# Keep map_2d_texture visible for ProceduralWorldMap preview
 			if map_2d_texture != null:
 				map_2d_texture.visible = true
 	else:
-		Logger.warn("UI/WorldBuilder", "Failed to load MapMakerModule script, using ProceduralWorldMap only")
+		MythosLogger.warn("UI/WorldBuilder", "Failed to load MapMakerModule script, using ProceduralWorldMap only")
 		# Keep map_2d_texture visible for ProceduralWorldMap preview
 		if map_2d_texture != null:
 			map_2d_texture.visible = true
@@ -1816,7 +1816,7 @@ func _on_generate_map_pressed() -> void:
 	var landmass: String = step_data.get("Map Gen", {}).get("landmass", "Continents")
 	
 	if style_name.is_empty() or not fantasy_archetypes.has(style_name):
-		Logger.warn("UI/WorldBuilder", "Invalid fantasy style selected")
+		MythosLogger.warn("UI/WorldBuilder", "Invalid fantasy style selected")
 		return
 	
 	var arch: Dictionary = fantasy_archetypes[style_name]
@@ -1828,7 +1828,7 @@ func _on_generate_map_pressed() -> void:
 	
 	# Use the ProceduralWorldMap node already in the scene
 	if procedural_world_map == null:
-		Logger.error("UI/WorldBuilder", "ProceduralWorldMap node not found in scene")
+		MythosLogger.error("UI/WorldBuilder", "ProceduralWorldMap node not found in scene")
 		return
 	
 	# Configure ProceduralWorldMap
@@ -1848,7 +1848,7 @@ func _on_generate_map_pressed() -> void:
 	# Store datasource reference for later use
 	step_data["Map Gen"]["datasource"] = ds
 	
-	Logger.info("UI/WorldBuilder", "Started procedural map generation", {"style": style_name, "landmass": landmass, "size": str(map_width) + "x" + str(map_height)})
+	MythosLogger.info("UI/WorldBuilder", "Started procedural map generation", {"style": style_name, "landmass": landmass, "size": str(map_width) + "x" + str(map_height)})
 
 
 func _on_map_generation_complete() -> void:
@@ -1865,11 +1865,11 @@ func _on_map_generation_complete() -> void:
 	var biome_img: Image = ds.get_cached_biome_image()
 	
 	if height_img == null:
-		Logger.warn("UI/WorldBuilder", "Height image not available from datasource")
+		MythosLogger.warn("UI/WorldBuilder", "Height image not available from datasource")
 		return
 	
 	if biome_img == null:
-		Logger.warn("UI/WorldBuilder", "Biome image not available from datasource")
+		MythosLogger.warn("UI/WorldBuilder", "Biome image not available from datasource")
 		# Fallback: create a simple biome image from height
 		biome_img = Image.create(map_width, map_height, false, Image.FORMAT_RGB8)
 		var arch: Dictionary = fantasy_archetypes.get(step_data.get("Map Gen", {}).get("style", ""), {})
@@ -1904,7 +1904,7 @@ func _on_map_generation_complete() -> void:
 	step_data["Map Gen"]["heightmap_image"] = height_img
 	step_data["Map Gen"]["biome_image"] = biome_img
 	
-	Logger.info("UI/WorldBuilder", "Map generation complete - preview updated via ProceduralWorldMap")
+	MythosLogger.info("UI/WorldBuilder", "Map generation complete - preview updated via ProceduralWorldMap")
 
 
 func _on_bake_to_3d_pressed() -> void:
@@ -1913,11 +1913,11 @@ func _on_bake_to_3d_pressed() -> void:
 	var biome_img: Image = step_data.get("Map Gen", {}).get("biome_image", null)
 	
 	if height_img == null:
-		Logger.warn("UI/WorldBuilder", "Cannot bake to 3D - heightmap image not found. Generate map first.")
+		MythosLogger.warn("UI/WorldBuilder", "Cannot bake to 3D - heightmap image not found. Generate map first.")
 		return
 	
 	if terrain_manager == null:
-		Logger.warn("UI/WorldBuilder", "Cannot bake to 3D - terrain manager not assigned")
+		MythosLogger.warn("UI/WorldBuilder", "Cannot bake to 3D - terrain manager not assigned")
 		return
 	
 	var map_width: int = step_data.get("Map Gen", {}).get("width", 1024)
@@ -1935,12 +1935,12 @@ func _on_bake_to_3d_pressed() -> void:
 	
 	if terrain_manager.has_method("generate_from_heightmap"):
 		terrain_manager.generate_from_heightmap(height_img, min_height, max_height, terrain_position)
-		Logger.info("UI/WorldBuilder", "Baked map to Terrain3D", {
+		MythosLogger.info("UI/WorldBuilder", "Baked map to Terrain3D", {
 			"size": Vector2i(map_width, map_height),
 			"height_range": [min_height, max_height]
 		})
 	else:
-		Logger.error("UI/WorldBuilder", "Terrain3DManager does not have generate_from_heightmap method")
+		MythosLogger.error("UI/WorldBuilder", "Terrain3DManager does not have generate_from_heightmap method")
 
 
 func _apply_radial_mask(img: Image, width: int, height: int, cx: float, cy: float, radius: float, invert: bool = false) -> void:
@@ -2103,7 +2103,7 @@ func _update_map_preview_placeholder(width: int, height: int) -> void:
 	
 	map_2d_texture.visible = true
 	
-	Logger.debug("UI/WorldBuilder", "Placeholder preview updated", {
+	MythosLogger.debug("UI/WorldBuilder", "Placeholder preview updated", {
 		"width": width,
 		"height": height,
 		"viewport_size": viewport_size,
@@ -2205,7 +2205,7 @@ func _update_2d_map_preview(height_img: Image, biome_img: Image, width: int, hei
 	# Grid is now drawn directly on the Image, no need to update viewport grid
 	# call_deferred("_update_map_grid")  # Commented out - grid drawn on Image instead
 	
-	Logger.debug("UI/WorldBuilder", "Generated map preview updated", {
+	MythosLogger.debug("UI/WorldBuilder", "Generated map preview updated", {
 		"width": width,
 		"height": height,
 		"viewport_size": viewport_size,
@@ -2233,7 +2233,7 @@ func _diagnostic_check_texture_rect_after_layout(texture_rect: TextureRect, expe
 	# According to docs: "The minimum width is adjusted to match the height, maintaining the texture's aspect ratio"
 	var expected_min_width: float = texture_rect_size.y * texture_aspect if texture_aspect > 0 else 0.0
 	
-	Logger.debug("UI/WorldBuilder", "AFTER LAYOUT COMPLETE (one frame later)", {
+	MythosLogger.debug("UI/WorldBuilder", "AFTER LAYOUT COMPLETE (one frame later)", {
 		"texture_rect_size": texture_rect_size,
 		"texture_rect_size_percent_of_parent": Vector2(
 			(texture_rect_size.x / parent_size.x * 100.0) if parent_size.x > 0 else 0.0,
@@ -2254,7 +2254,7 @@ func _diagnostic_check_texture_rect_after_layout(texture_rect: TextureRect, expe
 	
 	# Check for potential issues
 	if texture_rect_size.x <= texture_size.x * 1.1 and texture_rect_size.y <= texture_size.y * 1.1:
-		Logger.warn("UI/WorldBuilder", "⚠️ ISSUE DETECTED: TextureRect is stuck at texture's native size", {
+		MythosLogger.warn("UI/WorldBuilder", "⚠️ ISSUE DETECTED: TextureRect is stuck at texture's native size", {
 			"texture_rect_size": texture_rect_size,
 			"texture_size": texture_size,
 			"expand_mode": texture_rect.expand_mode,
@@ -2262,7 +2262,7 @@ func _diagnostic_check_texture_rect_after_layout(texture_rect: TextureRect, expe
 		})
 	
 	if texture_rect_size.x < parent_size.x * 0.5 or texture_rect_size.y < parent_size.y * 0.5:
-		Logger.warn("UI/WorldBuilder", "⚠️ ISSUE DETECTED: TextureRect is much smaller than parent", {
+		MythosLogger.warn("UI/WorldBuilder", "⚠️ ISSUE DETECTED: TextureRect is much smaller than parent", {
 			"texture_rect_size": texture_rect_size,
 			"parent_size": parent_size,
 			"fill_percentage": Vector2(
@@ -2271,7 +2271,7 @@ func _diagnostic_check_texture_rect_after_layout(texture_rect: TextureRect, expe
 			)
 		})
 	
-	Logger.debug("UI/WorldBuilder", "=== MAP PREVIEW DIAGNOSTIC END ===")
+	MythosLogger.debug("UI/WorldBuilder", "=== MAP PREVIEW DIAGNOSTIC END ===")
 
 
 func _on_icon_toolbar_selected(icon_id: String) -> void:
