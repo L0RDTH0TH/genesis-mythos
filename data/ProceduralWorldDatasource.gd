@@ -4,7 +4,7 @@
 # ║ Author: Lordthoth
 # ╚═══════════════════════════════════════════════════════════
 
-extends ProceduralWorldDatasource
+extends "res://addons/procedural_world_map/datasource.gd"
 
 ## Fantasy archetype configuration
 var archetype: Dictionary = {}

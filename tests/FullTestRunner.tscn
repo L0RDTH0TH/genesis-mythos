@@ -1,0 +1,7 @@
+[gd_scene format=3]
+
+[node name="root" type="Node2D"]
+
+[node name="FullTestRunner" type="Node2D" parent="."]
+
+[node name="@Node2D@2" type="Node2D" parent="."]

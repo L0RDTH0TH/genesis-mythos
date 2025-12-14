@@ -80,7 +80,7 @@ func test_tab_bar_all_tabs() -> void:
 				_simulate_tab_selection_safe(tab_bar, i)
 				await get_tree().process_frame
 				_check_for_errors("tab selection %d" % i)
-				_verify_debug_output_clean("tab selection %d" % i)
+				# Debug output verified via GUT error detection - "tab selection %d" % i)
 			
 			# Test invalid index (should handle gracefully)
 			if tab_count > 0:
@@ -113,7 +113,7 @@ func test_tab_bar_rapid_switching() -> void:
 				_simulate_tab_selection_safe(tab_bar, tab_index)
 				await get_tree().process_frame
 			_check_for_errors("rapid tab switching")
-			_verify_debug_output_clean("rapid tab switching")
+			# Debug output verified via GUT error detection - "rapid tab switching")
 			pass_test("Rapid tab switching handled gracefully")
 		else:
 			pass_test("TabBar has no tabs for rapid switching test")
@@ -136,14 +136,14 @@ func test_new_world_button() -> void:
 		await get_tree().process_frame
 		await get_tree().process_frame
 		_check_for_errors("new world button")
-		_verify_debug_output_clean("new world button")
+		# Debug output verified via GUT error detection - "new world button")
 		
 		# Rapid clicks
 		for i in range(5):
 			_simulate_button_click_safe(new_world_button)
 			await get_tree().process_frame
 		_check_for_errors("rapid new world button clicks")
-		_verify_debug_output_clean("rapid new world button clicks")
+		# Debug output verified via GUT error detection - "rapid new world button clicks")
 		
 		pass_test("New World button tested")
 	else:
@@ -160,7 +160,7 @@ func test_save_world_button() -> void:
 		await get_tree().process_frame
 		await get_tree().process_frame
 		_check_for_errors("save world button")
-		_verify_debug_output_clean("save world button")
+		# Debug output verified via GUT error detection - "save world button")
 		
 		# Rapid clicks
 		for i in range(5):
@@ -183,7 +183,7 @@ func test_load_world_button() -> void:
 		await get_tree().process_frame
 		await get_tree().process_frame
 		_check_for_errors("load world button")
-		_verify_debug_output_clean("load world button")
+		# Debug output verified via GUT error detection - "load world button")
 		
 		# Rapid clicks
 		for i in range(5):
@@ -217,7 +217,7 @@ func test_all_toolbar_buttons_rapidly() -> void:
 			_simulate_button_click_safe(button)
 			await get_tree().process_frame
 		_check_for_errors("all toolbar buttons rapidly")
-		_verify_debug_output_clean("all toolbar buttons rapidly")
+		# Debug output verified via GUT error detection - "all toolbar buttons rapidly")
 		pass_test("All toolbar buttons tested in rapid sequence")
 	else:
 		pass_test("No toolbar buttons found")
@@ -240,7 +240,7 @@ func test_preset_option_button_all_options() -> void:
 				_simulate_option_selection_safe(preset_option, i)
 				await get_tree().process_frame
 				_check_for_errors("preset option selection %d" % i)
-				_verify_debug_output_clean("preset option selection %d" % i)
+				# Debug output verified via GUT error detection - "preset option selection %d" % i)
 			
 			# Test invalid index (should handle gracefully)
 			if item_count > 0:
@@ -268,7 +268,7 @@ func test_preset_option_button_rapid_selection() -> void:
 				_simulate_option_selection_safe(preset_option, option_index)
 				await get_tree().process_frame
 			_check_for_errors("rapid preset option selection")
-			_verify_debug_output_clean("rapid preset option selection")
+			# Debug output verified via GUT error detection - "rapid preset option selection")
 			pass_test("Rapid preset option selection handled gracefully")
 		else:
 			pass_test("Preset OptionButton has no items for rapid selection test")
@@ -288,7 +288,7 @@ func test_button_clicks_with_null_data() -> void:
 		await get_tree().process_frame
 		await get_tree().process_frame
 		_check_for_errors("save button with null data")
-		_verify_debug_output_clean("save button with null data")
+		# Debug output verified via GUT error detection - "save button with null data")
 	
 	var load_world_button := _find_control_by_name("LoadWorldButton") as Button
 	if load_world_button:
@@ -297,7 +297,7 @@ func test_button_clicks_with_null_data() -> void:
 		await get_tree().process_frame
 		await get_tree().process_frame
 		_check_for_errors("load button with no save files")
-		_verify_debug_output_clean("load button with no save files")
+		# Debug output verified via GUT error detection - "load button with no save files")
 	
 	pass_test("Button clicks with null/invalid data tested")
 
@@ -392,13 +392,6 @@ func _check_for_errors(context: String) -> void:
 
 func _verify_debug_output_clean(context: String) -> void:
 	"""Verify debug output is clean after interaction."""
-	var debug_output = get_debug_output()
-	if debug_output:
-		if debug_output.has("errors") and debug_output["errors"].size() > 0:
-			var errors: Array = debug_output["errors"]
-			push_error("Debug errors during %s: %s" % [context, str(errors)])
-		
-		if debug_output.has("warnings") and debug_output["warnings"].size() > 0:
-			var warnings: Array = debug_output["warnings"]
-			# Warnings are less critical, but log them
-			push_warning("Debug warnings during %s: %s" % [context, str(warnings)])
+	# Note: get_debug_output() is only available via MCP, not in regular GDScript
+	# Errors will be caught by GUT's error detection system
+	pass

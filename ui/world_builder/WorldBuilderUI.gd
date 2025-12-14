@@ -762,7 +762,7 @@ func _create_step_map_gen_editor(parent: VBoxContainer) -> void:
 	noise_freq_slider.max_value = 0.1
 	noise_freq_slider.step = 0.0001
 	noise_freq_slider.value = 0.0005
-	noise_freq_slider.value_changed.connect(_on_map_gen_param_changed.bind("noise_frequency"))
+	noise_freq_slider.value_changed.connect(func(v): _on_map_gen_param_changed("noise_frequency", v))
 	noise_freq_container.add_child(noise_freq_slider)
 	
 	var noise_freq_value_label: Label = Label.new()
@@ -787,7 +787,7 @@ func _create_step_map_gen_editor(parent: VBoxContainer) -> void:
 	octaves_spinbox.min_value = 1
 	octaves_spinbox.max_value = 8
 	octaves_spinbox.value = 4
-	octaves_spinbox.value_changed.connect(_on_map_gen_param_changed.bind("noise_octaves"))
+	octaves_spinbox.value_changed.connect(func(v): _on_map_gen_param_changed("noise_octaves", v))
 	octaves_container.add_child(octaves_spinbox)
 	container.add_child(octaves_container)
 	control_references["Map Gen/noise_octaves"] = octaves_spinbox
@@ -806,7 +806,7 @@ func _create_step_map_gen_editor(parent: VBoxContainer) -> void:
 	persistence_slider.max_value = 1.0
 	persistence_slider.step = 0.01
 	persistence_slider.value = 0.5
-	persistence_slider.value_changed.connect(_on_map_gen_param_changed.bind("noise_persistence"))
+	persistence_slider.value_changed.connect(func(v): _on_map_gen_param_changed("noise_persistence", v))
 	persistence_container.add_child(persistence_slider)
 	
 	var persistence_value_label: Label = Label.new()
@@ -832,7 +832,7 @@ func _create_step_map_gen_editor(parent: VBoxContainer) -> void:
 	lacunarity_slider.max_value = 4.0
 	lacunarity_slider.step = 0.1
 	lacunarity_slider.value = 2.0
-	lacunarity_slider.value_changed.connect(_on_map_gen_param_changed.bind("noise_lacunarity"))
+	lacunarity_slider.value_changed.connect(func(v): _on_map_gen_param_changed("noise_lacunarity", v))
 	lacunarity_container.add_child(lacunarity_slider)
 	
 	var lacunarity_value_label: Label = Label.new()
@@ -869,7 +869,7 @@ func _create_step_map_gen_editor(parent: VBoxContainer) -> void:
 	sea_level_slider.max_value = 1.0
 	sea_level_slider.step = 0.01
 	sea_level_slider.value = 0.4
-	sea_level_slider.value_changed.connect(_on_map_gen_param_changed.bind("sea_level"))
+	sea_level_slider.value_changed.connect(func(v): _on_map_gen_param_changed("sea_level", v))
 	sea_level_container.add_child(sea_level_slider)
 	
 	var sea_level_value_label: Label = Label.new()
@@ -892,7 +892,7 @@ func _create_step_map_gen_editor(parent: VBoxContainer) -> void:
 	var erosion_check: CheckBox = CheckBox.new()
 	erosion_check.name = "erosion_enabled"
 	erosion_check.button_pressed = true
-	erosion_check.toggled.connect(_on_map_gen_param_changed.bind("erosion_enabled"))
+	erosion_check.toggled.connect(func(pressed): _on_map_gen_param_changed("erosion_enabled", pressed))
 	erosion_container.add_child(erosion_check)
 	container.add_child(erosion_container)
 	control_references["Map Gen/erosion_enabled"] = erosion_check
@@ -1719,15 +1719,32 @@ func _on_seed_text_submitted(text: String) -> void:
 
 func _on_seed_text_changed(text: String) -> void:
 	"""Handle seed text change."""
+	# Handle empty text
+	if text.is_empty():
+		return
+	
+	# Check if valid integer and not too large (max 64-bit signed int)
 	if text.is_valid_int():
+		# Check if the value can fit in a 64-bit signed integer
+		# Max value is 9223372036854775807, but we'll limit to a reasonable range
+		var max_seed: int = 2147483647  # 32-bit max for safety
 		var seed_val: int = text.to_int()
+		
+		# Clamp to valid range if too large
+		if seed_val > max_seed:
+			var seed_input: LineEdit = control_references.get("Map Gen/seed") as LineEdit
+			if seed_input != null:
+				seed_input.text = str(max_seed)
+			seed_val = max_seed
+		
 		step_data["Map Gen"]["seed"] = seed_val
 		_on_seed_changed(seed_val)
 	else:
 		# Reset to current value if invalid
 		var seed_input: LineEdit = control_references.get("Map Gen/seed") as LineEdit
 		if seed_input != null:
-			seed_input.text = str(step_data.get("Map Gen", {}).get("seed", 12345))
+			var current_seed = step_data.get("Map Gen", {}).get("seed", 12345)
+			seed_input.text = str(current_seed)
 
 
 func _on_random_seed_pressed() -> void:

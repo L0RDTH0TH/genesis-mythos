@@ -15,6 +15,9 @@ var test_scene: Node
 ## Track errors during interactions
 var interaction_errors: Array[String] = []
 
+## Global error listener
+var error_listener: TestErrorListener
+
 func before_all() -> void:
 	"""Setup test scene before all tests."""
 	test_scene = Node.new()
@@ -30,6 +33,8 @@ func after_all() -> void:
 func before_each() -> void:
 	"""Setup WorldBuilderUI instance before each test."""
 	interaction_errors.clear()
+	error_listener = TestErrorListener.get_instance()
+	error_listener.clear()
 	
 	var scene_path: String = "res://ui/world_builder/WorldBuilderUI.tscn"
 	if ResourceLoader.exists(scene_path):
@@ -209,7 +214,7 @@ func test_step_1_landmass_dropdown_all_options() -> void:
 		pass_test("Step 1: Landmass dropdown not found")
 
 func test_step_1_generate_button() -> void:
-	"""Test Step 1: Generate button triggers map generation."""
+	"""Test Step 1: Generate button triggers map generation - FULL LIFECYCLE."""
 	_navigate_to_step(0)
 	await get_tree().process_frame
 	
@@ -218,12 +223,78 @@ func test_step_1_generate_button() -> void:
 		generate_button = _find_control_by_pattern("*Generate*") as Button
 	
 	if generate_button:
+		# Pre-check: Verify ProceduralWorldDatasource script can be loaded
+		var datasource_script_path: String = "res://data/ProceduralWorldDatasource.gd"
+		var datasource_script: GDScript = load(datasource_script_path) as GDScript
+		if datasource_script == null:
+			error_listener.capture_script_error(datasource_script_path, "Failed to load script")
+			fail_test("FAIL: ProceduralWorldDatasource script failed to load. Context: Pre-generation check. Why: Script must load before generation. Hint: Check parse errors in ProceduralWorldDatasource.gd.")
+			return
+		
+		# Verify script can be instantiated
+		if datasource_script.can_instantiate():
+			var test_instance = datasource_script.new()
+			if test_instance == null:
+				error_listener.capture_script_error(datasource_script_path, "Failed to instantiate")
+				fail_test("FAIL: ProceduralWorldDatasource failed to instantiate. Context: Pre-generation check. Why: Script must be instantiable. Hint: Check _init() method.")
+				return
+			# Clean up test instance
+			if test_instance is RefCounted:
+				pass  # Auto-freed
+			elif test_instance is Node:
+				test_instance.queue_free()
+		
+		# Track expected signals (if WorldBuilderUI emits generation_complete or similar)
+		if world_builder_ui.has_signal("generation_complete"):
+			error_listener.expect_signal(world_builder_ui, "generation_complete", 10.0)
+		if world_builder_ui.has_signal("map_generated"):
+			error_listener.expect_signal(world_builder_ui, "map_generated", 10.0)
+		
 		# Click generate button
 		_simulate_button_click_safe(generate_button)
+		
+		# Wait for generation with timeout
+		var timeout: float = 10.0
+		var elapsed: float = 0.0
+		var generation_started: bool = false
+		
+		# Poll for generation completion
+		while elapsed < timeout:
+			await get_tree().process_frame
+			elapsed += get_process_delta_time()
+			
+			# Check if generation started (check for datasource creation or map data)
+			if world_builder_ui.has("procedural_world_map"):
+				var pwm = world_builder_ui.get("procedural_world_map")
+				if pwm and pwm.has("datasource") and pwm.get("datasource") != null:
+					generation_started = true
+					break
+			
+			# Check for errors during generation
+			if error_listener and error_listener.has_errors():
+				var all_errors: String = error_listener.get_all_errors()
+				fail_test("FAIL: Errors during generation:\n%s\nContext: Generation lifecycle. Why: Generation should complete without errors. Hint: Check script loading, resource creation, and signal emissions." % all_errors)
+				return
+		
+		if not generation_started and elapsed >= timeout:
+			fail_test("FAIL: Generation did not start within timeout. Context: Generation lifecycle. Why: Button click should trigger generation. Hint: Check _on_generate_map_pressed() method and signal connections.")
+			return
+		
+		# Wait additional frames for completion
 		await get_tree().process_frame
 		await get_tree().process_frame
-		await get_tree().process_frame  # Wait for generation
-		_check_for_errors("generate button")
+		await get_tree().process_frame
+		
+		# Verify final state: map data exists
+		if world_builder_ui.has("procedural_world_map"):
+			var pwm = world_builder_ui.get("procedural_world_map")
+			if pwm:
+				if not pwm.has("datasource") or pwm.get("datasource") == null:
+					fail_test("FAIL: Datasource not set after generation. Context: Post-generation state. Why: Generation should create and set datasource. Hint: Check _on_generate_map_pressed() implementation.")
+					return
+		
+		# Check for errors after generation
+		_check_for_errors("generate button - full lifecycle")
 		
 		# Test rapid clicks (should handle gracefully)
 		for i in range(5):
@@ -231,7 +302,7 @@ func test_step_1_generate_button() -> void:
 			await get_tree().process_frame
 		_check_for_errors("rapid generate button clicks")
 		
-		pass_test("Step 1: Generate button triggers map generation")
+		pass_test("Step 1: Generate button triggers map generation - full lifecycle verified")
 	else:
 		pass_test("Step 1: Generate button not found")
 
@@ -710,7 +781,10 @@ func test_step_8_world_name_input() -> void:
 		_check_for_errors("empty world name")
 		
 		# Test very long name
-		_simulate_text_input_safe(name_edit, "A" * 1000)
+		var long_name: String = ""
+		for i in range(1000):
+			long_name += "A"
+		_simulate_text_input_safe(name_edit, long_name)
 		await get_tree().process_frame
 		_check_for_errors("very long world name")
 		
@@ -745,7 +819,9 @@ func test_step_8_all_export_buttons() -> void:
 
 func test_navigation_next_button_all_steps() -> void:
 	"""Test Next button navigation through all 8 steps."""
-	if not world_builder_ui.has("current_step"):
+	# Try to get current_step property - use get() which returns null if property doesn't exist
+	var current_step_check = world_builder_ui.get("current_step")
+	if current_step_check == null:
 		pass_test("current_step not accessible")
 		return
 	
@@ -774,7 +850,9 @@ func test_navigation_next_button_all_steps() -> void:
 
 func test_navigation_back_button_all_steps() -> void:
 	"""Test Back button navigation backwards through all steps."""
-	if not world_builder_ui.has("current_step"):
+	# Try to get current_step property - use get() which returns null if property doesn't exist
+	var current_step_check = world_builder_ui.get("current_step")
+	if current_step_check == null:
 		pass_test("current_step not accessible")
 		return
 	
@@ -819,7 +897,8 @@ func test_navigation_step_buttons_direct_jump() -> void:
 			await get_tree().process_frame
 			_check_for_errors("step button %d" % i)
 			
-			if world_builder_ui.has("current_step"):
+			var current_step_check_inner = world_builder_ui.get("current_step")
+			if current_step_check_inner != null:
 				var current: int = world_builder_ui.get("current_step")
 				assert_true(current >= 0 and current < 8, "FAIL: Step button %d navigated to invalid step %d. Context: Direct step navigation. Why: Should navigate to valid step. Hint: Check WorldBuilderUI._on_step_button_pressed().")
 	
@@ -827,7 +906,9 @@ func test_navigation_step_buttons_direct_jump() -> void:
 
 func test_navigation_boundary_conditions() -> void:
 	"""Test navigation boundary conditions - can't go before 0 or after 7."""
-	if not world_builder_ui.has("current_step"):
+	# Try to get current_step property - use get() which returns null if property doesn't exist
+	var current_step_check = world_builder_ui.get("current_step")
+	if current_step_check == null:
 		pass_test("current_step not accessible")
 		return
 	
@@ -892,7 +973,9 @@ func test_rapid_slider_changes() -> void:
 
 func test_rapid_navigation() -> void:
 	"""Test rapid navigation between steps - should handle gracefully."""
-	if not world_builder_ui.has("current_step"):
+	# Try to get current_step property - use get() which returns null if property doesn't exist
+	var current_step_check = world_builder_ui.get("current_step")
+	if current_step_check == null:
 		pass_test("current_step not accessible")
 		return
 	
@@ -967,12 +1050,9 @@ func test_icon_toolbar_selection() -> void:
 		if world_builder_ui.has_method("_on_icon_toolbar_selected"):
 			var test_icon_ids: Array[String] = ["city", "dungeon", "town", "village", "castle", "ruin"]
 			for icon_id in test_icon_ids:
-				try:
-					world_builder_ui._on_icon_toolbar_selected(icon_id)
-					await get_tree().process_frame
-					_check_for_errors("icon toolbar selection: %s" % icon_id)
-				except:
-					interaction_errors.append("icon toolbar selection failed: %s" % icon_id)
+				world_builder_ui._on_icon_toolbar_selected(icon_id)
+				await get_tree().process_frame
+				_check_for_errors("icon toolbar selection: %s" % icon_id)
 		
 		pass_test("Icon toolbar selection tested")
 	else:
@@ -987,12 +1067,9 @@ func test_preview_click_events() -> void:
 		left_click.pressed = true
 		left_click.position = Vector2(100, 100)
 		
-		try:
-			world_builder_ui._on_preview_clicked(left_click)
-			await get_tree().process_frame
-			_check_for_errors("preview left click")
-		except:
-			interaction_errors.append("preview left click failed")
+		world_builder_ui._on_preview_clicked(left_click)
+		await get_tree().process_frame
+		_check_for_errors("preview left click")
 		
 		# Test right mouse button
 		var right_click := InputEventMouseButton.new()
@@ -1000,24 +1077,18 @@ func test_preview_click_events() -> void:
 		right_click.pressed = true
 		right_click.position = Vector2(200, 200)
 		
-		try:
-			world_builder_ui._on_preview_clicked(right_click)
-			await get_tree().process_frame
-			_check_for_errors("preview right click")
-		except:
-			interaction_errors.append("preview right click failed")
+		world_builder_ui._on_preview_clicked(right_click)
+		await get_tree().process_frame
+		_check_for_errors("preview right click")
 		
 		# Test mouse motion
 		var mouse_motion := InputEventMouseMotion.new()
 		mouse_motion.position = Vector2(150, 150)
 		mouse_motion.relative = Vector2(50, 50)
 		
-		try:
-			world_builder_ui._on_preview_clicked(mouse_motion)
-			await get_tree().process_frame
-			_check_for_errors("preview mouse motion")
-		except:
-			interaction_errors.append("preview mouse motion failed")
+		world_builder_ui._on_preview_clicked(mouse_motion)
+		await get_tree().process_frame
+		_check_for_errors("preview mouse motion")
 		
 		pass_test("Preview click events tested")
 	else:
@@ -1027,35 +1098,23 @@ func test_zoom_changes() -> void:
 	"""Test zoom changes - positive and negative deltas."""
 	if world_builder_ui.has_method("_on_zoom_changed"):
 		# Test zoom in
-		try:
-			world_builder_ui._on_zoom_changed(1.2)
-			await get_tree().process_frame
-			_check_for_errors("zoom in")
-		except:
-			interaction_errors.append("zoom in failed")
+		world_builder_ui._on_zoom_changed(1.2)
+		await get_tree().process_frame
+		_check_for_errors("zoom in")
 		
 		# Test zoom out
-		try:
-			world_builder_ui._on_zoom_changed(0.8)
-			await get_tree().process_frame
-			_check_for_errors("zoom out")
-		except:
-			interaction_errors.append("zoom out failed")
+		world_builder_ui._on_zoom_changed(0.8)
+		await get_tree().process_frame
+		_check_for_errors("zoom out")
 		
 		# Test extreme zoom values
-		try:
-			world_builder_ui._on_zoom_changed(10.0)
-			await get_tree().process_frame
-			_check_for_errors("extreme zoom in")
-		except:
-			interaction_errors.append("extreme zoom in failed")
+		world_builder_ui._on_zoom_changed(10.0)
+		await get_tree().process_frame
+		_check_for_errors("extreme zoom in")
 		
-		try:
-			world_builder_ui._on_zoom_changed(0.01)
-			await get_tree().process_frame
-			_check_for_errors("extreme zoom out")
-		except:
-			interaction_errors.append("extreme zoom out failed")
+		world_builder_ui._on_zoom_changed(0.01)
+		await get_tree().process_frame
+		_check_for_errors("extreme zoom out")
 		
 		pass_test("Zoom changes tested")
 	else:
@@ -1071,12 +1130,9 @@ func test_type_selection_dialog() -> void:
 		
 		var test_group: Array[String] = ["type1", "type2", "type3"]
 		
-		try:
-			world_builder_ui._on_type_selected("TestType", test_group, test_dialog)
-			await get_tree().process_frame
-			_check_for_errors("type selection")
-		except:
-			interaction_errors.append("type selection failed")
+		world_builder_ui._on_type_selected("TestType", test_group, test_dialog)
+		await get_tree().process_frame
+		_check_for_errors("type selection")
 		
 		test_dialog.queue_free()
 		pass_test("Type selection dialog tested")
@@ -1094,12 +1150,9 @@ func test_city_name_generation() -> void:
 		name_edit.text = ""
 		test_scene.add_child(name_edit)
 		
-		try:
-			world_builder_ui._on_generate_city_name(name_edit, 0)
-			await get_tree().process_frame
-			_check_for_errors("city name generation")
-		except:
-			interaction_errors.append("city name generation failed")
+		world_builder_ui._on_generate_city_name(name_edit, 0)
+		await get_tree().process_frame
+		_check_for_errors("city name generation")
 		
 		name_edit.queue_free()
 		pass_test("City name generation tested")
@@ -1121,12 +1174,9 @@ func test_civilization_selection() -> void:
 		name_edit.text = ""
 		test_scene.add_child(name_edit)
 		
-		try:
-			world_builder_ui._on_civilization_selected(0, 0, test_dialog, name_edit)
-			await get_tree().process_frame
-			_check_for_errors("civilization selection")
-		except:
-			interaction_errors.append("civilization selection failed")
+		world_builder_ui._on_civilization_selected(0, 0, test_dialog, name_edit)
+		await get_tree().process_frame
+		_check_for_errors("civilization selection")
 		
 		test_dialog.queue_free()
 		name_edit.queue_free()
@@ -1142,20 +1192,14 @@ func test_city_list_selection() -> void:
 	if world_builder_ui.has_method("_on_city_selected"):
 		# Test selecting various city indices
 		for i in range(5):
-			try:
-				world_builder_ui._on_city_selected(i)
-				await get_tree().process_frame
-				_check_for_errors("city selection %d" % i)
-			except:
-				interaction_errors.append("city selection failed for index %d" % i)
+			world_builder_ui._on_city_selected(i)
+			await get_tree().process_frame
+			_check_for_errors("city selection %d" % i)
 		
 		# Test invalid index
-		try:
-			world_builder_ui._on_city_selected(-1)
-			await get_tree().process_frame
-			_check_for_errors("city selection -1")
-		except:
-			interaction_errors.append("city selection failed for index -1")
+		world_builder_ui._on_city_selected(-1)
+		await get_tree().process_frame
+		_check_for_errors("city selection -1")
 		
 		pass_test("City list selection tested")
 	else:
@@ -1170,24 +1214,18 @@ func test_map_scroll_container_input() -> void:
 		mouse_button.pressed = true
 		mouse_button.position = Vector2(100, 100)
 		
-		try:
-			world_builder_ui._on_map_scroll_container_input(mouse_button)
-			await get_tree().process_frame
-			_check_for_errors("map scroll container mouse button")
-		except:
-			interaction_errors.append("map scroll container input failed")
+		world_builder_ui._on_map_scroll_container_input(mouse_button)
+		await get_tree().process_frame
+		_check_for_errors("map scroll container mouse button")
 		
 		# Test mouse motion
 		var mouse_motion := InputEventMouseMotion.new()
 		mouse_motion.position = Vector2(150, 150)
 		mouse_motion.relative = Vector2(50, 50)
 		
-		try:
-			world_builder_ui._on_map_scroll_container_input(mouse_motion)
-			await get_tree().process_frame
-			_check_for_errors("map scroll container mouse motion")
-		except:
-			interaction_errors.append("map scroll container mouse motion failed")
+		world_builder_ui._on_map_scroll_container_input(mouse_motion)
+		await get_tree().process_frame
+		_check_for_errors("map scroll container mouse motion")
 		
 		pass_test("Map scroll container input tested")
 	else:
@@ -1197,12 +1235,9 @@ func test_terrain_generated_signal() -> void:
 	"""Test terrain generated signal handler."""
 	if world_builder_ui.has_method("_on_terrain_generated"):
 		# Test with null terrain (should handle gracefully)
-		try:
-			world_builder_ui._on_terrain_generated(null)
-			await get_tree().process_frame
-			_check_for_errors("terrain generated null")
-		except:
-			interaction_errors.append("terrain generated null failed")
+		world_builder_ui._on_terrain_generated(null)
+		await get_tree().process_frame
+		_check_for_errors("terrain generated null")
 		
 		pass_test("Terrain generated signal tested")
 	else:
@@ -1211,12 +1246,9 @@ func test_terrain_generated_signal() -> void:
 func test_terrain_updated_signal() -> void:
 	"""Test terrain updated signal handler."""
 	if world_builder_ui.has_method("_on_terrain_updated"):
-		try:
-			world_builder_ui._on_terrain_updated()
-			await get_tree().process_frame
-			_check_for_errors("terrain updated")
-		except:
-			interaction_errors.append("terrain updated failed")
+		world_builder_ui._on_terrain_updated()
+		await get_tree().process_frame
+		_check_for_errors("terrain updated")
 		
 		pass_test("Terrain updated signal tested")
 	else:
@@ -1228,7 +1260,8 @@ func test_terrain_updated_signal() -> void:
 
 func _navigate_to_step(step: int) -> void:
 	"""Navigate to specific step."""
-	if world_builder_ui.has("current_step"):
+	var current_step_check = world_builder_ui.get("current_step")
+	if current_step_check != null:
 		world_builder_ui.set("current_step", step)
 		if world_builder_ui.has_method("_update_step_display"):
 			world_builder_ui._update_step_display()
@@ -1265,74 +1298,65 @@ func _find_control_recursive(parent: Node, search: String, use_pattern: bool) ->
 func _simulate_button_click_safe(button: Button) -> void:
 	"""Safely simulate button click with error handling."""
 	if button and is_instance_valid(button):
-		try:
-			button.pressed.emit()
-		except:
-			interaction_errors.append("Button click failed: %s" % button.name)
+		button.pressed.emit()
 
 func _simulate_text_input_safe(line_edit: LineEdit, text: String) -> void:
 	"""Safely simulate text input with error handling."""
 	if line_edit and is_instance_valid(line_edit):
-		try:
-			line_edit.text = text
-			line_edit.text_changed.emit(text)
-		except:
-			interaction_errors.append("Text input failed: %s" % line_edit.name)
+		line_edit.text = text
+		line_edit.text_changed.emit(text)
 
 func _simulate_slider_drag_safe(slider: HSlider, value: float) -> void:
 	"""Safely simulate slider drag with error handling."""
 	if slider and is_instance_valid(slider):
-		try:
-			slider.value = value
-			slider.value_changed.emit(value)
-		except:
-			interaction_errors.append("Slider drag failed: %s" % slider.name)
+		slider.value = value
+		slider.value_changed.emit(value)
 
 func _simulate_spinbox_change_safe(spinbox: SpinBox, value: float) -> void:
 	"""Safely simulate spinbox change with error handling."""
 	if spinbox and is_instance_valid(spinbox):
-		try:
-			spinbox.value = value
-			spinbox.value_changed.emit(value)
-		except:
-			interaction_errors.append("Spinbox change failed: %s" % spinbox.name)
+		spinbox.value = value
+		spinbox.value_changed.emit(value)
 
 func _simulate_option_selection_safe(option_button: OptionButton, index: int) -> void:
 	"""Safely simulate option selection with error handling."""
 	if option_button and is_instance_valid(option_button):
-		try:
-			if index >= 0 and index < option_button.get_item_count():
-				option_button.selected = index
-				option_button.item_selected.emit(index)
-		except:
-			interaction_errors.append("Option selection failed: %s" % option_button.name)
+		if index >= 0 and index < option_button.get_item_count():
+			option_button.selected = index
+			option_button.item_selected.emit(index)
 
 func _simulate_checkbox_toggle_safe(checkbox: CheckBox, pressed: bool) -> void:
 	"""Safely simulate checkbox toggle with error handling."""
 	if checkbox and is_instance_valid(checkbox):
-		try:
-			checkbox.button_pressed = pressed
-			checkbox.toggled.emit(pressed)
-		except:
-			interaction_errors.append("Checkbox toggle failed: %s" % checkbox.name)
+		checkbox.button_pressed = pressed
+		checkbox.toggled.emit(pressed)
 
 func _check_for_errors(context: String) -> void:
-	"""Check for errors in debug output and interaction_errors."""
+	"""Check for errors in interaction_errors, debug output, and error listener."""
+	# Check interaction errors
 	if interaction_errors.size() > 0:
 		var error_msg: String = "Errors during %s: %s" % [context, str(interaction_errors)]
 		push_error(error_msg)
 		interaction_errors.clear()
 	
-	# Check for parse errors or crashes in debug output
-	var debug_output = get_debug_output()
-	if debug_output:
-		if debug_output.has("errors"):
-			var errors: Array = debug_output["errors"]
-			if errors.size() > 0:
-				push_error("Debug errors during %s: %s" % [context, str(errors)])
-		
-		if debug_output.has("warnings"):
-			var warnings: Array = debug_output["warnings"]
-			# Log warnings but don't fail test
-			if warnings.size() > 0:
-				push_warning("Debug warnings during %s: %s" % [context, str(warnings)])
+	# Check error listener
+	if error_listener and error_listener.has_errors():
+		var all_errors: String = error_listener.get_all_errors()
+		var error_msg: String = "FAIL: Errors detected during %s:\n%s\nContext: Full lifecycle error detection. Why: Interactions should complete without errors. Hint: Check script compilation, resource loading, and signal emissions."
+		fail_test(error_msg % [context, all_errors])
+		error_listener.clear()
+		return
+	
+	# Check for missing expected signals
+	var missing_signals: Array[String] = error_listener.check_expected_signals() if error_listener else []
+	if missing_signals.size() > 0:
+		var error_msg: String = "FAIL: Missing expected signals during %s: %s\nContext: Signal tracking. Why: Expected signals should fire within timeout. Hint: Check signal connections and async operations."
+		fail_test(error_msg % [context, str(missing_signals)])
+		return
+	
+	# Check for active threads (potential leaks)
+	var active_threads: Array[Thread] = error_listener.check_threads_complete() if error_listener else []
+	if active_threads.size() > 0:
+		var error_msg: String = "FAIL: Active threads detected during %s: %d threads still running\nContext: Thread lifecycle. Why: Threads should complete or be cleaned up. Hint: Check thread.wait_to_finish() calls."
+		fail_test(error_msg % [context, active_threads.size()])
+		return
