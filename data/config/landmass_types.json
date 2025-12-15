@@ -1,0 +1,102 @@
+{
+  "landmass_types": {
+    "Continents": {
+      "type": "none",
+      "description": "Natural continent formation using noise patterns"
+    },
+    "Single Island": {
+      "type": "radial",
+      "center": [0.5, 0.5],
+      "radius": 0.35,
+      "invert": false,
+      "smooth_edges": true,
+      "smooth_radius": 0.1
+    },
+    "Island Chain": {
+      "type": "multi_radial",
+      "count": 4,
+      "radius": 0.25,
+      "position_range": [0.1, 0.9],
+      "smooth_edges": true,
+      "min_spacing": 0.2
+    },
+    "Archipelago": {
+      "type": "multi_radial",
+      "count": 12,
+      "radius": 0.15,
+      "position_range": [0.1, 0.9],
+      "smooth_edges": true,
+      "min_spacing": 0.15
+    },
+    "Pangea": {
+      "type": "radial",
+      "center": [0.5, 0.5],
+      "radius": 0.9,
+      "invert": true,
+      "smooth_edges": true,
+      "smooth_radius": 0.05
+    },
+    "Coastal": {
+      "type": "radial",
+      "center": [0.5, 0.5],
+      "radius": 0.7,
+      "invert": true,
+      "smooth_edges": true,
+      "smooth_radius": 0.1
+    },
+    "Fractal Coast": {
+      "type": "noise_mask",
+      "noise_type": "TYPE_PERLIN",
+      "frequency": 0.01,
+      "threshold": 0.5,
+      "invert": false,
+      "octaves": 4,
+      "lacunarity": 2.0,
+      "persistence": 0.5
+    },
+    "Voronoi Continents": {
+      "type": "voronoi",
+      "cell_count": 8,
+      "jitter": 0.5,
+      "threshold": 0.4,
+      "invert": false,
+      "smooth_edges": true
+    },
+    "Ring Archipelago": {
+      "type": "ring",
+      "center": [0.5, 0.5],
+      "inner_radius": 0.3,
+      "outer_radius": 0.5,
+      "island_count": 8,
+      "island_radius": 0.08,
+      "smooth_edges": true
+    },
+    "Peninsula": {
+      "type": "peninsula",
+      "base_center": [0.5, 0.8],
+      "base_radius": 0.4,
+      "peninsula_direction": [0.0, -1.0],
+      "peninsula_length": 0.3,
+      "peninsula_width": 0.15,
+      "smooth_edges": true
+    },
+    "Atoll": {
+      "type": "atoll",
+      "center": [0.5, 0.5],
+      "outer_radius": 0.4,
+      "inner_radius": 0.25,
+      "island_count": 12,
+      "island_radius": 0.05,
+      "smooth_edges": true
+    },
+    "Fjord Coast": {
+      "type": "fjord",
+      "coast_direction": [0.0, 1.0],
+      "fjord_count": 6,
+      "fjord_length": 0.3,
+      "fjord_width": 0.05,
+      "land_base_radius": 0.6,
+      "smooth_edges": true
+    }
+  }
+}

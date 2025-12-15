@@ -38,8 +38,15 @@ var biomes_data: Dictionary = {}
 ## Civilizations data
 var civilizations_data: Dictionary = {}
 
-## Fantasy archetypes data
+## Fantasy archetypes data - maps display name to file path
 var fantasy_archetypes: Dictionary = {}
+## List of available archetype display names
+var available_archetypes: Array[String] = []
+
+## Landmass type configurations loaded from JSON
+var landmass_configs: Dictionary = {}
+## List of available landmass type names
+var available_landmass_types: Array[String] = []
 
 ## Placed icons on 2D map
 var placed_icons: Array = []  # Array[IconNode] - using untyped for compatibility
@@ -83,7 +90,7 @@ const MAP_ICONS_PATH: String = "res://data/map_icons.json"
 const UI_CONFIG_PATH: String = "res://data/config/world_builder_ui.json"
 const BIOMES_PATH: String = "res://data/biomes.json"
 const CIVILIZATIONS_PATH: String = "res://data/civilizations.json"
-const FANTASY_ARCHETYPES_PATH: String = "res://data/fantasy_archetypes.json"
+const ARCHETYPES_DIR: String = "res://data/archetypes/"
 
 ## Control references
 var control_references: Dictionary = {}
@@ -93,17 +100,30 @@ var map_preview_texture: ImageTexture = ImageTexture.new()
 
 
 func _ready() -> void:
+	"""
+	Initialize World Builder UI.
+	
+	Custom MapMakerModule is the default and preferred 2D preview renderer.
+	ProceduralWorldMap is used only as graceful fallback on custom failure.
+	"""
 	MythosLogger.verbose("UI/WorldBuilder", "_ready() called")
 	_load_map_icons()
 	_load_biomes()
 	_load_civilizations()
 	_load_fantasy_archetypes()
+	_load_landmass_types()
 	_apply_theme()
 	_ensure_visibility()
 	_setup_navigation()
 	_setup_step_content()
 	_setup_buttons()
 	_setup_procedural_world_map_controls()
+	
+	# Hide ProceduralWorldMap by default - MapMakerModule is the primary renderer
+	if procedural_world_map != null:
+		procedural_world_map.visible = false
+		MythosLogger.debug("UI/WorldBuilder", "ProceduralWorldMap hidden by default (fallback only)")
+	
 	_update_step_display()
 	MythosLogger.info("UI/WorldBuilder", "Wizard-style UI ready")
 
@@ -173,11 +193,42 @@ func _load_civilizations() -> void:
 
 
 func _load_fantasy_archetypes() -> void:
-	"""Load fantasy archetypes configuration from JSON."""
-	MythosLogger.verbose("UI/WorldBuilder", "_load_fantasy_archetypes() called", {"path": FANTASY_ARCHETYPES_PATH})
-	var file: FileAccess = FileAccess.open(FANTASY_ARCHETYPES_PATH, FileAccess.READ)
+	"""Load list of available fantasy archetype files from directory."""
+	MythosLogger.verbose("UI/WorldBuilder", "_load_fantasy_archetypes() called", {"path": ARCHETYPES_DIR})
+	var dir: DirAccess = DirAccess.open(ARCHETYPES_DIR)
+	if dir == null:
+		MythosLogger.error("UI/WorldBuilder", "Failed to open archetypes directory: %s" % ARCHETYPES_DIR)
+		return
+	
+	available_archetypes.clear()
+	fantasy_archetypes.clear()
+	
+	dir.list_dir_begin()
+	var file_name: String = dir.get_next()
+	
+	while file_name != "":
+		if file_name.ends_with(".json"):
+			var file_path: String = ARCHETYPES_DIR + file_name
+			var arch_data: Dictionary = _load_archetype_file(file_path)
+			if not arch_data.is_empty():
+				var display_name: String = arch_data.get("name", file_name.get_basename().replace("_", " "))
+				available_archetypes.append(display_name)
+				fantasy_archetypes[display_name] = file_path
+		
+		file_name = dir.get_next()
+	
+	available_archetypes.sort()
+	var arch_count: int = available_archetypes.size()
+	MythosLogger.info("UI/WorldBuilder", "Loaded fantasy archetype definitions", {"count": arch_count})
+
+
+func _load_landmass_types() -> void:
+	"""Load landmass type configurations from JSON."""
+	const CONFIG_PATH: String = "res://data/config/landmass_types.json"
+	MythosLogger.verbose("UI/WorldBuilder", "_load_landmass_types() called", {"path": CONFIG_PATH})
+	var file: FileAccess = FileAccess.open(CONFIG_PATH, FileAccess.READ)
 	if file == null:
-		MythosLogger.error("UI/WorldBuilder", "Failed to load fantasy archetypes from %s" % FANTASY_ARCHETYPES_PATH)
+		MythosLogger.error("UI/WorldBuilder", "Failed to load landmass configs from " + CONFIG_PATH)
 		return
 	
 	var json_string: String = file.get_as_text()
@@ -186,12 +237,43 @@ func _load_fantasy_archetypes() -> void:
 	var json: JSON = JSON.new()
 	var parse_result: Error = json.parse(json_string)
 	if parse_result != OK:
-		MythosLogger.error("UI/WorldBuilder", "Failed to parse fantasy archetypes JSON: %s" % json.get_error_message())
+		MythosLogger.error("UI/WorldBuilder", "Failed to parse landmass configs JSON: " + json.get_error_message())
 		return
 	
-	fantasy_archetypes = json.data
-	var arch_count: int = fantasy_archetypes.size()
-	MythosLogger.info("UI/WorldBuilder", "Loaded fantasy archetype definitions", {"count": arch_count})
+	var data: Dictionary = json.data
+	landmass_configs = data.get("landmass_types", {})
+	available_landmass_types = landmass_configs.keys()
+	available_landmass_types.sort()
+	MythosLogger.info("UI/WorldBuilder", "Loaded landmass type configurations", {"count": available_landmass_types.size()})
+
+
+func _load_archetype_file(file_path: String) -> Dictionary:
+	"""Load a single archetype file and return its data."""
+	var file: FileAccess = FileAccess.open(file_path, FileAccess.READ)
+	if file == null:
+		MythosLogger.error("UI/WorldBuilder", "Failed to load archetype from %s" % file_path)
+		return {}
+	
+	var json_string: String = file.get_as_text()
+	file.close()
+	
+	var json: JSON = JSON.new()
+	var parse_result: Error = json.parse(json_string)
+	if parse_result != OK:
+		MythosLogger.error("UI/WorldBuilder", "Failed to parse archetype JSON from %s: %s" % [file_path, json.get_error_message()])
+		return {}
+	
+	return json.data
+
+
+func _load_archetype_by_name(archetype_name: String) -> Dictionary:
+	"""Load a specific archetype by its display name."""
+	var file_path: String = fantasy_archetypes.get(archetype_name, "")
+	if file_path.is_empty():
+		MythosLogger.error("UI/WorldBuilder", "Archetype not found: %s" % archetype_name)
+		return {}
+	
+	return _load_archetype_file(file_path)
 
 
 func _apply_theme() -> void:
@@ -553,18 +635,31 @@ func _update_map_grid() -> void:
 
 
 func update_camera_for_step(step: int) -> void:
-	"""Update camera projection and position based on current step, and toggle 2D/3D views."""
+	"""
+	Update camera projection and position based on current step, and toggle 2D/3D views.
+	
+	Custom MapMakerModule is the default and preferred 2D preview renderer.
+	ProceduralWorldMap is used only as graceful fallback on custom failure.
+	"""
 	print("DEBUG: update_camera_for_step() called with step:", step)
 	match step:
 		0, 1:  # Steps 1-2: Show 2D map, hide 3D viewport
-			# Show 2D map texture (but hide if MapMakerModule is active)
-			if map_2d_texture != null:
-				if map_maker_module != null:
-					print("DEBUG: MapMakerModule exists, hiding map_2d_texture placeholder")
+			# Custom MapMakerModule is the default renderer - make it visible if it exists
+			if map_maker_module != null:
+				print("DEBUG: MapMakerModule exists, showing custom renderer")
+				map_maker_module.visible = true
+				# Hide placeholder and fallback systems
+				if map_2d_texture != null:
 					map_2d_texture.visible = false
-				else:
-					print("DEBUG: MapMakerModule not yet created, showing map_2d_texture placeholder")
-					map_2d_texture.visible = true
+				if procedural_world_map != null:
+					procedural_world_map.visible = false
+			else:
+				# MapMakerModule not yet initialized - hide everything until it's ready
+				print("DEBUG: MapMakerModule not yet created, hiding placeholders")
+				if map_2d_texture != null:
+					map_2d_texture.visible = false
+				if procedural_world_map != null:
+					procedural_world_map.visible = false
 			
 			# Hide 3D terrain viewport (prevents rendering)
 			if terrain_3d_view != null:
@@ -676,16 +771,16 @@ func _create_step_map_gen_editor(parent: VBoxContainer) -> void:
 	
 	var style_dropdown: OptionButton = OptionButton.new()
 	style_dropdown.name = "style"
-	for style_name: String in fantasy_archetypes.keys():
+	for style_name: String in available_archetypes:
 		style_dropdown.add_item(style_name)
 	style_dropdown.selected = 0
 	style_dropdown.item_selected.connect(_on_fantasy_style_selected)
 	container.add_child(style_dropdown)
 	control_references["Map Gen/style"] = style_dropdown
-	step_data["Map Gen"]["style"] = fantasy_archetypes.keys()[0] if fantasy_archetypes.size() > 0 else ""
+	step_data["Map Gen"]["style"] = available_archetypes[0] if available_archetypes.size() > 0 else ""
 	
 	# Initialize with first style's recommendations
-	if fantasy_archetypes.size() > 0:
+	if available_archetypes.size() > 0:
 		_on_fantasy_style_selected(0)
 	
 	# Size dropdown
@@ -708,21 +803,36 @@ func _create_step_map_gen_editor(parent: VBoxContainer) -> void:
 	
 	# ProceduralWorldMap will handle display automatically - no placeholder needed
 	
-	# Landmass dropdown
+	# Landmass dropdown (dynamically loaded from JSON)
 	var landmass_label: Label = Label.new()
 	landmass_label.text = "Landmass Type:"
 	container.add_child(landmass_label)
 	
 	var landmass_dropdown: OptionButton = OptionButton.new()
 	landmass_dropdown.name = "landmass"
-	var landmass_types: Array[String] = ["Continents", "Island Chain", "Single Island", "Archipelago", "Pangea", "Coastal"]
-	for landmass: String in landmass_types:
-		landmass_dropdown.add_item(landmass)
+	# Load from JSON config (fallback to hard-coded if not loaded)
+	if available_landmass_types.is_empty():
+		var default_types: Array[String] = ["Continents", "Island Chain", "Single Island", "Archipelago", "Pangea", "Coastal"]
+		for landmass: String in default_types:
+			landmass_dropdown.add_item(landmass)
+	else:
+		for landmass: String in available_landmass_types:
+			landmass_dropdown.add_item(landmass)
 	landmass_dropdown.selected = 0
 	landmass_dropdown.item_selected.connect(_on_landmass_selected)
 	container.add_child(landmass_dropdown)
 	control_references["Map Gen/landmass"] = landmass_dropdown
-	step_data["Map Gen"]["landmass"] = "Continents"
+	step_data["Map Gen"]["landmass"] = available_landmass_types[0] if not available_landmass_types.is_empty() else "Continents"
+	
+	# Container for landmass-specific sub-controls (will be populated dynamically)
+	var landmass_params_container: VBoxContainer = VBoxContainer.new()
+	landmass_params_container.name = "LandmassParamsContainer"
+	landmass_params_container.visible = false
+	container.add_child(landmass_params_container)
+	control_references["Map Gen/landmass_params"] = landmass_params_container
+	
+	# Initialize sub-controls for default landmass
+	_update_landmass_sub_controls("Continents")
 	
 	# Generate button
 	var generate_button: Button = Button.new()
@@ -1463,7 +1573,8 @@ func _initialize_map_maker_module() -> void:
 		print("DEBUG: map_2d_texture visible after:", map_2d_texture.visible)
 	
 	# Create MapMakerModule instance using load() at runtime
-	# Note: MapMakerModule is optional - ProceduralWorldMap is the primary system
+	# Custom MapMakerModule is the default and preferred 2D preview renderer.
+	# ProceduralWorldMap is used only as graceful fallback on custom failure.
 	var module_script = load("res://ui/world_builder/MapMakerModule.gd")
 	if module_script != null and module_script is GDScript:
 		# Check if script can be instantiated (no parse errors)
@@ -1784,11 +1895,13 @@ func _on_fantasy_style_selected(index: int) -> void:
 	var rec_land: String = arch.get("default_landmass", "Continents")
 	var landmass_dropdown: OptionButton = control_references.get("Map Gen/landmass") as OptionButton
 	if landmass_dropdown != null:
-		var landmass_types: Array[String] = ["Continents", "Island Chain", "Single Island", "Archipelago", "Pangea", "Coastal"]
+		# Use available_landmass_types if loaded, otherwise fallback
+		var landmass_types: Array[String] = available_landmass_types if not available_landmass_types.is_empty() else ["Continents", "Island Chain", "Single Island", "Archipelago", "Pangea", "Coastal"]
 		var land_index: int = landmass_types.find(rec_land)
 		if land_index >= 0:
 			landmass_dropdown.selected = land_index
 			step_data["Map Gen"]["landmass"] = rec_land
+			_update_landmass_sub_controls(rec_land)
 	
 	# Set tooltip with description
 	style_dropdown.tooltip_text = arch.get("description", "")
@@ -1822,10 +1935,142 @@ func _on_landmass_selected(index: int) -> void:
 	
 	var landmass: String = landmass_dropdown.get_item_text(index)
 	step_data["Map Gen"]["landmass"] = landmass
+	
+	# Update sub-controls for selected landmass type
+	_update_landmass_sub_controls(landmass)
+
+
+func _update_landmass_sub_controls(landmass_type: String) -> void:
+	"""Update sub-controls based on selected landmass type."""
+	var params_container: VBoxContainer = control_references.get("Map Gen/landmass_params") as VBoxContainer
+	if params_container == null:
+		return
+	
+	# Clear existing sub-controls
+	for child: Node in params_container.get_children():
+		child.queue_free()
+	
+	# Get config for this landmass type
+	if not landmass_configs.has(landmass_type):
+		params_container.visible = false
+		return
+	
+	var config: Dictionary = landmass_configs[landmass_type]
+	var mask_type: String = config.get("type", "none")
+	
+	# Hide if no mask or no configurable parameters
+	if mask_type == "none":
+		params_container.visible = false
+		return
+	
+	params_container.visible = true
+	
+	# Add sub-controls based on mask type
+	match mask_type:
+		"radial":
+			_create_landmass_slider(params_container, "Radius", "landmass_radius", 0.1, 1.0, config.get("radius", 0.35), 0.01)
+			_create_landmass_slider(params_container, "Center X", "landmass_center_x", 0.0, 1.0, config.get("center", [0.5, 0.5])[0], 0.01)
+			_create_landmass_slider(params_container, "Center Y", "landmass_center_y", 0.0, 1.0, config.get("center", [0.5, 0.5])[1], 0.01)
+		"multi_radial":
+			_create_landmass_spinbox(params_container, "Island Count", "landmass_count", 1, 50, config.get("count", 4))
+			_create_landmass_slider(params_container, "Island Radius", "landmass_radius", 0.05, 0.5, config.get("radius", 0.25), 0.01)
+		"noise_mask":
+			_create_landmass_slider(params_container, "Frequency", "landmass_frequency", 0.001, 0.1, config.get("frequency", 0.01), 0.001)
+			_create_landmass_slider(params_container, "Threshold", "landmass_threshold", 0.0, 1.0, config.get("threshold", 0.5), 0.01)
+		"voronoi":
+			_create_landmass_spinbox(params_container, "Cell Count", "landmass_cell_count", 2, 50, config.get("cell_count", 8))
+			_create_landmass_slider(params_container, "Threshold", "landmass_threshold", 0.0, 1.0, config.get("threshold", 0.4), 0.01)
+		"ring":
+			_create_landmass_slider(params_container, "Inner Radius", "landmass_inner_radius", 0.1, 0.8, config.get("inner_radius", 0.3), 0.01)
+			_create_landmass_slider(params_container, "Outer Radius", "landmass_outer_radius", 0.2, 1.0, config.get("outer_radius", 0.5), 0.01)
+			_create_landmass_spinbox(params_container, "Island Count", "landmass_island_count", 3, 30, config.get("island_count", 8))
+		"peninsula":
+			_create_landmass_slider(params_container, "Base Radius", "landmass_base_radius", 0.2, 0.8, config.get("base_radius", 0.4), 0.01)
+			_create_landmass_slider(params_container, "Length", "landmass_length", 0.1, 0.5, config.get("peninsula_length", 0.3), 0.01)
+			_create_landmass_slider(params_container, "Width", "landmass_width", 0.05, 0.3, config.get("peninsula_width", 0.15), 0.01)
+		"atoll":
+			_create_landmass_slider(params_container, "Outer Radius", "landmass_outer_radius", 0.2, 0.8, config.get("outer_radius", 0.4), 0.01)
+			_create_landmass_slider(params_container, "Inner Radius", "landmass_inner_radius", 0.1, 0.6, config.get("inner_radius", 0.25), 0.01)
+			_create_landmass_spinbox(params_container, "Island Count", "landmass_island_count", 3, 30, config.get("island_count", 12))
+		"fjord":
+			_create_landmass_spinbox(params_container, "Fjord Count", "landmass_fjord_count", 2, 20, config.get("fjord_count", 6))
+			_create_landmass_slider(params_container, "Fjord Length", "landmass_fjord_length", 0.1, 0.5, config.get("fjord_length", 0.3), 0.01)
+			_create_landmass_slider(params_container, "Land Base Radius", "landmass_base_radius", 0.3, 0.9, config.get("land_base_radius", 0.6), 0.01)
+
+
+func _create_landmass_slider(parent: VBoxContainer, label_text: String, param_name: String, min_val: float, max_val: float, default_val: float, step: float) -> void:
+	"""Create a slider control for landmass parameter."""
+	var container: HBoxContainer = HBoxContainer.new()
+	
+	var label: Label = Label.new()
+	label.text = label_text + ":"
+	label.custom_minimum_size = Vector2(120, 0)
+	container.add_child(label)
+	
+	var slider: HSlider = HSlider.new()
+	slider.name = param_name
+	slider.min_value = min_val
+	slider.max_value = max_val
+	slider.step = step
+	slider.value = default_val
+	slider.value_changed.connect(func(v): _on_landmass_param_changed(param_name, v))
+	container.add_child(slider)
+	
+	var value_label: Label = Label.new()
+	value_label.name = param_name + "_value"
+	value_label.custom_minimum_size = Vector2(60, 0)
+	value_label.text = "%.2f" % default_val
+	container.add_child(value_label)
+	
+	parent.add_child(container)
+	control_references["Map Gen/" + param_name] = slider
+	control_references["Map Gen/" + param_name + "_value"] = value_label
+	step_data["Map Gen"][param_name] = default_val
+
+
+func _create_landmass_spinbox(parent: VBoxContainer, label_text: String, param_name: String, min_val: int, max_val: int, default_val: int) -> void:
+	"""Create a spinbox control for landmass parameter."""
+	var container: HBoxContainer = HBoxContainer.new()
+	
+	var label: Label = Label.new()
+	label.text = label_text + ":"
+	label.custom_minimum_size = Vector2(120, 0)
+	container.add_child(label)
+	
+	var spinbox: SpinBox = SpinBox.new()
+	spinbox.name = param_name
+	spinbox.min_value = min_val
+	spinbox.max_value = max_val
+	spinbox.value = default_val
+	spinbox.value_changed.connect(func(v): _on_landmass_param_changed(param_name, int(v)))
+	container.add_child(spinbox)
+	
+	parent.add_child(container)
+	control_references["Map Gen/" + param_name] = spinbox
+	step_data["Map Gen"][param_name] = default_val
+
+
+func _on_landmass_param_changed(param_name: String, value: Variant) -> void:
+	"""Handle landmass parameter change."""
+	step_data["Map Gen"][param_name] = value
+	
+	# Update value label if it exists
+	var value_label: Label = control_references.get("Map Gen/" + param_name + "_value") as Label
+	if value_label != null:
+		if value is float:
+			value_label.text = "%.2f" % value
+		else:
+			value_label.text = str(value)
 
 
 func _on_generate_map_pressed() -> void:
-	"""Generate procedural 2D map using ProceduralWorldMap addon with archetype-based parameters."""
+	"""
+	Generate procedural 2D map using custom MapMakerModule as default renderer.
+	
+	Custom MapMakerModule is the default and preferred 2D preview renderer.
+	ProceduralWorldMap is used only as graceful fallback on custom failure.
+	This ensures visual consistency while maintaining addon compatibility for future Terrain3D seeding.
+	"""
 	var seed_value: int = step_data.get("Map Gen", {}).get("seed", 12345)
 	var style_name: String = step_data.get("Map Gen", {}).get("style", "")
 	var map_width: int = step_data.get("Map Gen", {}).get("width", 1024)
@@ -1836,42 +2081,146 @@ func _on_generate_map_pressed() -> void:
 		MythosLogger.warn("UI/WorldBuilder", "Invalid fantasy style selected")
 		return
 	
-	var arch: Dictionary = fantasy_archetypes[style_name]
-	
-	# Create custom datasource
-	var datasource_script = load("res://data/ProceduralWorldDatasource.gd")
-	var ds = datasource_script.new()  # ProceduralWorldDatasource - type hint removed for addon compatibility
-	ds.configure_from_archetype(arch, landmass, seed_value)
-	
-	# Use the ProceduralWorldMap node already in the scene
-	if procedural_world_map == null:
-		MythosLogger.error("UI/WorldBuilder", "ProceduralWorldMap node not found in scene")
+	var arch: Dictionary = _load_archetype_by_name(style_name)
+	if arch.is_empty():
+		MythosLogger.warn("UI/WorldBuilder", "Failed to load archetype: %s" % style_name)
 		return
 	
-	# Configure ProceduralWorldMap
-	procedural_world_map.datasource = ds
-	procedural_world_map.camera_size = Vector2i(map_width, map_height)
-	procedural_world_map.coordinates = Vector2.ZERO
-	procedural_world_map.zoom = 1.0
-	procedural_world_map.incremental_quality = false  # Generate immediately
+	# Collect all generation parameters for MapMakerModule
+	var generation_params: Dictionary = {
+		"seed": seed_value,
+		"width": map_width,
+		"height": map_height,
+		"landmass_type": landmass,
+		"noise_frequency": step_data.get("Map Gen", {}).get("noise_frequency", 0.0005),
+		"noise_octaves": step_data.get("Map Gen", {}).get("noise_octaves", 4),
+		"noise_persistence": step_data.get("Map Gen", {}).get("noise_persistence", 0.5),
+		"noise_lacunarity": step_data.get("Map Gen", {}).get("noise_lacunarity", 2.0),
+		"sea_level": step_data.get("Map Gen", {}).get("sea_level", 0.4),
+		"erosion_enabled": step_data.get("Map Gen", {}).get("erosion_enabled", true)
+	}
 	
-	# Connect to update signal if not already connected
-	if not procedural_world_map.update.is_connected(_on_map_generation_complete):
-		procedural_world_map.update.connect(_on_map_generation_complete)
+	# Add landmass-specific parameters if they exist
+	var landmass_params: Array[String] = ["landmass_radius", "landmass_center_x", "landmass_center_y", "landmass_count", 
+		"landmass_frequency", "landmass_threshold", "landmass_cell_count", "landmass_inner_radius", "landmass_outer_radius",
+		"landmass_island_count", "landmass_base_radius", "landmass_length", "landmass_width", "landmass_fjord_count", "landmass_fjord_length"]
+	for param: String in landmass_params:
+		if step_data.get("Map Gen", {}).has(param):
+			generation_params[param] = step_data["Map Gen"][param]
 	
-	# Trigger generation
-	procedural_world_map.refresh()
+	# Map noise type from archetype if available
+	if arch.has("noise_type"):
+		var noise_type_str: String = arch.get("noise_type", "TYPE_PERLIN")
+		match noise_type_str:
+			"TYPE_SIMPLEX":
+				generation_params["noise_type"] = FastNoiseLite.TYPE_SIMPLEX
+			"TYPE_SIMPLEX_SMOOTH":
+				generation_params["noise_type"] = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+			"TYPE_PERLIN":
+				generation_params["noise_type"] = FastNoiseLite.TYPE_PERLIN
+			"TYPE_VALUE":
+				generation_params["noise_type"] = FastNoiseLite.TYPE_VALUE
+			"TYPE_CELLULAR":
+				generation_params["noise_type"] = FastNoiseLite.TYPE_CELLULAR
+			_:
+				generation_params["noise_type"] = FastNoiseLite.TYPE_PERLIN
 	
-	# Store datasource reference for later use
-	step_data["Map Gen"]["datasource"] = ds
+	# Ensure MapMakerModule is initialized
+	if map_maker_module == null:
+		_initialize_map_maker_module()
 	
-	MythosLogger.info("UI/WorldBuilder", "Started procedural map generation", {"style": style_name, "landmass": landmass, "size": str(map_width) + "x" + str(map_height)})
+	# Try custom MapMakerModule regeneration first (default path)
+	var custom_success: bool = false
+	if map_maker_module != null and map_maker_module.has_method("regenerate_map"):
+		MythosLogger.info("UI/WorldBuilder", "Using custom MapMakerModule renderer for map generation")
+		custom_success = map_maker_module.regenerate_map(generation_params)
+		
+		if custom_success:
+			# Extract images from MapMakerModule's world_map_data
+			var world_map_data = map_maker_module.get_world_map_data()
+			if world_map_data != null and world_map_data.heightmap_image != null:
+				# Store images in step_data for later use (baking to 3D, etc.)
+				step_data["Map Gen"]["heightmap_image"] = world_map_data.heightmap_image.duplicate()
+				if world_map_data.biome_preview_image != null:
+					step_data["Map Gen"]["biome_image"] = world_map_data.biome_preview_image.duplicate()
+				else:
+					# Fallback: create biome image from heightmap if preview not available
+					step_data["Map Gen"]["biome_image"] = _create_biome_image_from_heightmap(
+						world_map_data.heightmap_image, map_width, map_height, arch
+					)
+				
+				# Ensure MapMakerModule viewport is visible
+				if map_maker_module.visible == false:
+					map_maker_module.visible = true
+				
+				# Hide ProceduralWorldMap (fallback system)
+				if procedural_world_map != null:
+					procedural_world_map.visible = false
+				
+				MythosLogger.info("UI/WorldBuilder", "Custom map generation complete - images stored, MapMakerModule displays automatically", {
+					"style": style_name,
+					"landmass": landmass,
+					"size": str(map_width) + "x" + str(map_height),
+					"seed": seed_value
+				})
+				return
+	
+	# Fallback to ProceduralWorldMap if custom generation failed
+	if not custom_success:
+		MythosLogger.warn("UI/WorldBuilder", "Custom map generation failed, falling back to ProceduralWorldMap addon")
+		
+		# Ensure ProceduralWorldMap node exists
+		if procedural_world_map == null:
+			MythosLogger.error("UI/WorldBuilder", "ProceduralWorldMap node not found in scene - cannot use fallback")
+			return
+		
+		# Create custom datasource for ProceduralWorldMap
+		var datasource_script = load("res://data/ProceduralWorldDatasource.gd")
+		var ds = datasource_script.new()  # ProceduralWorldDatasource - type hint removed for addon compatibility
+		ds.configure_from_archetype(arch, landmass, seed_value)
+		
+		# Configure ProceduralWorldMap
+		procedural_world_map.datasource = ds
+		procedural_world_map.camera_size = Vector2i(map_width, map_height)
+		procedural_world_map.coordinates = Vector2.ZERO
+		procedural_world_map.zoom = 1.0
+		procedural_world_map.incremental_quality = false  # Generate immediately
+		
+		# Connect to update signal if not already connected
+		if not procedural_world_map.update.is_connected(_on_map_generation_complete_fallback):
+			procedural_world_map.update.connect(_on_map_generation_complete_fallback)
+		
+		# Make ProceduralWorldMap visible temporarily for fallback
+		procedural_world_map.visible = true
+		
+		# Hide MapMakerModule if it exists (fallback mode)
+		if map_maker_module != null:
+			map_maker_module.visible = false
+		
+		# Trigger generation - ProceduralWorldMap will handle display automatically
+		procedural_world_map.refresh()
+		
+		# Store datasource reference for later use
+		step_data["Map Gen"]["datasource"] = ds
+		
+		MythosLogger.info("UI/WorldBuilder", "Started ProceduralWorldMap fallback generation", {
+			"style": style_name,
+			"landmass": landmass,
+			"size": str(map_width) + "x" + str(map_height),
+			"seed": seed_value
+		})
 
 
-func _on_map_generation_complete() -> void:
-	"""Handle map generation completion - extract images and update preview."""
+func _on_map_generation_complete_fallback() -> void:
+	"""
+	Handle ProceduralWorldMap fallback generation completion - extract images for storage.
+	
+	This is only called when using ProceduralWorldMap as fallback renderer.
+	Custom MapMakerModule handles its own completion internally.
+	"""
 	var ds = step_data.get("Map Gen", {}).get("datasource", null)  # ProceduralWorldDatasource - type hint removed
 	if ds == null:
+		MythosLogger.warn("UI/WorldBuilder", "Datasource not found in _on_map_generation_complete_fallback")
 		return
 	
 	var map_width: int = step_data.get("Map Gen", {}).get("width", 1024)
@@ -1888,40 +2237,61 @@ func _on_map_generation_complete() -> void:
 	if biome_img == null:
 		MythosLogger.warn("UI/WorldBuilder", "Biome image not available from datasource")
 		# Fallback: create a simple biome image from height
-		biome_img = Image.create(map_width, map_height, false, Image.FORMAT_RGB8)
-		var arch: Dictionary = fantasy_archetypes.get(step_data.get("Map Gen", {}).get("style", ""), {})
-		# Use backward-compatible color lookup
-		var colors: Dictionary
-		if arch.has("biomes"):
-			colors = arch["biomes"].get("colors", arch.get("biome_colors", {}))
-		else:
-			colors = arch.get("biome_colors", {})
-		
-		for y: int in map_height:
-			for x: int in map_width:
-				var h: float = height_img.get_pixel(x, y).r
-				var col: Color
-				if h < 0.35:
-					col = Color(colors.get("water", "#2a6d9e"))
-				elif h < 0.38:
-					col = Color(colors.get("beach", "#d4b56a"))
-				elif h < 0.5:
-					col = Color(colors.get("grass", "#3d8c40"))
-				elif h < 0.65:
-					col = Color(colors.get("forest", "#2d5a3d"))
-				elif h < 0.8:
-					col = Color(colors.get("hill", "#8b7355"))
-				elif h < 0.95:
-					col = Color(colors.get("mountain", "#c0c0c0"))
-				else:
-					col = Color(colors.get("snow", "#ffffff"))
-				biome_img.set_pixel(x, y, col)
+		var style_name: String = step_data.get("Map Gen", {}).get("style", "")
+		var arch: Dictionary = _load_archetype_by_name(style_name) if not style_name.is_empty() else {}
+		biome_img = _create_biome_image_from_heightmap(height_img, map_width, map_height, arch)
 	
 	# Store images in step_data for later use (baking to 3D, etc.)
 	step_data["Map Gen"]["heightmap_image"] = height_img
 	step_data["Map Gen"]["biome_image"] = biome_img
 	
-	MythosLogger.info("UI/WorldBuilder", "Map generation complete - preview updated via ProceduralWorldMap")
+	# ProceduralWorldMap handles its own display automatically via shader material
+	# Ensure it's visible - the map should already be rendering from the refresh() call
+	if procedural_world_map != null:
+		procedural_world_map.visible = true
+		MythosLogger.debug("UI/WorldBuilder", "ProceduralWorldMap fallback display confirmed", {
+			"visible": procedural_world_map.visible,
+			"has_material": procedural_world_map.material != null,
+			"camera_size": procedural_world_map.camera_size
+		})
+	else:
+		MythosLogger.warn("UI/WorldBuilder", "ProceduralWorldMap node not found - display may not update")
+	
+	MythosLogger.info("UI/WorldBuilder", "ProceduralWorldMap fallback generation complete - images stored")
+
+
+func _create_biome_image_from_heightmap(height_img: Image, map_width: int, map_height: int, arch: Dictionary) -> Image:
+	"""Create a biome image from heightmap using archetype colors."""
+	var biome_img: Image = Image.create(map_width, map_height, false, Image.FORMAT_RGB8)
+	
+	# Use backward-compatible color lookup
+	var colors: Dictionary
+	if arch.has("biomes"):
+		colors = arch["biomes"].get("colors", arch.get("biome_colors", {}))
+	else:
+		colors = arch.get("biome_colors", {})
+	
+	for y: int in map_height:
+		for x: int in map_width:
+			var h: float = height_img.get_pixel(x, y).r
+			var col: Color
+			if h < 0.35:
+				col = Color(colors.get("water", "#2a6d9e"))
+			elif h < 0.38:
+				col = Color(colors.get("beach", "#d4b56a"))
+			elif h < 0.5:
+				col = Color(colors.get("grass", "#3d8c40"))
+			elif h < 0.65:
+				col = Color(colors.get("forest", "#2d5a3d"))
+			elif h < 0.8:
+				col = Color(colors.get("hill", "#8b7355"))
+			elif h < 0.95:
+				col = Color(colors.get("mountain", "#c0c0c0"))
+			else:
+				col = Color(colors.get("snow", "#ffffff"))
+			biome_img.set_pixel(x, y, col)
+	
+	return biome_img
 
 
 func _on_bake_to_3d_pressed() -> void:
@@ -2129,8 +2499,13 @@ func _update_map_preview_placeholder(width: int, height: int) -> void:
 
 
 func _update_2d_map_preview(height_img: Image, biome_img: Image, width: int, height: int) -> void:
-	"""Update the 2D map preview with generated terrain rendered in viewport at native pixel size."""
+	"""Update the 2D map preview with generated terrain rendered in viewport at native pixel size.
+	
+	NOTE: This function is for legacy viewport-based display. ProceduralWorldMap handles its own display
+	automatically, so this function is only used if the legacy system is initialized.
+	"""
 	if map_2d_viewport == null or map_2d_texture == null:
+		# Legacy system not initialized - ProceduralWorldMap handles display
 		return
 	
 	var map_root: Node2D = map_2d_viewport.get_node_or_null("MapRoot")

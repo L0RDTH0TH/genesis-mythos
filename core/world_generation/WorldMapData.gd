@@ -41,6 +41,9 @@ class_name WorldMapData
 @export var biome_temperature_noise_frequency: float = 0.002
 @export var biome_moisture_noise_frequency: float = 0.002
 
+## Landmass type (Continents, Single Island, etc.)
+@export var landmass_type: String = "Continents"
+
 ## Markers array (Array of Dictionary: {position: Vector2, icon_type: String, label: String, note: String})
 @export var markers: Array[Dictionary] = []
 

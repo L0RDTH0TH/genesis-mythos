@@ -442,6 +442,172 @@ func generate_map() -> void:
 	print("DEBUG: MapMakerModule: Map generation complete")
 
 
+func regenerate_map(params: Dictionary) -> bool:
+	"""
+	Regenerate map with new parameters from dictionary.
+	
+	Custom MapMakerModule is the default and preferred 2D preview renderer.
+	This method reconfigures and regenerates the map with provided parameters.
+	
+	Args:
+		params: Dictionary containing generation parameters:
+			- seed (int): Generation seed
+			- width (int): Map width
+			- height (int): Map height
+			- noise_frequency (float): Noise frequency
+			- noise_octaves (int): Noise octaves
+			- noise_persistence (float): Noise persistence
+			- noise_lacunarity (float): Noise lacunarity
+			- sea_level (float): Sea level (0.0-1.0)
+			- erosion_enabled (bool): Enable erosion
+			- noise_type (int, optional): FastNoiseLite noise type
+	
+	Returns:
+		bool: True if regeneration succeeded, False on failure
+	"""
+	MythosLogger.info("UI/MapMakerModule", "regenerate_map() called", {"params_keys": params.keys()})
+	
+	# Validate required parameters
+	if not params.has("seed") or not params.has("width") or not params.has("height"):
+		MythosLogger.error("UI/MapMakerModule", "regenerate_map() missing required parameters (seed, width, height)")
+		return false
+	
+	# Initialize or update world_map_data
+	if world_map_data == null:
+		world_map_data = WorldMapData.new()
+		is_initialized = false
+	
+	# Update basic parameters
+	world_map_data.seed = params.get("seed", world_map_data.seed)
+	world_map_data.world_width = params.get("width", world_map_data.world_width)
+	world_map_data.world_height = params.get("height", world_map_data.world_height)
+	world_map_data.landmass_type = params.get("landmass_type", world_map_data.landmass_type)
+	
+	# Update noise parameters
+	world_map_data.noise_frequency = params.get("noise_frequency", world_map_data.noise_frequency)
+	world_map_data.noise_octaves = params.get("noise_octaves", world_map_data.noise_octaves)
+	world_map_data.noise_persistence = params.get("noise_persistence", world_map_data.noise_persistence)
+	world_map_data.noise_lacunarity = params.get("noise_lacunarity", world_map_data.noise_lacunarity)
+	world_map_data.sea_level = params.get("sea_level", world_map_data.sea_level)
+	world_map_data.erosion_enabled = params.get("erosion_enabled", world_map_data.erosion_enabled)
+	
+	if params.has("noise_type"):
+		world_map_data.noise_type = params.get("noise_type", world_map_data.noise_type)
+	
+	# Check if heightmap needs to be recreated (size changed or not initialized)
+	var map_size_x: int = max(512, _next_power_of_2(int(world_map_data.world_width)))
+	var map_size_y: int = max(512, _next_power_of_2(int(world_map_data.world_height)))
+	var needs_recreate: bool = false
+	
+	if not is_initialized or world_map_data.heightmap_image == null:
+		needs_recreate = true
+	else:
+		# Check if size changed
+		var existing_size: Vector2i = world_map_data.heightmap_image.get_size()
+		if existing_size.x != map_size_x or existing_size.y != map_size_y:
+			needs_recreate = true
+		else:
+			# Size is same, but we still need to clear old data for regeneration
+			# Clear the existing heightmap to remove old map data
+			world_map_data.heightmap_image.fill(Color.BLACK)
+			MythosLogger.debug("UI/MapMakerModule", "Cleared existing heightmap for regeneration")
+	
+	# Recreate heightmap if needed
+	if needs_recreate:
+		world_map_data.create_heightmap(map_size_x, map_size_y)
+		
+		# Update render target sprite scale
+		var render_target: Sprite2D = map_root.get_node_or_null("RenderTarget") as Sprite2D
+		if render_target != null and render_target.texture != null:
+			var tex_size: Vector2 = render_target.texture.get_size()
+			if tex_size.x > 0 and tex_size.y > 0:
+				render_target.scale = Vector2(float(world_map_data.world_width) / tex_size.x, float(world_map_data.world_height) / tex_size.y)
+		
+		# Connect components if not already done
+		if map_renderer != null:
+			map_renderer.set_world_map_data(world_map_data)
+		if map_editor != null:
+			map_editor.set_world_map_data(world_map_data)
+		if marker_manager != null:
+			marker_manager.set_world_map_data(world_map_data)
+		
+		is_initialized = true
+	else:
+		# Ensure components are connected even if not recreating
+		if map_renderer != null and map_renderer.world_map_data != world_map_data:
+			map_renderer.set_world_map_data(world_map_data)
+		if map_editor != null and map_editor.world_map_data != world_map_data:
+			map_editor.set_world_map_data(world_map_data)
+		if marker_manager != null and marker_manager.world_map_data != world_map_data:
+			marker_manager.set_world_map_data(world_map_data)
+	
+	# Clear old map data before generating new map
+	# This ensures the old map is completely removed before new generation
+	if world_map_data.heightmap_image != null:
+		world_map_data.heightmap_image.fill(Color.BLACK)
+		MythosLogger.debug("UI/MapMakerModule", "Cleared existing heightmap before regeneration")
+	
+	# Clear biome preview image to force regeneration
+	world_map_data.biome_preview_image = null
+	
+	# Attempt generation with error handling
+	var generation_success: bool = false
+	if map_generator == null:
+		MythosLogger.error("UI/MapMakerModule", "regenerate_map() - map_generator is null")
+		return false
+	
+	# Try to generate map
+	MythosLogger.debug("UI/MapMakerModule", "Starting map generation", {
+		"seed": world_map_data.seed,
+		"size": Vector2i(world_map_data.world_width, world_map_data.world_height)
+	})
+	
+	map_generator.generate_map(world_map_data, false)  # Synchronous
+	
+	# Validate generation result
+	if world_map_data.heightmap_image == null:
+		MythosLogger.error("UI/MapMakerModule", "regenerate_map() - heightmap_image is null after generation")
+		return false
+	
+	# Check if heightmap has valid data (not all zeros)
+	var sample_pos: Vector2i = Vector2i(min(100, world_map_data.heightmap_image.get_width() - 1), min(100, world_map_data.heightmap_image.get_height() - 1))
+	var sample_color: Color = world_map_data.heightmap_image.get_pixel(sample_pos.x, sample_pos.y)
+	if sample_color.r <= 0.0:
+		MythosLogger.warn("UI/MapMakerModule", "regenerate_map() - heightmap appears empty (sample is zero)")
+		# Don't fail here - might be valid for very low maps
+	
+	# Generate biome preview
+	map_generator.generate_biome_preview(world_map_data)
+	if world_map_data.biome_preview_image == null:
+		MythosLogger.warn("UI/MapMakerModule", "regenerate_map() - biome_preview_image is null after generation")
+		# Non-fatal, but log warning
+	
+	# Refresh renderer to display new map (this will update textures and force redraw)
+	if map_renderer != null:
+		# Force renderer to update with new data
+		map_renderer.set_world_map_data(world_map_data)  # Ensure renderer has latest data
+		map_renderer.refresh()  # This updates textures and triggers redraw
+		generation_success = true
+		
+		# Force viewport update to ensure new map is displayed
+		if map_viewport != null:
+			map_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+			# Then set back to always update
+			call_deferred("_set_viewport_update_always")
+	else:
+		MythosLogger.error("UI/MapMakerModule", "regenerate_map() - map_renderer is null, cannot refresh")
+		return false
+	
+	MythosLogger.info("UI/MapMakerModule", "regenerate_map() completed successfully")
+	return generation_success
+
+
+func _set_viewport_update_always() -> void:
+	"""Helper to set viewport update mode back to always."""
+	if map_viewport != null:
+		map_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+
+
 func set_view_mode(mode: MapRenderer.ViewMode) -> void:
 	"""Set map view mode."""
 	current_view_mode = mode
