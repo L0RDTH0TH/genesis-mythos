@@ -38,6 +38,7 @@ func _init() -> void:
 	moisture_noise = FastNoiseLite.new()
 	landmass_mask_noise = FastNoiseLite.new()
 	_load_landmass_configs()
+	_load_biome_configs()
 	MythosLogger.verbose("World/Generation", "MapGenerator._init() - All noise generators created")
 
 
@@ -174,18 +175,26 @@ func _configure_noise(world_map_data: WorldMapData) -> void:
 	temperature_noise.seed = world_map_data.seed + 2000
 	temperature_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
 	temperature_noise.frequency = world_map_data.biome_temperature_noise_frequency
+	# Apply temperature bias if available (via offset)
+	var temp_bias: float = world_map_data.get("temperature_bias") if world_map_data.has("temperature_bias") else 0.0
+	temperature_noise.offset = Vector3(0, 0, temp_bias * 1000.0)
 	MythosLogger.verbose("World/Generation", "MapGenerator._configure_noise() - Temperature noise configured", {
 		"seed": temperature_noise.seed,
-		"frequency": world_map_data.biome_temperature_noise_frequency
+		"frequency": world_map_data.biome_temperature_noise_frequency,
+		"bias": temp_bias
 	})
 	
 	# Configure moisture noise
 	moisture_noise.seed = world_map_data.seed + 3000
 	moisture_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
 	moisture_noise.frequency = world_map_data.biome_moisture_noise_frequency
+	# Apply moisture bias if available (via offset)
+	var moist_bias: float = world_map_data.get("moisture_bias") if world_map_data.has("moisture_bias") else 0.0
+	moisture_noise.offset = Vector3(0, 0, moist_bias * 1000.0)
 	MythosLogger.verbose("World/Generation", "MapGenerator._configure_noise() - Moisture noise configured", {
 		"seed": moisture_noise.seed,
-		"frequency": world_map_data.biome_moisture_noise_frequency
+		"frequency": world_map_data.biome_moisture_noise_frequency,
+		"bias": moist_bias
 	})
 	
 	MythosLogger.verbose("World/Generation", "MapGenerator._configure_noise() - All noise generators configured")
@@ -354,46 +363,184 @@ func generate_biome_preview(world_map_data: WorldMapData) -> Image:
 			var temperature: float = (temperature_noise.get_noise_2d(world_x, world_y) + 1.0) * 0.5
 			var moisture: float = (moisture_noise.get_noise_2d(world_x, world_y) + 1.0) * 0.5
 			
+			# Apply biases if available
+			var temp_bias: float = world_map_data.get("temperature_bias") if world_map_data.has("temperature_bias") else 0.0
+			var moist_bias: float = world_map_data.get("moisture_bias") if world_map_data.has("moisture_bias") else 0.0
+			temperature = clampf(temperature + temp_bias * 0.5, 0.0, 1.0)
+			moisture = clampf(moisture + moist_bias * 0.5, 0.0, 1.0)
+			
 			# Determine biome color based on height, temperature, moisture
-			var biome_color: Color = _get_biome_color(height, temperature, moisture)
+			var biome_color: Color = _get_biome_color(height, temperature, moisture, world_map_data.sea_level)
 			biome_img.set_pixel(x, size.y - 1 - y, biome_color)
 	
 	world_map_data.biome_preview_image = biome_img
 	return biome_img
 
 
-func _get_biome_color(height: float, temperature: float, moisture: float) -> Color:
-	"""Determine biome color from height, temperature, moisture."""
-	# Underwater
-	if height < 0.4:
-		return Color(0.1, 0.2, 0.4, 1.0)  # Deep blue
+func _load_biome_configs() -> void:
+	"""Load biome configurations from JSON."""
+	const CONFIG_PATH: String = "res://data/biomes.json"
+	var file: FileAccess = FileAccess.open(CONFIG_PATH, FileAccess.READ)
+	if file == null:
+		MythosLogger.warn("World/Generation", "Failed to load biome configs from " + CONFIG_PATH + ", using defaults")
+		_use_default_biomes()
+		return
 	
-	# Beach
-	if height < 0.42:
-		return Color(0.9, 0.85, 0.7, 1.0)  # Sandy beige
+	var json_string: String = file.get_as_text()
+	file.close()
 	
-	# Lowlands (plains, desert, grassland)
-	if height < 0.5:
-		if moisture > 0.6:
-			return Color(0.3, 0.6, 0.2, 1.0)  # Green grassland
-		elif moisture < 0.3:
-			return Color(0.7, 0.6, 0.4, 1.0)  # Desert
-		else:
-			return Color(0.5, 0.5, 0.3, 1.0)  # Plains
+	var json: JSON = JSON.new()
+	var parse_result: Error = json.parse(json_string)
+	if parse_result != OK:
+		MythosLogger.warn("World/Generation", "Failed to parse biome configs JSON: " + json.get_error_message() + ", using defaults")
+		_use_default_biomes()
+		return
 	
-	# Midlands (forest, temperate)
-	if height < 0.65:
-		if moisture > 0.5:
-			return Color(0.2, 0.4, 0.15, 1.0)  # Dark green forest
-		else:
-			return Color(0.4, 0.45, 0.25, 1.0)  # Light forest
+	var data: Dictionary = json.data
+	biome_configs = data.get("biomes", [])
 	
-	# Highlands (mountains, tundra)
-	if height < 0.8:
-		return Color(0.5, 0.5, 0.5, 1.0)  # Gray mountains
+	# Convert temperature and rainfall ranges to normalized 0-1
+	# Temperature: -50 to 50 Celsius -> 0.0 to 1.0
+	# Rainfall: 0 to 300 mm -> 0.0 to 1.0
+	# Height: 0.0 to 1.0 (already normalized)
+	for biome: Dictionary in biome_configs:
+		# Convert temperature range (Celsius to 0-1)
+		var temp_range: Array = biome.get("temperature_range", [-50, 50])
+		biome["temperature_range_normalized"] = [
+			(temp_range[0] + 50.0) / 100.0,  # -50 -> 0.0, 50 -> 1.0
+			(temp_range[1] + 50.0) / 100.0
+		]
+		
+		# Convert rainfall range (mm to 0-1)
+		var rain_range: Array = biome.get("rainfall_range", [0, 300])
+		biome["rainfall_range_normalized"] = [
+			rain_range[0] / 300.0,  # 0 -> 0.0, 300 -> 1.0
+			rain_range[1] / 300.0
+		]
+		
+		# Add height range if not specified (default based on biome type)
+		if not biome.has("height_range_normalized"):
+			var biome_id: String = biome.get("id", "")
+			match biome_id:
+				"ocean":
+					biome["height_range_normalized"] = [0.0, 0.4]
+				"swamp":
+					biome["height_range_normalized"] = [0.35, 0.5]
+				"grassland", "savanna", "desert":
+					biome["height_range_normalized"] = [0.4, 0.6]
+				"temperate_forest", "tropical_rainforest":
+					biome["height_range_normalized"] = [0.4, 0.7]
+				"taiga":
+					biome["height_range_normalized"] = [0.5, 0.8]
+				"tundra":
+					biome["height_range_normalized"] = [0.6, 0.9]
+				"mountain":
+					biome["height_range_normalized"] = [0.7, 1.0]
+				_:
+					biome["height_range_normalized"] = [0.0, 1.0]  # Default: all heights
+		
+		# Convert color array to Color object
+		var color_array: Array = biome.get("color", [0.5, 0.5, 0.5, 1.0])
+		biome["color_object"] = Color(color_array[0], color_array[1], color_array[2], color_array[3] if color_array.size() > 3 else 1.0)
 	
-	# Peaks (snow)
-	return Color(0.95, 0.95, 1.0, 1.0)  # White snow
+	MythosLogger.info("World/Generation", "Loaded biome configurations", {"count": biome_configs.size()})
+
+
+func _use_default_biomes() -> void:
+	"""Use default biome configurations if JSON fails to load."""
+	biome_configs = [
+		{"id": "ocean", "name": "Ocean", "height_range_normalized": [0.0, 0.4], "temperature_range_normalized": [0.0, 1.0], "rainfall_range_normalized": [0.0, 1.0], "color_object": Color(0.2, 0.4, 0.8, 1.0)},
+		{"id": "beach", "name": "Beach", "height_range_normalized": [0.38, 0.42], "temperature_range_normalized": [0.0, 1.0], "rainfall_range_normalized": [0.0, 1.0], "color_object": Color(0.9, 0.85, 0.7, 1.0)},
+		{"id": "grassland", "name": "Grassland", "height_range_normalized": [0.42, 0.6], "temperature_range_normalized": [0.3, 0.7], "rainfall_range_normalized": [0.2, 0.6], "color_object": Color(0.6, 0.7, 0.4, 1.0)},
+		{"id": "forest", "name": "Forest", "height_range_normalized": [0.42, 0.7], "temperature_range_normalized": [0.3, 0.7], "rainfall_range_normalized": [0.5, 1.0], "color_object": Color(0.2, 0.5, 0.2, 1.0)},
+		{"id": "desert", "name": "Desert", "height_range_normalized": [0.42, 0.6], "temperature_range_normalized": [0.6, 1.0], "rainfall_range_normalized": [0.0, 0.2], "color_object": Color(0.9, 0.8, 0.6, 1.0)},
+		{"id": "mountain", "name": "Mountain", "height_range_normalized": [0.7, 0.95], "temperature_range_normalized": [0.0, 1.0], "rainfall_range_normalized": [0.0, 1.0], "color_object": Color(0.5, 0.5, 0.5, 1.0)},
+		{"id": "snow", "name": "Snow", "height_range_normalized": [0.95, 1.0], "temperature_range_normalized": [0.0, 1.0], "rainfall_range_normalized": [0.0, 1.0], "color_object": Color(0.95, 0.95, 1.0, 1.0)}
+	]
+
+
+func _get_biome_color(height: float, temperature: float, moisture: float, sea_level: float = 0.4) -> Color:
+	"""Determine biome color from height, temperature, moisture using loaded biome configs."""
+	# Underwater check
+	
+	if height < sea_level:
+		# Find ocean biome
+		for biome: Dictionary in biome_configs:
+			if biome.get("id", "") == "ocean":
+				return biome.get("color_object", Color(0.2, 0.4, 0.8, 1.0))
+		return Color(0.2, 0.4, 0.8, 1.0)  # Default ocean color
+	
+	# Find matching biomes with blending support
+	var candidate_biomes: Array[Dictionary] = []
+	var candidate_weights: Array[float] = []
+	
+	for biome: Dictionary in biome_configs:
+		var biome_id: String = biome.get("id", "")
+		if biome_id == "ocean":
+			continue  # Skip ocean (already handled)
+		
+		var h_range: Array = biome.get("height_range_normalized", [0.0, 1.0])
+		var t_range: Array = biome.get("temperature_range_normalized", [0.0, 1.0])
+		var m_range: Array = biome.get("rainfall_range_normalized", [0.0, 1.0])
+		
+		# Calculate distance from range centers (for blending)
+		var h_center: float = (h_range[0] + h_range[1]) * 0.5
+		var t_center: float = (t_range[0] + t_range[1]) * 0.5
+		var m_center: float = (m_range[0] + m_range[1]) * 0.5
+		
+		var h_dist: float = abs(height - h_center) / max(0.01, h_range[1] - h_range[0])
+		var t_dist: float = abs(temperature - t_center) / max(0.01, t_range[1] - t_range[0])
+		var m_dist: float = abs(moisture - m_center) / max(0.01, m_range[1] - m_range[0])
+		
+		# Calculate match weight (closer to center = higher weight)
+		var weight: float = 1.0 / (1.0 + h_dist + t_dist + m_dist)
+		
+		# Only include biomes that are reasonably close
+		if weight > 0.1:
+			candidate_biomes.append(biome)
+			candidate_weights.append(weight)
+	
+	# Blend colors if multiple candidates and blending enabled
+	if candidate_biomes.size() > 1 and biome_transition_width > 0.0:
+		var total_weight: float = 0.0
+		var blended_color: Color = Color.BLACK
+		
+		for i: int in candidate_biomes.size():
+			var biome: Dictionary = candidate_biomes[i]
+			var weight: float = candidate_weights[i]
+			var biome_color: Color = biome.get("color_object", Color(0.5, 0.5, 0.5, 1.0))
+			
+			blended_color += biome_color * weight
+			total_weight += weight
+		
+		if total_weight > 0.0:
+			blended_color /= total_weight
+			return blended_color
+	
+	# Find best single match if no blending or only one candidate
+	var best_match: Dictionary = {}
+	var best_weight: float = 0.0
+	
+	for i: int in candidate_biomes.size():
+		if candidate_weights[i] > best_weight:
+			best_weight = candidate_weights[i]
+			best_match = candidate_biomes[i]
+	
+	# Return best match color, or default if no match
+	if not best_match.is_empty():
+		return best_match.get("color_object", Color(0.5, 0.5, 0.5, 1.0))
+	
+	# Fallback: height-based selection
+	if height < sea_level + 0.02:
+		return Color(0.9, 0.85, 0.7, 1.0)  # Beach
+	elif height < 0.5:
+		return Color(0.6, 0.7, 0.4, 1.0)  # Grassland
+	elif height < 0.7:
+		return Color(0.2, 0.5, 0.2, 1.0)  # Forest
+	elif height < 0.9:
+		return Color(0.5, 0.5, 0.5, 1.0)  # Mountain
+	else:
+		return Color(0.95, 0.95, 1.0, 1.0)  # Snow
 
 
 func _load_landmass_configs() -> void:

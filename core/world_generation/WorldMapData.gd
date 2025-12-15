@@ -41,6 +41,10 @@ class_name WorldMapData
 @export var biome_temperature_noise_frequency: float = 0.002
 @export var biome_moisture_noise_frequency: float = 0.002
 
+## Climate bias parameters (for regional adjustments)
+var temperature_bias: float = 0.0
+var moisture_bias: float = 0.0
+
 ## Landmass type (Continents, Single Island, etc.)
 @export var landmass_type: String = "Continents"
 

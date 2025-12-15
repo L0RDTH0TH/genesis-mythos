@@ -1338,6 +1338,110 @@ func _create_step_climate(parent: VBoxContainer) -> void:
 	step_data["Climate"]["wind_direction_x"] = 1.0
 	step_data["Climate"]["wind_direction_y"] = 0.0
 	
+	# Temperature Bias
+	var temp_bias_container: HBoxContainer = HBoxContainer.new()
+	var temp_bias_label: Label = Label.new()
+	temp_bias_label.text = "Temperature Bias:"
+	temp_bias_label.custom_minimum_size = Vector2(200, 0)
+	temp_bias_container.add_child(temp_bias_label)
+	
+	var temp_bias_slider: HSlider = HSlider.new()
+	temp_bias_slider.name = "temperature_bias"
+	temp_bias_slider.min_value = -1.0
+	temp_bias_slider.max_value = 1.0
+	temp_bias_slider.step = 0.01
+	temp_bias_slider.value = 0.0
+	temp_bias_slider.value_changed.connect(func(v): _on_climate_param_changed("temperature_bias", v))
+	temp_bias_container.add_child(temp_bias_slider)
+	
+	var temp_bias_value_label: Label = Label.new()
+	temp_bias_value_label.name = "temperature_bias_value"
+	temp_bias_value_label.custom_minimum_size = Vector2(80, 0)
+	temp_bias_value_label.text = "0.00"
+	temp_bias_container.add_child(temp_bias_value_label)
+	container.add_child(temp_bias_container)
+	control_references["Climate/temperature_bias"] = temp_bias_slider
+	control_references["Climate/temperature_bias_value"] = temp_bias_value_label
+	step_data["Climate"]["temperature_bias"] = 0.0
+	
+	# Moisture Bias
+	var moist_bias_container: HBoxContainer = HBoxContainer.new()
+	var moist_bias_label: Label = Label.new()
+	moist_bias_label.text = "Moisture Bias:"
+	moist_bias_label.custom_minimum_size = Vector2(200, 0)
+	moist_bias_container.add_child(moist_bias_label)
+	
+	var moist_bias_slider: HSlider = HSlider.new()
+	moist_bias_slider.name = "moisture_bias"
+	moist_bias_slider.min_value = -1.0
+	moist_bias_slider.max_value = 1.0
+	moist_bias_slider.step = 0.01
+	moist_bias_slider.value = 0.0
+	moist_bias_slider.value_changed.connect(func(v): _on_climate_param_changed("moisture_bias", v))
+	moist_bias_container.add_child(moist_bias_slider)
+	
+	var moist_bias_value_label: Label = Label.new()
+	moist_bias_value_label.name = "moisture_bias_value"
+	moist_bias_value_label.custom_minimum_size = Vector2(80, 0)
+	moist_bias_value_label.text = "0.00"
+	moist_bias_container.add_child(moist_bias_value_label)
+	container.add_child(moist_bias_container)
+	control_references["Climate/moisture_bias"] = moist_bias_slider
+	control_references["Climate/moisture_bias_value"] = moist_bias_value_label
+	step_data["Climate"]["moisture_bias"] = 0.0
+	
+	# Temperature Noise Frequency
+	var temp_freq_container: HBoxContainer = HBoxContainer.new()
+	var temp_freq_label: Label = Label.new()
+	temp_freq_label.text = "Temperature Noise Frequency:"
+	temp_freq_label.custom_minimum_size = Vector2(200, 0)
+	temp_freq_container.add_child(temp_freq_label)
+	
+	var temp_freq_slider: HSlider = HSlider.new()
+	temp_freq_slider.name = "temperature_noise_frequency"
+	temp_freq_slider.min_value = 0.0001
+	temp_freq_slider.max_value = 0.01
+	temp_freq_slider.step = 0.0001
+	temp_freq_slider.value = 0.002
+	temp_freq_slider.value_changed.connect(func(v): _on_climate_param_changed("temperature_noise_frequency", v))
+	temp_freq_container.add_child(temp_freq_slider)
+	
+	var temp_freq_value_label: Label = Label.new()
+	temp_freq_value_label.name = "temperature_noise_frequency_value"
+	temp_freq_value_label.custom_minimum_size = Vector2(80, 0)
+	temp_freq_value_label.text = "0.002"
+	temp_freq_container.add_child(temp_freq_value_label)
+	container.add_child(temp_freq_container)
+	control_references["Climate/temperature_noise_frequency"] = temp_freq_slider
+	control_references["Climate/temperature_noise_frequency_value"] = temp_freq_value_label
+	step_data["Climate"]["temperature_noise_frequency"] = 0.002
+	
+	# Moisture Noise Frequency
+	var moist_freq_container: HBoxContainer = HBoxContainer.new()
+	var moist_freq_label: Label = Label.new()
+	moist_freq_label.text = "Moisture Noise Frequency:"
+	moist_freq_label.custom_minimum_size = Vector2(200, 0)
+	moist_freq_container.add_child(moist_freq_label)
+	
+	var moist_freq_slider: HSlider = HSlider.new()
+	moist_freq_slider.name = "moisture_noise_frequency"
+	moist_freq_slider.min_value = 0.0001
+	moist_freq_slider.max_value = 0.01
+	moist_freq_slider.step = 0.0001
+	moist_freq_slider.value = 0.002
+	moist_freq_slider.value_changed.connect(func(v): _on_climate_param_changed("moisture_noise_frequency", v))
+	moist_freq_container.add_child(moist_freq_slider)
+	
+	var moist_freq_value_label: Label = Label.new()
+	moist_freq_value_label.name = "moisture_noise_frequency_value"
+	moist_freq_value_label.custom_minimum_size = Vector2(80, 0)
+	moist_freq_value_label.text = "0.002"
+	moist_freq_container.add_child(moist_freq_value_label)
+	container.add_child(moist_freq_container)
+	control_references["Climate/moisture_noise_frequency"] = moist_freq_slider
+	control_references["Climate/moisture_noise_frequency_value"] = moist_freq_value_label
+	step_data["Climate"]["moisture_noise_frequency"] = 0.002
+	
 	# Time of Day
 	var time_container: HBoxContainer = HBoxContainer.new()
 	var time_label: Label = Label.new()
@@ -1377,6 +1481,33 @@ func _create_step_biomes(parent: VBoxContainer) -> void:
 	container.add_theme_constant_override("separation", 10)
 	step_panel.add_child(container)
 	
+	# Biome Transition Width (for blending)
+	var transition_container: HBoxContainer = HBoxContainer.new()
+	var transition_label: Label = Label.new()
+	transition_label.text = "Biome Transition Width:"
+	transition_label.custom_minimum_size = Vector2(200, 0)
+	transition_container.add_child(transition_label)
+	
+	var transition_slider: HSlider = HSlider.new()
+	transition_slider.name = "biome_transition_width"
+	transition_slider.min_value = 0.0
+	transition_slider.max_value = 0.2
+	transition_slider.step = 0.01
+	transition_slider.value = 0.05
+	transition_slider.value_changed.connect(func(v): _on_biome_param_changed("biome_transition_width", v))
+	transition_container.add_child(transition_slider)
+	
+	var transition_value_label: Label = Label.new()
+	transition_value_label.name = "biome_transition_width_value"
+	transition_value_label.custom_minimum_size = Vector2(80, 0)
+	transition_value_label.text = "0.05"
+	transition_container.add_child(transition_value_label)
+	container.add_child(transition_container)
+	control_references["Biomes/biome_transition_width"] = transition_slider
+	control_references["Biomes/biome_transition_width_value"] = transition_value_label
+	step_data["Biomes"] = {}
+	step_data["Biomes"]["biome_transition_width"] = 0.05
+	
 	# Biome overlay toggle
 	var overlay_container: HBoxContainer = HBoxContainer.new()
 	var overlay_label: Label = Label.new()
@@ -1391,7 +1522,6 @@ func _create_step_biomes(parent: VBoxContainer) -> void:
 	overlay_container.add_child(overlay_checkbox)
 	container.add_child(overlay_container)
 	control_references["Biomes/show_biome_overlay"] = overlay_checkbox
-	step_data["Biomes"] = {}
 	step_data["Biomes"]["show_biome_overlay"] = false
 	
 	# Biome selection list
@@ -2097,7 +2227,12 @@ func _on_generate_map_pressed() -> void:
 		"noise_persistence": step_data.get("Map Gen", {}).get("noise_persistence", 0.5),
 		"noise_lacunarity": step_data.get("Map Gen", {}).get("noise_lacunarity", 2.0),
 		"sea_level": step_data.get("Map Gen", {}).get("sea_level", 0.4),
-		"erosion_enabled": step_data.get("Map Gen", {}).get("erosion_enabled", true)
+		"erosion_enabled": step_data.get("Map Gen", {}).get("erosion_enabled", true),
+		"temperature_bias": step_data.get("Climate", {}).get("temperature_bias", 0.0),
+		"moisture_bias": step_data.get("Climate", {}).get("moisture_bias", 0.0),
+		"temperature_noise_frequency": step_data.get("Climate", {}).get("temperature_noise_frequency", 0.002),
+		"moisture_noise_frequency": step_data.get("Climate", {}).get("moisture_noise_frequency", 0.002),
+		"biome_transition_width": step_data.get("Biomes", {}).get("biome_transition_width", 0.05)
 	}
 	
 	# Add landmass-specific parameters if they exist
@@ -3345,6 +3480,18 @@ func _update_climate_live() -> void:
 	# Update environment if terrain manager supports it
 	if terrain_manager.has_method("update_environment"):
 		terrain_manager.update_environment(time_of_day, 0.1, wind_strength, "clear", Color(0.5, 0.7, 1.0, 1.0), Color(0.3, 0.3, 0.3, 1.0))
+
+
+func _on_biome_param_changed(param_name: String, value: Variant) -> void:
+	"""Handle biome parameter changes."""
+	step_data["Biomes"][param_name] = value
+	
+	# Update value labels
+	match param_name:
+		"biome_transition_width":
+			var label: Label = control_references.get("Biomes/biome_transition_width_value") as Label
+			if label != null:
+				label.text = "%.2f" % value
 
 
 func _on_biome_overlay_toggled(pressed: bool) -> void:

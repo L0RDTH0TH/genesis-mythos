@@ -490,9 +490,17 @@ func regenerate_map(params: Dictionary) -> bool:
 	world_map_data.noise_lacunarity = params.get("noise_lacunarity", world_map_data.noise_lacunarity)
 	world_map_data.sea_level = params.get("sea_level", world_map_data.sea_level)
 	world_map_data.erosion_enabled = params.get("erosion_enabled", world_map_data.erosion_enabled)
+	world_map_data.biome_temperature_noise_frequency = params.get("temperature_noise_frequency", world_map_data.biome_temperature_noise_frequency)
+	world_map_data.biome_moisture_noise_frequency = params.get("moisture_noise_frequency", world_map_data.biome_moisture_noise_frequency)
+	world_map_data.temperature_bias = params.get("temperature_bias", world_map_data.temperature_bias)
+	world_map_data.moisture_bias = params.get("moisture_bias", world_map_data.moisture_bias)
 	
 	if params.has("noise_type"):
 		world_map_data.noise_type = params.get("noise_type", world_map_data.noise_type)
+	
+	# Update MapGenerator biome transition width if provided
+	if params.has("biome_transition_width") and map_generator != null:
+		map_generator.biome_transition_width = params.get("biome_transition_width", 0.05)
 	
 	# Check if heightmap needs to be recreated (size changed or not initialized)
 	var map_size_x: int = max(512, _next_power_of_2(int(world_map_data.world_width)))
