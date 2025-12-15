@@ -659,7 +659,12 @@ func _load_biome_configs() -> void:
 		return
 	
 	var data: Dictionary = json.data
-	biome_configs = data.get("biomes", [])
+	# Cast generic Array to Array[Dictionary]
+	var biomes_array: Array = data.get("biomes", [])
+	biome_configs.clear()
+	for biome_data in biomes_array:
+		if biome_data is Dictionary:
+			biome_configs.append(biome_data)
 	
 	# Convert temperature and rainfall ranges to normalized 0-1
 	# Temperature: -50 to 50 Celsius -> 0.0 to 1.0
