@@ -24,6 +24,7 @@ WorldStreamer="*res://core/streaming/world_streamer.gd"
 EntitySim="*res://core/sim/entity_sim.gd"
 FactionEconomy="*res://core/sim/faction_economy.gd"
 DebugMenu="*res://addons/debug_menu/debug_menu.tscn"
+DebugMenuScaler="*res://scripts/core/DebugMenuScaler.gd"
 
 [display]
 
