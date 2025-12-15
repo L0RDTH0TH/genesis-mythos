@@ -7,8 +7,20 @@
 extends Resource
 class_name WorldMapData
 
-## World generation seed
+## World generation seed (main seed)
 @export var seed: int = 12345
+
+## Sub-seeds for different systems (allows partial randomization)
+var height_seed: int = -1      # -1 = use main seed
+var biome_seed: int = -1        # -1 = use main seed
+var climate_seed: int = -1      # -1 = use main seed
+var erosion_seed: int = -1      # -1 = use main seed
+var river_seed: int = -1        # -1 = use main seed
+
+## Seed locks (prevent randomization of specific systems)
+var height_seed_locked: bool = false
+var biome_seed_locked: bool = false
+var climate_seed_locked: bool = false
 
 ## World size in units
 @export var world_width: int = 1000
@@ -68,6 +80,45 @@ func _init() -> void:
 	if heightmap_image == null:
 		heightmap_image = Image.create(1024, 1024, false, Image.FORMAT_RF)
 		heightmap_image.fill(Color.BLACK)
+	_update_sub_seeds()
+
+
+func _update_sub_seeds() -> void:
+	"""Update sub-seeds from main seed if not locked."""
+	if not height_seed_locked or height_seed == -1:
+		height_seed = seed if height_seed == -1 else height_seed
+	if not biome_seed_locked or biome_seed == -1:
+		biome_seed = seed if biome_seed == -1 else biome_seed
+	if not climate_seed_locked or climate_seed == -1:
+		climate_seed = seed if climate_seed == -1 else climate_seed
+	if not erosion_seed == -1:
+		erosion_seed = seed if erosion_seed == -1 else erosion_seed
+	if not river_seed == -1:
+		river_seed = seed if river_seed == -1 else river_seed
+
+
+func set_seed(new_seed: int, update_sub_seeds: bool = true) -> void:
+	"""Set main seed and optionally update sub-seeds."""
+	seed = new_seed
+	if update_sub_seeds:
+		_update_sub_seeds()
+
+
+func get_effective_seed(system: String) -> int:
+	"""Get effective seed for a specific system."""
+	match system:
+		"height":
+			return height_seed if height_seed >= 0 else seed
+		"biome":
+			return biome_seed if biome_seed >= 0 else seed
+		"climate":
+			return climate_seed if climate_seed >= 0 else seed
+		"erosion":
+			return erosion_seed if erosion_seed >= 0 else seed
+		"river":
+			return river_seed if river_seed >= 0 else seed
+		_:
+			return seed
 
 
 func create_heightmap(size_x: int, size_y: int, format: Image.Format = Image.FORMAT_RF) -> Image:
@@ -195,6 +246,16 @@ func load_from_file(file_path: String) -> bool:
 	landmass_type = source.landmass_type
 	markers = source.markers.duplicate()
 	regional_climate_adjustments = source.regional_climate_adjustments.duplicate()
+	
+	# Copy sub-seeds
+	height_seed = source.height_seed
+	biome_seed = source.biome_seed
+	climate_seed = source.climate_seed
+	erosion_seed = source.erosion_seed
+	river_seed = source.river_seed
+	height_seed_locked = source.height_seed_locked
+	biome_seed_locked = source.biome_seed_locked
+	climate_seed_locked = source.climate_seed_locked
 	
 	MythosLogger.info("World/Data", "Loaded WorldMapData from " + file_path)
 	return true

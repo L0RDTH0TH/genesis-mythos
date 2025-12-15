@@ -133,8 +133,9 @@ func _configure_noise(world_map_data: WorldMapData) -> void:
 		"octaves": world_map_data.noise_octaves
 	})
 	
-	# Configure height noise - seed must be set first for proper initialization
-	height_noise.seed = world_map_data.seed
+	# Configure height noise - use effective seed (allows sub-seeds)
+	var effective_height_seed: int = world_map_data.get_effective_seed("height")
+	height_noise.seed = effective_height_seed
 	height_noise.noise_type = world_map_data.noise_type
 	height_noise.frequency = world_map_data.noise_frequency
 	height_noise.fractal_octaves = world_map_data.noise_octaves
@@ -171,8 +172,8 @@ func _configure_noise(world_map_data: WorldMapData) -> void:
 		"bias": temp_bias
 	})
 	
-	# Configure moisture noise
-	moisture_noise.seed = world_map_data.seed + 3000
+	# Configure moisture noise - use effective climate seed
+	moisture_noise.seed = effective_climate_seed + 3000
 	moisture_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
 	moisture_noise.frequency = world_map_data.biome_moisture_noise_frequency
 	# Apply moisture bias if available (via offset)
@@ -303,6 +304,7 @@ func _use_default_post_processing() -> void:
 
 func _apply_post_processing_pipeline(world_map_data: WorldMapData) -> void:
 	"""Apply modular post-processing pipeline based on configuration."""
+	# Check if post-processing is enabled (can be disabled for previews)
 	if not post_processing_config.get("enabled", true):
 		MythosLogger.verbose("World/Generation", "Post-processing pipeline disabled")
 		return
