@@ -124,6 +124,7 @@ func _setup_world_builder_ui() -> void:
 	# Add UI to scene tree as a CanvasLayer child for proper overlay
 	var canvas_layer: CanvasLayer = CanvasLayer.new()
 	canvas_layer.name = "UICanvasLayer"
+	canvas_layer.layer = 0  # Keep WorldBuilderUI on default layer (0) so DebugMenu can be on top
 	add_child(canvas_layer, true)
 	canvas_layer.add_child(world_builder_ui, true)
 	

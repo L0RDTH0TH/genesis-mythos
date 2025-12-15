@@ -16,9 +16,16 @@ func _ready() -> void:
 	debug_menu = get_tree().root.get_node_or_null("DebugMenu")
 	if debug_menu:
 		debug_menu.scale = Vector2(scale_factor, scale_factor)
-		# Ensure DebugMenu is on top layer and visible when toggled
-		debug_menu.layer = 128  # High layer to ensure it's on top
-		print("Debug Menu scaled by factor: ", scale_factor, " and positioned on layer ", debug_menu.layer)
+		# Ensure DebugMenu is on the HIGHEST possible layer (255 is max) to be above ALL other UI
+		debug_menu.layer = 255
+		# Also ensure the DebugMenu Control node itself is on top
+		var debug_control: Control = debug_menu.get_node_or_null("DebugMenu")
+		if debug_control:
+			debug_control.z_index = 1000  # Very high z-index to ensure it's on top
+			debug_control.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Don't block input to game
+			print("Debug Menu scaled by factor: ", scale_factor, " and positioned on layer ", debug_menu.layer, " with z_index ", debug_control.z_index)
+		else:
+			print("Debug Menu scaled by factor: ", scale_factor, " and positioned on layer ", debug_menu.layer, " (DebugMenu Control node not found)")
 	else:
 		push_warning("DebugMenu CanvasLayer not found – ensure addon is enabled and running")
 
