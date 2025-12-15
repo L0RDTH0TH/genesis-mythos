@@ -40,7 +40,8 @@
         "iterations": 5,
         "strength": 0.3,
         "sediment_factor": 0.1,
-        "deposition_rate": 0.05
+        "deposition_rate": 0.05,
+        "respect_erosion_enabled": true
       },
       {
         "type": "smoothing",
@@ -50,10 +51,11 @@
       },
       {
         "type": "river_carving",
-        "enabled": false,
+        "enabled": true,
         "river_count": 10,
         "start_elevation": 0.7,
-        "carving_strength": 0.2
+        "carving_strength": 0.2,
+        "respect_rivers_enabled": true
       }
     ]
   }

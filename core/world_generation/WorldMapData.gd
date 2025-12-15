@@ -85,16 +85,21 @@ func _init() -> void:
 
 func _update_sub_seeds() -> void:
 	"""Update sub-seeds from main seed if not locked."""
-	if not height_seed_locked or height_seed == -1:
-		height_seed = seed if height_seed == -1 else height_seed
-	if not biome_seed_locked or biome_seed == -1:
-		biome_seed = seed if biome_seed == -1 else biome_seed
-	if not climate_seed_locked or climate_seed == -1:
-		climate_seed = seed if climate_seed == -1 else climate_seed
-	if not erosion_seed == -1:
-		erosion_seed = seed if erosion_seed == -1 else erosion_seed
-	if not river_seed == -1:
-		river_seed = seed if river_seed == -1 else river_seed
+	# Only update if not locked AND seed is -1 (unset)
+	if not height_seed_locked:
+		if height_seed == -1:
+			height_seed = seed
+	if not biome_seed_locked:
+		if biome_seed == -1:
+			biome_seed = seed
+	if not climate_seed_locked:
+		if climate_seed == -1:
+			climate_seed = seed
+	# Erosion and river seeds don't have locks, just update if -1
+	if erosion_seed == -1:
+		erosion_seed = seed
+	if river_seed == -1:
+		river_seed = seed
 
 
 func set_seed(new_seed: int, update_sub_seeds: bool = true) -> void:
@@ -256,6 +261,10 @@ func load_from_file(file_path: String) -> bool:
 	height_seed_locked = source.height_seed_locked
 	biome_seed_locked = source.biome_seed_locked
 	climate_seed_locked = source.climate_seed_locked
+	
+	# Copy climate biases
+	temperature_bias = source.temperature_bias
+	moisture_bias = source.moisture_bias
 	
 	MythosLogger.info("World/Data", "Loaded WorldMapData from " + file_path)
 	return true

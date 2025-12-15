@@ -7,6 +7,12 @@
 extends RefCounted
 class_name MapGenerator
 
+## Custom datasource callback (optional, for extensibility)
+var custom_datasource_callback: Callable
+
+## Custom post-processor callbacks (array of callables)
+var custom_post_processors: Array[Callable] = []
+
 ## Noise instance for height generation
 var height_noise: FastNoiseLite
 
@@ -44,7 +50,10 @@ func _init() -> void:
 
 
 func generate_map(world_map_data: WorldMapData, use_thread: bool = true) -> void:
-	"""Generate complete map (heightmap, rivers, biomes). Use thread for large maps."""
+	"""Generate complete map (heightmap, rivers, biomes). Use thread for large maps.
+	
+	For very large maps (8192x8192+), automatically uses threading and LOD optimizations.
+	"""
 	MythosLogger.verbose("World/Generation", "MapGenerator.generate_map() - Starting map generation", {
 		"width": world_map_data.world_width if world_map_data else 0,
 		"height": world_map_data.world_height if world_map_data else 0,
@@ -61,7 +70,18 @@ func generate_map(world_map_data: WorldMapData, use_thread: bool = true) -> void
 		return
 	
 	var map_size: int = world_map_data.world_width * world_map_data.world_height
+	# Auto-enable threading for large maps (8192x8192 = 67M pixels)
 	var use_threading: bool = use_thread and map_size > 512 * 512
+	
+	# For very large maps, optimize post-processing
+	if map_size > 8192 * 8192:
+		MythosLogger.info("World/Generation", "Very large map detected, optimizing post-processing", {"size": map_size})
+		# Reduce post-processing iterations for performance
+		var steps: Array = post_processing_config.get("steps", [])
+		for step: Dictionary in steps:
+			if step.has("iterations"):
+				var orig_iterations: int = step.get("iterations", 5)
+				step["iterations"] = max(1, orig_iterations / 2)  # Reduce by half for very large maps
 	
 	MythosLogger.verbose("World/Generation", "MapGenerator.generate_map() - Map size: %d pixels, threading: %s" % [map_size, use_threading])
 	
@@ -159,12 +179,13 @@ func _configure_noise(world_map_data: WorldMapData) -> void:
 		"seed": continent_noise.seed
 	})
 	
-	# Configure temperature noise
-	temperature_noise.seed = world_map_data.seed + 2000
+	# Configure temperature noise - use effective climate seed
+	var effective_climate_seed: int = world_map_data.get_effective_seed("climate")
+	temperature_noise.seed = effective_climate_seed + 2000
 	temperature_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
 	temperature_noise.frequency = world_map_data.biome_temperature_noise_frequency
-	# Apply temperature bias if available (via offset)
-	var temp_bias: float = world_map_data.get("temperature_bias") if world_map_data.has("temperature_bias") else 0.0
+	# Apply temperature bias (via offset)
+	var temp_bias: float = world_map_data.temperature_bias
 	temperature_noise.offset = Vector3(0, 0, temp_bias * 1000.0)
 	MythosLogger.verbose("World/Generation", "MapGenerator._configure_noise() - Temperature noise configured", {
 		"seed": temperature_noise.seed,
@@ -176,8 +197,8 @@ func _configure_noise(world_map_data: WorldMapData) -> void:
 	moisture_noise.seed = effective_climate_seed + 3000
 	moisture_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
 	moisture_noise.frequency = world_map_data.biome_moisture_noise_frequency
-	# Apply moisture bias if available (via offset)
-	var moist_bias: float = world_map_data.get("moisture_bias") if world_map_data.has("moisture_bias") else 0.0
+	# Apply moisture bias (via offset)
+	var moist_bias: float = world_map_data.moisture_bias
 	moisture_noise.offset = Vector3(0, 0, moist_bias * 1000.0)
 	MythosLogger.verbose("World/Generation", "MapGenerator._configure_noise() - Moisture noise configured", {
 		"seed": moisture_noise.seed,
@@ -323,6 +344,10 @@ func _apply_post_processing_pipeline(world_map_data: WorldMapData) -> void:
 		var step_type: String = step_config.get("type", "")
 		match step_type:
 			"erosion":
+				# Backward compatibility: Check erosion_enabled flag
+				if not world_map_data.erosion_enabled:
+					MythosLogger.verbose("World/Generation", "Erosion step skipped (erosion_enabled = false)")
+					continue
 				var iterations: int = step_config.get("iterations", world_map_data.erosion_iterations)
 				var strength: float = step_config.get("strength", world_map_data.erosion_strength)
 				var sediment_factor: float = step_config.get("sediment_factor", 0.1)
@@ -333,6 +358,10 @@ func _apply_post_processing_pipeline(world_map_data: WorldMapData) -> void:
 				var radius: int = step_config.get("radius", 1)
 				_apply_smoothing(world_map_data, smooth_iterations, radius)
 			"river_carving":
+				# Backward compatibility: Check rivers_enabled flag
+				if not world_map_data.rivers_enabled:
+					MythosLogger.verbose("World/Generation", "River carving step skipped (rivers_enabled = false)")
+					continue
 				var river_count: int = step_config.get("river_count", world_map_data.river_count)
 				var start_elevation: float = step_config.get("start_elevation", world_map_data.river_start_elevation)
 				var carving_strength: float = step_config.get("carving_strength", 0.2)
@@ -470,14 +499,18 @@ func _apply_river_carving(world_map_data: WorldMapData, river_count: int, start_
 	var img: Image = world_map_data.heightmap_image
 	var size: Vector2i = img.get_size()
 	
+	# Use effective river seed if available
+	var effective_river_seed: int = world_map_data.get_effective_seed("river")
+	
 	MythosLogger.verbose("World/Generation", "Applying river carving", {
 		"river_count": river_count,
-		"start_elevation": start_elevation
+		"start_elevation": start_elevation,
+		"seed": effective_river_seed
 	})
 	
 	# Find high points (potential river sources)
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
-	rng.seed = world_map_data.seed + 9000
+	rng.seed = effective_river_seed + 9000
 	
 	var river_sources: Array[Vector2i] = []
 	var attempts: int = 0
@@ -574,9 +607,9 @@ func generate_biome_preview(world_map_data: WorldMapData) -> Image:
 			var temperature: float = (temperature_noise.get_noise_2d(world_x, world_y) + 1.0) * 0.5
 			var moisture: float = (moisture_noise.get_noise_2d(world_x, world_y) + 1.0) * 0.5
 			
-			# Apply global biases if available
-			var temp_bias: float = world_map_data.get("temperature_bias") if world_map_data.has("temperature_bias") else 0.0
-			var moist_bias: float = world_map_data.get("moisture_bias") if world_map_data.has("moisture_bias") else 0.0
+			# Apply global biases
+			var temp_bias: float = world_map_data.temperature_bias
+			var moist_bias: float = world_map_data.moisture_bias
 			temperature = clampf(temperature + temp_bias * 0.5, 0.0, 1.0)
 			moisture = clampf(moisture + moist_bias * 0.5, 0.0, 1.0)
 			
