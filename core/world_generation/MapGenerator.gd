@@ -39,6 +39,7 @@ func _init() -> void:
 	landmass_mask_noise = FastNoiseLite.new()
 	_load_landmass_configs()
 	_load_biome_configs()
+	_load_post_processing_config()
 	MythosLogger.verbose("World/Generation", "MapGenerator._init() - All noise generators created")
 
 
@@ -78,17 +79,8 @@ func _generate_sync(world_map_data: WorldMapData) -> void:
 	_configure_noise(world_map_data)
 	_generate_heightmap(world_map_data)
 	
-	if world_map_data.erosion_enabled:
-		MythosLogger.verbose("World/Generation", "MapGenerator._generate_sync() - Erosion enabled, applying")
-		_apply_erosion(world_map_data)
-	else:
-		MythosLogger.verbose("World/Generation", "MapGenerator._generate_sync() - Erosion disabled")
-	
-	if world_map_data.rivers_enabled:
-		MythosLogger.verbose("World/Generation", "MapGenerator._generate_sync() - Rivers enabled, generating")
-		_generate_rivers(world_map_data)
-	else:
-		MythosLogger.verbose("World/Generation", "MapGenerator._generate_sync() - Rivers disabled")
+	# Apply post-processing pipeline (replaces old erosion/rivers checks)
+	_apply_post_processing_pipeline(world_map_data)
 	
 	MythosLogger.verbose("World/Generation", "MapGenerator._generate_sync() - Synchronous generation complete")
 
@@ -113,13 +105,8 @@ func _thread_generate(world_map_data: WorldMapData) -> void:
 	_configure_noise(world_map_data)
 	_generate_heightmap(world_map_data)
 	
-	if world_map_data.erosion_enabled:
-		MythosLogger.verbose("World/Generation", "MapGenerator._thread_generate() - Applying erosion in thread")
-		_apply_erosion(world_map_data)
-	
-	if world_map_data.rivers_enabled:
-		MythosLogger.verbose("World/Generation", "MapGenerator._thread_generate() - Generating rivers in thread")
-		_generate_rivers(world_map_data)
+	# Apply post-processing pipeline
+	_apply_post_processing_pipeline(world_map_data)
 	
 	MythosLogger.verbose("World/Generation", "MapGenerator._thread_generate() - Thread generation complete")
 	# Note: Since MapGenerator extends RefCounted (not Node), we can't use call_deferred
@@ -280,18 +267,105 @@ func _generate_heightmap(world_map_data: WorldMapData) -> void:
 			MythosLogger.verbose("World/Generation", "Heightmap sample", {"position": test_pos, "height": test_color.r})
 
 
-func _apply_erosion(world_map_data: WorldMapData) -> void:
-	"""Apply simple hydraulic erosion to carve valleys and rivers."""
+func _load_post_processing_config() -> void:
+	"""Load post-processing pipeline configuration from JSON."""
+	const CONFIG_PATH: String = "res://data/config/terrain_generation.json"
+	var file: FileAccess = FileAccess.open(CONFIG_PATH, FileAccess.READ)
+	if file == null:
+		MythosLogger.warn("World/Generation", "Failed to load post-processing config from " + CONFIG_PATH + ", using defaults")
+		_use_default_post_processing()
+		return
+	
+	var json_string: String = file.get_as_text()
+	file.close()
+	
+	var json: JSON = JSON.new()
+	var parse_result: Error = json.parse(json_string)
+	if parse_result != OK:
+		MythosLogger.warn("World/Generation", "Failed to parse post-processing config JSON: " + json.get_error_message() + ", using defaults")
+		_use_default_post_processing()
+		return
+	
+	var data: Dictionary = json.data
+	post_processing_config = data.get("post_processing", {})
+	MythosLogger.info("World/Generation", "Loaded post-processing configuration", {"enabled": post_processing_config.get("enabled", true)})
+
+
+func _use_default_post_processing() -> void:
+	"""Use default post-processing configuration if JSON fails to load."""
+	post_processing_config = {
+		"enabled": true,
+		"steps": [
+			{"type": "erosion", "enabled": true, "iterations": 5, "strength": 0.3, "sediment_factor": 0.1, "deposition_rate": 0.05}
+		]
+	}
+
+
+func _apply_post_processing_pipeline(world_map_data: WorldMapData) -> void:
+	"""Apply modular post-processing pipeline based on configuration."""
+	if not post_processing_config.get("enabled", true):
+		MythosLogger.verbose("World/Generation", "Post-processing pipeline disabled")
+		return
+	
+	var steps: Array = post_processing_config.get("steps", [])
+	if steps.is_empty():
+		MythosLogger.verbose("World/Generation", "No post-processing steps configured")
+		return
+	
+	MythosLogger.verbose("World/Generation", "Applying post-processing pipeline", {"step_count": steps.size()})
+	
+	for step_config: Dictionary in steps:
+		if not step_config.get("enabled", true):
+			continue
+		
+		var step_type: String = step_config.get("type", "")
+		match step_type:
+			"erosion":
+				var iterations: int = step_config.get("iterations", world_map_data.erosion_iterations)
+				var strength: float = step_config.get("strength", world_map_data.erosion_strength)
+				var sediment_factor: float = step_config.get("sediment_factor", 0.1)
+				var deposition_rate: float = step_config.get("deposition_rate", 0.05)
+				_apply_advanced_erosion(world_map_data, iterations, strength, sediment_factor, deposition_rate)
+			"smoothing":
+				var smooth_iterations: int = step_config.get("iterations", 2)
+				var radius: int = step_config.get("radius", 1)
+				_apply_smoothing(world_map_data, smooth_iterations, radius)
+			"river_carving":
+				var river_count: int = step_config.get("river_count", world_map_data.river_count)
+				var start_elevation: float = step_config.get("start_elevation", world_map_data.river_start_elevation)
+				var carving_strength: float = step_config.get("carving_strength", 0.2)
+				_apply_river_carving(world_map_data, river_count, start_elevation, carving_strength)
+			_:
+				MythosLogger.warn("World/Generation", "Unknown post-processing step type: " + step_type)
+	
+	MythosLogger.info("World/Generation", "Post-processing pipeline complete")
+
+
+func _apply_advanced_erosion(world_map_data: WorldMapData, iterations: int, strength: float, sediment_factor: float, deposition_rate: float) -> void:
+	"""Apply advanced hydraulic erosion with sediment transport and deposition."""
 	var img: Image = world_map_data.heightmap_image
 	var size: Vector2i = img.get_size()
 	
-	# Simple erosion: simulate water flow downhill
-	for iteration in range(world_map_data.erosion_iterations):
+	# Create sediment map for tracking material transport
+	var sediment_map: Array[float] = []
+	sediment_map.resize(size.x * size.y)
+	for i: int in sediment_map.size():
+		sediment_map[i] = 0.0
+	
+	MythosLogger.verbose("World/Generation", "Starting advanced erosion", {
+		"iterations": iterations,
+		"strength": strength,
+		"sediment_factor": sediment_factor
+	})
+	
+	for iteration in range(iterations):
 		var new_img: Image = img.duplicate()
+		var new_sediment: Array[float] = sediment_map.duplicate()
 		
 		for y in range(1, size.y - 1):
 			for x in range(1, size.x - 1):
 				var current_height: float = img.get_pixel(x, y).r
+				var current_sediment: float = sediment_map[y * size.x + x]
 				
 				# Find steepest downhill direction
 				var neighbors: Array[Vector2i] = [
@@ -302,30 +376,165 @@ func _apply_erosion(world_map_data: WorldMapData) -> void:
 				]
 				
 				var max_slope: float = 0.0
-				var erosion_amount: float = 0.0
+				var downhill_dir: Vector2i = Vector2i.ZERO
 				
 				for neighbor in neighbors:
 					var neighbor_height: float = img.get_pixel(neighbor.x, neighbor.y).r
 					var slope: float = current_height - neighbor_height
 					if slope > max_slope:
 						max_slope = slope
-						erosion_amount = slope * world_map_data.erosion_strength * 0.1
+						downhill_dir = neighbor
 				
-				# Erode current pixel
-				if erosion_amount > 0.0:
-					var new_height: float = clamp(current_height - erosion_amount, 0.0, 1.0)
+				# Calculate erosion and sediment transport
+				if max_slope > 0.0:
+					var erosion_amount: float = max_slope * strength * 0.1
+					var sediment_capacity: float = max_slope * sediment_factor
+					
+					# Erode material
+					var actual_erosion: float = min(erosion_amount, current_height)
+					var new_height: float = clamp(current_height - actual_erosion, 0.0, 1.0)
+					
+					# Add to sediment
+					var new_sediment_amount: float = current_sediment + actual_erosion
+					
+					# Transport sediment downhill if capacity exceeded
+					if new_sediment_amount > sediment_capacity:
+						var excess: float = new_sediment_amount - sediment_capacity
+						new_sediment_amount = sediment_capacity
+						# Move excess to downhill neighbor
+						if downhill_dir != Vector2i.ZERO:
+							var neighbor_idx: int = downhill_dir.y * size.x + downhill_dir.x
+							if neighbor_idx >= 0 and neighbor_idx < new_sediment.size():
+								new_sediment[neighbor_idx] += excess * 0.5  # Some loss during transport
+					
+					# Deposit sediment if slope is low
+					if max_slope < 0.01:
+						var deposit: float = new_sediment_amount * deposition_rate
+						new_height = clamp(new_height + deposit, 0.0, 1.0)
+						new_sediment_amount = max(0.0, new_sediment_amount - deposit)
+					
 					new_img.set_pixel(x, y, Color(new_height, new_height, new_height, 1.0))
+					new_sediment[y * size.x + x] = new_sediment_amount
 		
 		img = new_img
 		world_map_data.heightmap_image = img
+		sediment_map = new_sediment
 		
 		if iteration % 2 == 0:
-			MythosLogger.debug("World/Generation", "Erosion iteration", {
+			MythosLogger.debug("World/Generation", "Advanced erosion iteration", {
 				"current": iteration + 1,
-				"total": world_map_data.erosion_iterations
+				"total": iterations
 			})
 	
-	MythosLogger.info("World/Generation", "Erosion complete", {"iterations": world_map_data.erosion_iterations})
+	MythosLogger.info("World/Generation", "Advanced erosion complete", {"iterations": iterations})
+
+
+func _apply_smoothing(world_map_data: WorldMapData, iterations: int, radius: int) -> void:
+	"""Apply smoothing filter to heightmap."""
+	var img: Image = world_map_data.heightmap_image
+	var size: Vector2i = img.get_size()
+	
+	MythosLogger.verbose("World/Generation", "Applying smoothing", {"iterations": iterations, "radius": radius})
+	
+	for iteration in range(iterations):
+		var new_img: Image = img.duplicate()
+		
+		for y in range(radius, size.y - radius):
+			for x in range(radius, size.x - radius):
+				var sum: float = 0.0
+				var count: int = 0
+				
+				# Average neighboring pixels
+				for dy in range(-radius, radius + 1):
+					for dx in range(-radius, radius + 1):
+						var nx: int = x + dx
+						var ny: int = y + dy
+						if nx >= 0 and nx < size.x and ny >= 0 and ny < size.y:
+							sum += img.get_pixel(nx, ny).r
+							count += 1
+				
+				if count > 0:
+					var avg: float = sum / float(count)
+					new_img.set_pixel(x, y, Color(avg, avg, avg, 1.0))
+		
+		img = new_img
+		world_map_data.heightmap_image = img
+	
+	MythosLogger.info("World/Generation", "Smoothing complete", {"iterations": iterations})
+
+
+func _apply_river_carving(world_map_data: WorldMapData, river_count: int, start_elevation: float, carving_strength: float) -> void:
+	"""Apply river carving by tracing paths from high points."""
+	var img: Image = world_map_data.heightmap_image
+	var size: Vector2i = img.get_size()
+	
+	MythosLogger.verbose("World/Generation", "Applying river carving", {
+		"river_count": river_count,
+		"start_elevation": start_elevation
+	})
+	
+	# Find high points (potential river sources)
+	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	rng.seed = world_map_data.seed + 9000
+	
+	var river_sources: Array[Vector2i] = []
+	var attempts: int = 0
+	const MAX_ATTEMPTS: int = 1000
+	
+	while river_sources.size() < river_count and attempts < MAX_ATTEMPTS:
+		var x: int = rng.randi_range(size.x / 4, 3 * size.x / 4)
+		var y: int = rng.randi_range(size.y / 4, 3 * size.y / 4)
+		var height: float = img.get_pixel(x, y).r
+		
+		if height >= start_elevation:
+			river_sources.append(Vector2i(x, y))
+		
+		attempts += 1
+	
+	# Carve rivers by tracing downhill
+	for source: Vector2i in river_sources:
+		var current_pos: Vector2i = source
+		var path_length: int = 0
+		const MAX_PATH_LENGTH: int = 500
+		
+		while path_length < MAX_PATH_LENGTH:
+			var neighbors: Array[Vector2i] = [
+				Vector2i(current_pos.x - 1, current_pos.y),
+				Vector2i(current_pos.x + 1, current_pos.y),
+				Vector2i(current_pos.x, current_pos.y - 1),
+				Vector2i(current_pos.x, current_pos.y + 1)
+			]
+			
+			var lowest_neighbor: Vector2i = current_pos
+			var lowest_height: float = img.get_pixel(current_pos.x, current_pos.y).r
+			
+			for neighbor: Vector2i in neighbors:
+				if neighbor.x < 0 or neighbor.x >= size.x or neighbor.y < 0 or neighbor.y >= size.y:
+					continue
+				
+				var neighbor_height: float = img.get_pixel(neighbor.x, neighbor.y).r
+				if neighbor_height < lowest_height:
+					lowest_height = neighbor_height
+					lowest_neighbor = neighbor
+			
+			# Stop if no downhill path
+			if lowest_neighbor == current_pos:
+				break
+			
+			# Carve river at current position
+			var current_height: float = img.get_pixel(current_pos.x, current_pos.y).r
+			var carved_height: float = clamp(current_height - carving_strength, 0.0, 1.0)
+			img.set_pixel(current_pos.x, current_pos.y, Color(carved_height, carved_height, carved_height, 1.0))
+			
+			current_pos = lowest_neighbor
+			path_length += 1
+			
+			# Stop if reached sea level
+			if lowest_height < world_map_data.sea_level:
+				break
+	
+	world_map_data.heightmap_image = img
+	MythosLogger.info("World/Generation", "River carving complete", {"rivers_carved": river_sources.size()})
 
 
 func _generate_rivers(world_map_data: WorldMapData) -> void:
@@ -363,11 +572,20 @@ func generate_biome_preview(world_map_data: WorldMapData) -> Image:
 			var temperature: float = (temperature_noise.get_noise_2d(world_x, world_y) + 1.0) * 0.5
 			var moisture: float = (moisture_noise.get_noise_2d(world_x, world_y) + 1.0) * 0.5
 			
-			# Apply biases if available
+			# Apply global biases if available
 			var temp_bias: float = world_map_data.get("temperature_bias") if world_map_data.has("temperature_bias") else 0.0
 			var moist_bias: float = world_map_data.get("moisture_bias") if world_map_data.has("moisture_bias") else 0.0
 			temperature = clampf(temperature + temp_bias * 0.5, 0.0, 1.0)
 			moisture = clampf(moisture + moist_bias * 0.5, 0.0, 1.0)
+			
+			# Apply regional climate adjustments if available (from MapEditor painting)
+			var pixel_key: String = "%d,%d" % [x, size.y - 1 - y]
+			if world_map_data.regional_climate_adjustments.has(pixel_key):
+				var adjustment: Dictionary = world_map_data.regional_climate_adjustments[pixel_key]
+				var temp_adj: float = adjustment.get("temp", 0.0)
+				var moist_adj: float = adjustment.get("moist", 0.0)
+				temperature = clampf(temperature + temp_adj * 0.5, 0.0, 1.0)
+				moisture = clampf(moisture + moist_adj * 0.5, 0.0, 1.0)
 			
 			# Determine biome color based on height, temperature, moisture
 			var biome_color: Color = _get_biome_color(height, temperature, moisture, world_map_data.sea_level)

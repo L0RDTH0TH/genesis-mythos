@@ -30,5 +30,31 @@
     "region_size": 1024,
     "mesh_size": 64,
     "vertex_spacing": 1.0
+  },
+  "post_processing": {
+    "enabled": true,
+    "steps": [
+      {
+        "type": "erosion",
+        "enabled": true,
+        "iterations": 5,
+        "strength": 0.3,
+        "sediment_factor": 0.1,
+        "deposition_rate": 0.05
+      },
+      {
+        "type": "smoothing",
+        "enabled": false,
+        "iterations": 2,
+        "radius": 1
+      },
+      {
+        "type": "river_carving",
+        "enabled": false,
+        "river_count": 10,
+        "start_elevation": 0.7,
+        "carving_strength": 0.2
+      }
+    ]
   }
 }

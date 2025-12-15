@@ -45,6 +45,10 @@ class_name WorldMapData
 var temperature_bias: float = 0.0
 var moisture_bias: float = 0.0
 
+## Regional climate adjustments (from MapEditor painting)
+## Key: "x,y" -> {temp: float, moist: float}
+var regional_climate_adjustments: Dictionary = {}
+
 ## Landmass type (Continents, Single Island, etc.)
 @export var landmass_type: String = "Continents"
 

@@ -12,14 +12,17 @@ var world_map_data: WorldMapData
 
 ## Current editing tool
 enum EditTool {
-	RAISE,      # Raise height
-	LOWER,      # Lower height
-	SMOOTH,     # Smooth terrain
-	SHARPEN,    # Sharpen terrain
-	RIVER,      # Paint rivers (force low paths)
-	MOUNTAIN,   # Preset: Add mountain
-	CRATER,     # Preset: Add crater
-	ISLAND      # Preset: Add island
+	RAISE,           # Raise height
+	LOWER,           # Lower height
+	SMOOTH,          # Smooth terrain
+	SHARPEN,         # Sharpen terrain
+	RIVER,           # Paint rivers (force low paths)
+	MOUNTAIN,        # Preset: Add mountain
+	CRATER,          # Preset: Add crater
+	ISLAND,          # Preset: Add island
+	BIOME_PAINT,     # Paint biome colors directly
+	TEMPERATURE,     # Paint temperature adjustments
+	MOISTURE         # Paint moisture adjustments
 }
 
 var current_tool: EditTool = EditTool.RAISE
@@ -28,6 +31,14 @@ var current_tool: EditTool = EditTool.RAISE
 var brush_radius: float = 50.0
 var brush_strength: float = 0.1
 var brush_falloff: float = 0.5  # 0.0 = hard edge, 1.0 = smooth falloff
+
+## Climate painting parameters
+var temperature_offset: float = 0.0  # -1.0 to 1.0
+var moisture_offset: float = 0.0     # -1.0 to 1.0
+var selected_biome_id: String = ""   # For biome painting
+
+## Climate adjustment map (stores regional temperature/moisture offsets)
+var climate_adjustments: Dictionary = {}  # Key: "x,y" -> {temp: float, moist: float}
 
 ## Is currently painting (mouse held down)
 var is_painting: bool = false
@@ -135,6 +146,12 @@ func _apply_paint(world_position: Vector2) -> void:
 			_paint_crater(img, center_pixel, min_x, max_x, min_y, max_y, radius_pixels)
 		EditTool.ISLAND:
 			_paint_island(img, center_pixel, min_x, max_x, min_y, max_y, radius_pixels)
+		EditTool.BIOME_PAINT:
+			_paint_biome(img, center_pixel, min_x, max_x, min_y, max_y, radius_pixels)
+		EditTool.TEMPERATURE:
+			_paint_temperature(center_pixel, min_x, max_x, min_y, max_y, radius_pixels)
+		EditTool.MOISTURE:
+			_paint_moisture(center_pixel, min_x, max_x, min_y, max_y, radius_pixels)
 
 
 func _paint_raise(img: Image, center: Vector2i, min_x: int, max_x: int, min_y: int, max_y: int, radius: int) -> void:
@@ -307,5 +324,106 @@ func _edit_tool_to_string(tool: EditTool) -> String:
 			return "CRATER"
 		EditTool.ISLAND:
 			return "ISLAND"
+		EditTool.BIOME_PAINT:
+			return "BIOME_PAINT"
+		EditTool.TEMPERATURE:
+			return "TEMPERATURE"
+		EditTool.MOISTURE:
+			return "MOISTURE"
 		_:
 			return "UNKNOWN"
+
+
+func set_temperature_offset(offset: float) -> void:
+	"""Set temperature offset for climate painting (-1.0 to 1.0)."""
+	temperature_offset = clamp(offset, -1.0, 1.0)
+
+
+func set_moisture_offset(offset: float) -> void:
+	"""Set moisture offset for climate painting (-1.0 to 1.0)."""
+	moisture_offset = clamp(offset, -1.0, 1.0)
+
+
+func set_selected_biome(biome_id: String) -> void:
+	"""Set selected biome for biome painting."""
+	selected_biome_id = biome_id
+
+
+func _paint_biome(img: Image, center: Vector2i, min_x: int, max_x: int, min_y: int, max_y: int, radius: int) -> void:
+	"""Paint biome color directly (requires biome color lookup)."""
+	# For now, this is a placeholder - would need access to biome color data
+	# In full implementation, would look up biome color and apply it
+	# For Phase 3, just log that biome painting was attempted
+	MythosLogger.debug("World/Editor", "Biome painting not fully implemented yet", {"biome_id": selected_biome_id})
+
+
+func _paint_temperature(center: Vector2i, min_x: int, max_x: int, min_y: int, max_y: int, radius: int) -> void:
+	"""Paint temperature adjustments (stores offsets for later use in generation)."""
+	if world_map_data == null:
+		return
+	
+	for y in range(min_y, max_y + 1):
+		for x in range(min_x, max_x + 1):
+			var distance: float = Vector2(x, y).distance_to(Vector2(center.x, center.y))
+			if distance > radius:
+				continue
+			
+			var falloff: float = 1.0 - (distance / float(radius))
+			falloff = pow(falloff, 1.0 / (brush_falloff + 0.1))
+			
+			var key: String = "%d,%d" % [x, y]
+			if not climate_adjustments.has(key):
+				climate_adjustments[key] = {"temp": 0.0, "moist": 0.0}
+			
+			# Apply temperature offset
+			var current_offset: float = climate_adjustments[key].get("temp", 0.0)
+			var new_offset: float = clamp(current_offset + temperature_offset * brush_strength * falloff, -1.0, 1.0)
+			climate_adjustments[key]["temp"] = new_offset
+			
+			# Also store in world_map_data for MapGenerator access
+			world_map_data.regional_climate_adjustments[key] = climate_adjustments[key]
+	
+	MythosLogger.debug("World/Editor", "Temperature adjustments painted", {"pixels": climate_adjustments.size()})
+
+
+func _paint_moisture(center: Vector2i, min_x: int, max_x: int, min_y: int, max_y: int, radius: int) -> void:
+	"""Paint moisture adjustments (stores offsets for later use in generation)."""
+	if world_map_data == null:
+		return
+	
+	for y in range(min_y, max_y + 1):
+		for x in range(min_x, max_x + 1):
+			var distance: float = Vector2(x, y).distance_to(Vector2(center.x, center.y))
+			if distance > radius:
+				continue
+			
+			var falloff: float = 1.0 - (distance / float(radius))
+			falloff = pow(falloff, 1.0 / (brush_falloff + 0.1))
+			
+			var key: String = "%d,%d" % [x, y]
+			if not climate_adjustments.has(key):
+				climate_adjustments[key] = {"temp": 0.0, "moist": 0.0}
+			
+			# Apply moisture offset
+			var current_offset: float = climate_adjustments[key].get("moist", 0.0)
+			var new_offset: float = clamp(current_offset + moisture_offset * brush_strength * falloff, -1.0, 1.0)
+			climate_adjustments[key]["moist"] = new_offset
+			
+			# Also store in world_map_data for MapGenerator access
+			world_map_data.regional_climate_adjustments[key] = climate_adjustments[key]
+	
+	MythosLogger.debug("World/Editor", "Moisture adjustments painted", {"pixels": climate_adjustments.size()})
+
+
+func get_climate_adjustment(x: int, y: int) -> Dictionary:
+	"""Get climate adjustment for pixel coordinates."""
+	var key: String = "%d,%d" % [x, y]
+	return climate_adjustments.get(key, {"temp": 0.0, "moist": 0.0})
+
+
+func clear_climate_adjustments() -> void:
+	"""Clear all climate adjustments."""
+	climate_adjustments.clear()
+	if world_map_data != null:
+		world_map_data.regional_climate_adjustments.clear()
+	MythosLogger.debug("World/Editor", "Climate adjustments cleared")
