@@ -32,9 +32,45 @@ func _ready() -> void:
 func _input(event: InputEvent) -> void:
 	"""Fallback input handler to ensure F3 toggle works even if DebugMenu doesn't receive input."""
 	if event is InputEventKey and event.pressed and event.keycode == KEY_F3:
+		print("=== F3 PRESSED ===")
 		if debug_menu:
+			print("DebugMenu CanvasLayer found")
+			print("  - Layer: ", debug_menu.layer)
+			print("  - Scale: ", debug_menu.scale)
+			print("  - Visible: ", debug_menu.visible)
+			
 			# Access the style property directly to cycle through states
 			# Style enum: HIDDEN=0, VISIBLE_COMPACT=1, VISIBLE_DETAILED=2, MAX=3
 			var current_style: int = debug_menu.get("style")
+			var style_names = ["HIDDEN", "VISIBLE_COMPACT", "VISIBLE_DETAILED"]
+			print("  - Current style: ", style_names[current_style], " (", current_style, ")")
+			
 			var next_style: int = wrapi(current_style + 1, 0, 3)
 			debug_menu.set("style", next_style)
+			
+			var new_style: int = debug_menu.get("style")
+			print("  - New style: ", style_names[new_style], " (", new_style, ")")
+			print("  - Visible after change: ", debug_menu.visible)
+			
+			# Check the DebugMenu Control node
+			var debug_control: Control = debug_menu.get_node_or_null("DebugMenu")
+			if debug_control:
+				print("  - DebugMenu Control node found")
+				print("    - Visible: ", debug_control.visible)
+				print("    - Z-index: ", debug_control.z_index)
+				print("    - Position: ", debug_control.position)
+				print("    - Size: ", debug_control.size)
+				print("    - Global position: ", debug_control.global_position)
+				print("    - Modulate: ", debug_control.modulate)
+			else:
+				print("  - DebugMenu Control node NOT FOUND!")
+				print("  - Available children: ", debug_menu.get_children())
+		else:
+			print("DebugMenu CanvasLayer NOT FOUND!")
+			# Try to find it again
+			debug_menu = get_tree().root.get_node_or_null("DebugMenu")
+			if debug_menu:
+				print("  - Found on retry!")
+			else:
+				print("  - Root children: ", get_tree().root.get_children())
+		print("==================")
