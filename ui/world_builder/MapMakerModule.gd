@@ -450,7 +450,7 @@ func generate_map() -> void:
 	print("DEBUG: MapMakerModule: Map generation complete")
 
 
-func regenerate_map(params: Dictionary) -> bool:
+func regenerate_map(params: Dictionary, use_low_res_preview: bool = false) -> bool:
 	"""
 	Regenerate map with new parameters from dictionary.
 	
@@ -469,6 +469,7 @@ func regenerate_map(params: Dictionary) -> bool:
 			- sea_level (float): Sea level (0.0-1.0)
 			- erosion_enabled (bool): Enable erosion
 			- noise_type (int, optional): FastNoiseLite noise type
+		use_low_res_preview: If true, skip expensive post-processing for faster preview
 	
 	Returns:
 		bool: True if regeneration succeeded, False on failure
