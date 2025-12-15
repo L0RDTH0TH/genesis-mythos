@@ -31,6 +31,15 @@ var landmass_mask_noise: FastNoiseLite
 ## Landmass type configurations loaded from JSON
 var landmass_configs: Dictionary = {}
 
+## Biome configurations loaded from JSON
+var biome_configs: Array[Dictionary] = []
+
+## Biome transition width for blending (0.0 = no blending)
+var biome_transition_width: float = 0.05
+
+## Post-processing pipeline configuration loaded from JSON
+var post_processing_config: Dictionary = {}
+
 ## Generation thread
 var generation_thread: Thread
 
