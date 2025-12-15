@@ -242,7 +242,11 @@ func _load_landmass_types() -> void:
 	
 	var data: Dictionary = json.data
 	landmass_configs = data.get("landmass_types", {})
-	available_landmass_types = landmass_configs.keys()
+	# Convert keys to Array[String] (keys() returns Array, need explicit cast)
+	var keys_array: Array = landmass_configs.keys()
+	available_landmass_types.clear()
+	for key in keys_array:
+		available_landmass_types.append(str(key))
 	available_landmass_types.sort()
 	MythosLogger.info("UI/WorldBuilder", "Loaded landmass type configurations", {"count": available_landmass_types.size()})
 
@@ -2007,7 +2011,12 @@ func _on_fantasy_style_selected(index: int) -> void:
 	var selected_style: String = style_dropdown.get_item_text(index)
 	step_data["Map Gen"]["style"] = selected_style
 	
-	var arch: Dictionary = fantasy_archetypes.get(selected_style, {})
+	# Load archetype from file path (fantasy_archetypes stores file paths, not data)
+	var arch_file_path: String = fantasy_archetypes.get(selected_style, "")
+	if arch_file_path.is_empty():
+		return
+	
+	var arch: Dictionary = _load_archetype_by_name(selected_style)
 	if arch.is_empty():
 		return
 	

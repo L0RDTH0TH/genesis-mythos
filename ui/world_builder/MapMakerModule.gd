@@ -64,7 +64,7 @@ func _ready() -> void:
 	_setup_renderer()
 	_setup_editor()
 	_setup_marker_manager()
-	_setup_mini_3d_preview()
+	# _setup_mini_3d_preview()  # TODO: Implement in future phase
 	_setup_keyboard_shortcuts()
 	print("DEBUG: MapMakerModule._ready() complete")
 
@@ -625,7 +625,7 @@ func regenerate_map(params: Dictionary) -> bool:
 			call_deferred("_set_viewport_update_always")
 		
 		# Update mini 3D preview if available
-		call_deferred("update_mini_3d_preview")
+		# call_deferred("update_mini_3d_preview")  # TODO: Implement in future phase
 	else:
 		MythosLogger.error("UI/MapMakerModule", "regenerate_map() - map_renderer is null, cannot refresh")
 		return false
