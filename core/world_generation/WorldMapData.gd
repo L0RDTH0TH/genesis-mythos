@@ -147,3 +147,54 @@ func get_elevation_at(position: Vector2) -> float:
 func is_underwater(position: Vector2) -> bool:
 	"""Check if position is underwater based on sea level."""
 	return get_elevation_at(position) < sea_level
+
+
+func save_to_file(file_path: String) -> bool:
+	"""Save world map data to file (variant format)."""
+	var file: FileAccess = FileAccess.open(file_path, FileAccess.WRITE)
+	if file == null:
+		MythosLogger.error("World/Data", "Failed to save WorldMapData to " + file_path)
+		return false
+	
+	# Save as Resource (Godot's native format)
+	var error: Error = ResourceSaver.save(self, file_path)
+	file.close()
+	
+	if error != OK:
+		MythosLogger.error("World/Data", "Failed to save WorldMapData: " + str(error))
+		return false
+	
+	MythosLogger.info("World/Data", "Saved WorldMapData to " + file_path)
+	return true
+
+
+func load_from_file(file_path: String) -> bool:
+	"""Load world map data from file."""
+	if not FileAccess.file_exists(file_path):
+		MythosLogger.error("World/Data", "File does not exist: " + file_path)
+		return false
+	
+	var loaded_data: Resource = load(file_path)
+	if loaded_data == null or not loaded_data is WorldMapData:
+		MythosLogger.error("World/Data", "Failed to load WorldMapData from " + file_path)
+		return false
+	
+	# Copy properties from loaded data
+	var source: WorldMapData = loaded_data as WorldMapData
+	seed = source.seed
+	world_width = source.world_width
+	world_height = source.world_height
+	heightmap_image = source.heightmap_image.duplicate() if source.heightmap_image != null else null
+	biome_preview_image = source.biome_preview_image.duplicate() if source.biome_preview_image != null else null
+	noise_type = source.noise_type
+	noise_frequency = source.noise_frequency
+	noise_octaves = source.noise_octaves
+	noise_persistence = source.noise_persistence
+	noise_lacunarity = source.noise_lacunarity
+	sea_level = source.sea_level
+	landmass_type = source.landmass_type
+	markers = source.markers.duplicate()
+	regional_climate_adjustments = source.regional_climate_adjustments.duplicate()
+	
+	MythosLogger.info("World/Data", "Loaded WorldMapData from " + file_path)
+	return true

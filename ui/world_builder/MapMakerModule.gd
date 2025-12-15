@@ -47,6 +47,13 @@ var map_root: Node2D
 ## Terrain3DManager reference
 var terrain_3d_manager = null  # Terrain3DManager - type hint removed
 
+## Mini 3D preview viewport and container
+var mini_3d_preview: SubViewportContainer = null
+var mini_3d_viewport: SubViewport = null
+var mini_3d_world: Node3D = null
+var mini_3d_camera: Camera3D = null
+var mini_3d_terrain: Node = null
+
 
 func _ready() -> void:
 	"""Initialize MapMakerModule."""
@@ -57,6 +64,7 @@ func _ready() -> void:
 	_setup_renderer()
 	_setup_editor()
 	_setup_marker_manager()
+	_setup_mini_3d_preview()
 	_setup_keyboard_shortcuts()
 	print("DEBUG: MapMakerModule._ready() complete")
 
@@ -565,12 +573,25 @@ func regenerate_map(params: Dictionary) -> bool:
 		return false
 	
 	# Try to generate map
+	# For low-res preview, skip expensive post-processing for faster generation
+	var original_post_proc_enabled: bool = true
+	if use_low_res_preview:
+		if map_generator.post_processing_config.has("enabled"):
+			original_post_proc_enabled = map_generator.post_processing_config.get("enabled", true)
+		map_generator.post_processing_config["enabled"] = false
+	
 	MythosLogger.debug("UI/MapMakerModule", "Starting map generation", {
 		"seed": world_map_data.seed,
-		"size": Vector2i(world_map_data.world_width, world_map_data.world_height)
+		"size": Vector2i(world_map_data.world_width, world_map_data.world_height),
+		"preview_mode": use_low_res_preview,
+		"image_size": Vector2i(map_size_x, map_size_y)
 	})
 	
 	map_generator.generate_map(world_map_data, false)  # Synchronous
+	
+	# Restore post-processing setting
+	if use_low_res_preview:
+		map_generator.post_processing_config["enabled"] = original_post_proc_enabled
 	
 	# Validate generation result
 	if world_map_data.heightmap_image == null:
@@ -602,6 +623,9 @@ func regenerate_map(params: Dictionary) -> bool:
 			map_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 			# Then set back to always update
 			call_deferred("_set_viewport_update_always")
+		
+		# Update mini 3D preview if available
+		call_deferred("update_mini_3d_preview")
 	else:
 		MythosLogger.error("UI/MapMakerModule", "regenerate_map() - map_renderer is null, cannot refresh")
 		return false

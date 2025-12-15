@@ -2265,10 +2265,12 @@ func _on_generate_map_pressed() -> void:
 		_initialize_map_maker_module()
 	
 	# Try custom MapMakerModule regeneration first (default path)
+	# Use low-res preview for faster initial generation, then full-res on final
+	var use_preview: bool = false  # Can be toggled for real-time parameter changes
 	var custom_success: bool = false
 	if map_maker_module != null and map_maker_module.has_method("regenerate_map"):
 		MythosLogger.info("UI/WorldBuilder", "Using custom MapMakerModule renderer for map generation")
-		custom_success = map_maker_module.regenerate_map(generation_params)
+		custom_success = map_maker_module.regenerate_map(generation_params, use_preview)
 		
 		if custom_success:
 			# Extract images from MapMakerModule's world_map_data
