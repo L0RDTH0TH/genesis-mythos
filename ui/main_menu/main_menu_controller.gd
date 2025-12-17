@@ -33,7 +33,7 @@ func _apply_ui_constants() -> void:
 	if world_button:
 		world_button.custom_minimum_size = Vector2(0, UIConstants.BUTTON_HEIGHT_LARGE)
 	
-	# Apply spacing to VBoxContainer (GGVBox)
+	# Apply spacing to GGVBox container
 	var vbox: Control = get_node_or_null("CenterContainer/VBoxContainer")
 	if vbox:
 		vbox.add_theme_constant_override("separation", UIConstants.SPACING_LARGE)

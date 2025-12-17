@@ -32,7 +32,6 @@ grow_vertical = 2
 
 [node name="VBoxContainer" type="GGVBox" parent="CenterContainer"]
 layout_mode = 2
-theme_override_constants/separation = 40
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
@@ -47,17 +46,15 @@ text = "Main Menu"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="CharacterCreationButton" type="Button" parent="CenterContainer/VBoxContainer"]
+[node name="CharacterCreationButton" type="GGButton" parent="CenterContainer/VBoxContainer"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 120)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 0
 text = "Create Character"
 
-[node name="WorldCreationButton" type="Button" parent="CenterContainer/VBoxContainer"]
+[node name="WorldCreationButton" type="GGButton" parent="CenterContainer/VBoxContainer"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 120)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 0
