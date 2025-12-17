@@ -53,3 +53,4 @@ func _notification(what: int) -> void:
 		# Ensure dialog stays centered
 		if visible:
 			popup_centered()
+

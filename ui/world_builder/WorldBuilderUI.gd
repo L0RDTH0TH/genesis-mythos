@@ -369,8 +369,8 @@ func _update_viewport_size() -> void:
 	# Only update if stretch is disabled
 	if not terrain_3d_view.stretch:
 		var container_size: Vector2 = terrain_3d_view.size
-		if container_size.x > 0 and container_size.y > 0:
-			preview_viewport.size = Vector2i(int(container_size.x), int(container_size.y))
+	if container_size.x > 0 and container_size.y > 0:
+		preview_viewport.size = Vector2i(int(container_size.x), int(container_size.y))
 			MythosLogger.debug("UI/WorldBuilder", "Viewport size updated to: %s" % container_size)
 	else:
 		MythosLogger.debug("UI/WorldBuilder", "Viewport size managed automatically by SubViewportContainer.stretch")

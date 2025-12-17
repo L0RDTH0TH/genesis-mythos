@@ -24,6 +24,9 @@ func _setup_resize_handler() -> void:
 	var viewport: Viewport = get_viewport()
 	if viewport != null:
 		viewport.size_changed.connect(_on_viewport_size_changed)
+	
+	# Also listen to window notifications
+	set_process(true)
 
 
 func _on_viewport_size_changed() -> void:
@@ -58,69 +61,77 @@ func _apply_responsive_positioning() -> void:
 	if debug_control == null:
 		return
 	
-	# Set anchor to top-right
+	# Ensure anchor is set to top-right
 	debug_control.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	
-	# Apply margins from UIConstants
-	var margin_right: int = -UIConstants.SPACING_MEDIUM  # Negative = margin from right edge
-	var margin_top: int = UIConstants.SPACING_MEDIUM
-	
-	# Get the natural size of the content (before scaling)
-	await get_tree().process_frame  # Wait for layout to update
-	var content_size: Vector2 = debug_control.get_combined_minimum_size()
-	if content_size == Vector2.ZERO:
-		# Fallback if size not available yet
-		content_size = Vector2(300, 400)
-	
-	# Apply margins to position in top-right with safe spacing
-	# For PRESET_TOP_RIGHT (anchor at top-right corner):
-	# - offset_left: negative value = extends left from right edge
-	# - offset_right: usually 0 or negative for margin
-	# - offset_top: positive = down from top edge
-	# - offset_bottom: positive = down from top edge
-	debug_control.offset_left = -content_size.x + margin_right
-	debug_control.offset_top = margin_top
-	debug_control.offset_right = margin_right
-	debug_control.offset_bottom = margin_top + content_size.y
-	
-	# Clamp to ensure it stays on screen
-	_clamp_to_viewport()
-
-
-func _clamp_to_viewport() -> void:
-	"""Clamp debug menu position to ensure it stays fully visible."""
-	if debug_control == null:
-		return
+	# Wait for layout to update to get actual content size
+	await get_tree().process_frame
+	await get_tree().process_frame  # Extra frame to ensure size is calculated
 	
 	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
-	await get_tree().process_frame  # Wait for size to update
-	var rect_size: Vector2 = debug_control.get_combined_minimum_size() * debug_control.scale
-	if rect_size == Vector2.ZERO:
-		rect_size = Vector2(300, 400) * debug_control.scale
 	
-	# Calculate actual position based on anchors and offsets
+	# Get the natural size of the content (before scaling)
+	var content_size: Vector2 = debug_control.get_combined_minimum_size()
+	if content_size == Vector2.ZERO:
+		# Fallback: estimate size based on typical debug menu content
+		content_size = Vector2(UIConstants.LABEL_WIDTH_WIDE * 2, UIConstants.LIST_HEIGHT_STANDARD * 2)
+	
+	# Calculate scaled size
+	var scaled_size: Vector2 = content_size * debug_control.scale
+	
+	# Apply margins from UIConstants
+	var safe_margin: int = UIConstants.SPACING_MEDIUM
+	
+	# For PRESET_TOP_RIGHT:
+	# - offset_left: negative value extends left from right edge (defines width)
+	# - offset_right: negative value creates margin from right edge
+	# - offset_top: positive value creates margin from top edge
+	# - offset_bottom: positive value sets bottom edge from top (defines height)
+	
+	# Calculate safe position ensuring it fits on screen
+	var max_width: float = viewport_size.x - (safe_margin * 2)
+	var max_height: float = viewport_size.y - (safe_margin * 2)
+	
+	# Adjust scale if content is too large
+	if scaled_size.x > max_width:
+		debug_control.scale = Vector2(max_width / content_size.x, debug_control.scale.y)
+		scaled_size = content_size * debug_control.scale
+	if scaled_size.y > max_height:
+		debug_control.scale = Vector2(debug_control.scale.x, max_height / content_size.y)
+		scaled_size = content_size * debug_control.scale
+	
+	# Set offsets with safe margins
+	debug_control.offset_left = -scaled_size.x
+	debug_control.offset_top = safe_margin
+	debug_control.offset_right = -safe_margin
+	debug_control.offset_bottom = safe_margin + scaled_size.y
+	
+	# Verify it's fully visible (final check)
 	var right_edge: float = viewport_size.x + debug_control.offset_right
-	var left_edge: float = right_edge - rect_size.x
+	var left_edge: float = right_edge - scaled_size.x
 	var top_edge: float = debug_control.offset_top
-	var bottom_edge: float = top_edge + rect_size.y
+	var bottom_edge: float = top_edge + scaled_size.y
 	
-	# Ensure it doesn't go off the right edge
+	# Final clamp if still needed (shouldn't be, but safety check)
 	if right_edge > viewport_size.x:
-		var overflow: float = right_edge - viewport_size.x
-		debug_control.offset_right -= overflow
-	
-	# Ensure it doesn't go off the left edge (if viewport is very small)
-	if left_edge < 0:
-		debug_control.offset_right = viewport_size.x - rect_size.x - UIConstants.SPACING_MEDIUM
-	
-	# Ensure it doesn't go off the top
-	if top_edge < 0:
-		debug_control.offset_top = UIConstants.SPACING_MEDIUM
-		debug_control.offset_bottom = debug_control.offset_top + rect_size.y
-	
-	# Ensure it doesn't go off the bottom (if viewport is very small)
-	if bottom_edge > viewport_size.y:
-		debug_control.offset_top = viewport_size.y - rect_size.y - UIConstants.SPACING_MEDIUM
-		debug_control.offset_bottom = debug_control.offset_top + rect_size.y
+		debug_control.offset_right = -safe_margin
+		debug_control.offset_left = -scaled_size.x
+	if left_edge < safe_margin:
+		debug_control.offset_right = -safe_margin
+		debug_control.offset_left = -(viewport_size.x - safe_margin * 2)
+	if top_edge < safe_margin:
+		debug_control.offset_top = safe_margin
+		debug_control.offset_bottom = safe_margin + scaled_size.y
+	if bottom_edge > viewport_size.y - safe_margin:
+		debug_control.offset_top = viewport_size.y - scaled_size.y - safe_margin
+		debug_control.offset_bottom = debug_control.offset_top + scaled_size.y
+
+
+func _notification(what: int) -> void:
+	"""Handle window resize notifications."""
+	if what == NOTIFICATION_WM_SIZE_CHANGED or what == NOTIFICATION_RESIZED:
+		# Defer to next frame to avoid async issues in notification handler
+		call_deferred("_apply_responsive_positioning")
+		MythosLogger.debug("UI/DebugMenu", "Debug menu repositioned via notification")
 
 
