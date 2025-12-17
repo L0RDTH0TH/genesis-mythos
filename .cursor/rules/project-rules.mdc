@@ -67,7 +67,7 @@ res://
 └── project.godot
 ```
 
-**Note:** Additional folders (`addons/`, `demo/`, `tests/`, `tools/`, `shaders/`, `materials/`) are explicitly permitted and do not require rule changes. Terrain3D and GUT are now explicitly supported addons.
+**Note:** Additional folders (`addons/`, `demo/`, `tests/`, `tools/`, `shaders/`, `materials/`) are explicitly permitted and do not require rule changes. Terrain3D, GUT, and ProceduralWorldMap are explicitly supported addons (core systems for procedural world generation).
 
 ## 3. Code Style – MANDATORY FOR BOTH GROK AND CURSOR
 
@@ -179,3 +179,5 @@ Always add the exact script header shown in rule 3.
 ---
 
 **THESE RULES ARE CURRENT AND AUTHORITATIVE AS OF 2025-12-13. MAJOR CHANGES REQUIRE EXPLICIT APPROVAL AND AUDIT.**
+
+**UPDATE 2025-12-13:** ProceduralWorldMap upgraded to explicitly supported addon status (core system that generates 2D maps seeding Terrain3D procedural generation).

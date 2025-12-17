@@ -15,7 +15,7 @@ func _run() -> void:
 		print("ERROR: This script must be run in the editor (Script > Run)")
 		return
 	
-	var editor_interface: EditorInterface = EditorInterface
+	var editor_interface: EditorInterface = get_editor_interface()
 	var filesystem: EditorFileSystem = editor_interface.get_resource_filesystem()
 	
 	# Parchment texture paths

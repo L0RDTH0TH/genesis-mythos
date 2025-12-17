@@ -1,9 +1,10 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://ui/world_builder/WorldBuilderUI.gd" id="1_worldbuilder"]
 [ext_resource type="Theme" path="res://themes/bg3_theme.tres" id="2_theme"]
 [ext_resource type="Shader" path="res://shaders/overlay_vignette.gdshader" id="3_vignette"]
 [ext_resource type="Environment" path="res://assets/environments/eryndor_base.tres" id="4_environment"]
+[ext_resource type="Script" path="res://addons/procedural_world_map/worldmap.gd" id="5_proceduralworldmap"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_center"]
 bg_color = Color(0.25, 0.2, 0.15, 1)
@@ -58,7 +59,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="TitleLabel" type="Label" parent="BackgroundPanel"]
+[node name="TitleLabel" type="GGLabel" parent="BackgroundPanel"]
 layout_mode = 1
 anchors_preset = 6
 anchor_left = 0.0
@@ -123,6 +124,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.1, 0.1, 0.1, 1)
+script = ExtResource("5_proceduralworldmap")
 incremental_quality = false
 camera_size = Vector2i(1024, 1024)
 zoom = 1.0
@@ -138,7 +140,7 @@ stretch = true
 visible = false
 
 [node name="PreviewViewport" type="SubViewport" parent="BackgroundPanel/MainContainer/RightSplit/CenterPanel/Terrain3DView"]
-size = Vector2(1920, 1080)
+size = Vector2(1024, 1024)
 transparent_bg = false
 handle_input_locally = false
 render_target_update_mode = 0
@@ -180,7 +182,7 @@ offset_bottom = -10.0
 grow_horizontal = 2
 grow_vertical = 0
 
-[node name="BackButton" type="Button" parent="BackgroundPanel/ButtonContainer"]
+[node name="BackButton" type="GGButton" parent="BackgroundPanel/ButtonContainer"]
 layout_mode = 2
 text = "Back"
 

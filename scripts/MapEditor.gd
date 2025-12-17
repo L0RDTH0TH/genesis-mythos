@@ -21,11 +21,15 @@ var canvas_texture: ImageTexture = ImageTexture.new()  # Persistent reference â€
 var map_width: int = 1024
 var map_height: int = 1024
 var seed_value: int = 12345
-var archetypes: Dictionary = {}
+var archetypes: Dictionary = {}  # Maps display name to file path
+var available_archetypes: Array[String] = []  # List of archetype display names
+var current_archetype: Dictionary = {}  # Currently loaded archetype data
 var selected_style: String = "High Fantasy"
 
 var size_map: Dictionary = {"Tiny": 512, "Small": 1024, "Medium": 2048, "Large": 4096, "Extra Large": 8192}
 var landmass_types: Array[String] = ["Continents", "Island Chain", "Single Island", "Archipelago", "Pangea", "Coastal"]
+
+const ARCHETYPES_DIR: String = "res://data/archetypes/"
 
 # Brush variables for manual editing (from original implementation)
 var brush_size: int = 20
@@ -45,13 +49,8 @@ func _ready() -> void:
 		canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		canvas.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED
 	
-	# Load archetypes from JSON
-	var file: FileAccess = FileAccess.open("res://data/fantasy_archetypes.json", FileAccess.READ)
-	if file:
-		archetypes = JSON.parse_string(file.get_as_text())
-		file.close()
-	else:
-		print("Error loading fantasy_archetypes.json")
+	# Load available archetypes from directory
+	_load_archetype_list()
 	
 	# Populate Size dropdown
 	if size_dropdown != null:
@@ -62,11 +61,11 @@ func _ready() -> void:
 	
 	# Populate Fantasy Style dropdown
 	if style_dropdown != null:
-		for style in archetypes.keys():
-			style_dropdown.add_item(style)
+		for style_name: String in available_archetypes:
+			style_dropdown.add_item(style_name)
 		style_dropdown.selected = 0
 		style_dropdown.item_selected.connect(_on_style_selected)
-		if archetypes.size() > 0:
+		if available_archetypes.size() > 0:
 			_on_style_selected(0)  # Initialize with first style
 	
 	# Populate Landmass dropdown
@@ -147,12 +146,12 @@ func _on_style_selected(index: int) -> void:
 	if style_dropdown == null:
 		return
 	selected_style = style_dropdown.get_item_text(index)
-	var arch: Dictionary = archetypes.get(selected_style, {})
-	if arch.is_empty():
+	current_archetype = _load_archetype_by_name(selected_style)
+	if current_archetype.is_empty():
 		return
 	
 	# Set recommended size
-	var rec_size: String = arch.get("recommended_size", "Small")
+	var rec_size: String = current_archetype.get("recommended_size", "Small")
 	if size_dropdown != null:
 		var size_index: int = 0
 		for i in range(size_dropdown.get_item_count()):
@@ -163,7 +162,7 @@ func _on_style_selected(index: int) -> void:
 		_on_size_selected(size_index)
 	
 	# Set default landmass
-	var rec_land: String = arch.get("default_landmass", "Continents")
+	var rec_land: String = current_archetype.get("default_landmass", "Continents")
 	if landmass_dropdown != null:
 		var land_index: int = landmass_types.find(rec_land)
 		if land_index >= 0:
@@ -171,7 +170,63 @@ func _on_style_selected(index: int) -> void:
 	
 	# Set tooltip
 	if style_dropdown != null:
-		style_dropdown.tooltip_text = arch.get("description", "")
+		style_dropdown.tooltip_text = current_archetype.get("description", "")
+
+func _load_archetype_list() -> void:
+	"""Load list of available archetype files from directory."""
+	var dir: DirAccess = DirAccess.open(ARCHETYPES_DIR)
+	if dir == null:
+		push_error("MapEditor: Failed to open archetypes directory: " + ARCHETYPES_DIR)
+		return
+	
+	available_archetypes.clear()
+	archetypes.clear()
+	
+	dir.list_dir_begin()
+	var file_name: String = dir.get_next()
+	
+	while file_name != "":
+		if file_name.ends_with(".json"):
+			var file_path: String = ARCHETYPES_DIR + file_name
+			var arch_data: Dictionary = _load_archetype_file(file_path)
+			if not arch_data.is_empty():
+				var display_name: String = arch_data.get("name", file_name.get_basename().replace("_", " "))
+				available_archetypes.append(display_name)
+				archetypes[display_name] = file_path
+		
+		file_name = dir.get_next()
+	
+	available_archetypes.sort()
+	print("MapEditor: Loaded ", available_archetypes.size(), " archetype definitions")
+
+
+func _load_archetype_file(file_path: String) -> Dictionary:
+	"""Load a single archetype file and return its data."""
+	var file: FileAccess = FileAccess.open(file_path, FileAccess.READ)
+	if file == null:
+		push_error("MapEditor: Failed to load archetype from " + file_path)
+		return {}
+	
+	var json_string: String = file.get_as_text()
+	file.close()
+	
+	var arch_data: Dictionary = JSON.parse_string(json_string)
+	if arch_data.is_empty():
+		push_error("MapEditor: Failed to parse archetype JSON from " + file_path)
+		return {}
+	
+	return arch_data
+
+
+func _load_archetype_by_name(archetype_name: String) -> Dictionary:
+	"""Load a specific archetype by its display name."""
+	var file_path: String = archetypes.get(archetype_name, "")
+	if file_path.is_empty():
+		push_error("MapEditor: Archetype not found: " + archetype_name)
+		return {}
+	
+	return _load_archetype_file(file_path)
+
 
 func _on_landmass_selected(_index: int) -> void:
 	pass  # Placeholder
@@ -189,15 +244,20 @@ func _on_seed_changed(text: String) -> void:
 			seed_input.text = str(seed_value)
 
 func _on_generate_map() -> void:
-	var arch: Dictionary = archetypes.get(selected_style, {})
-	if arch.is_empty():
+	# Reload archetype to ensure we have latest data
+	current_archetype = _load_archetype_by_name(selected_style)
+	if current_archetype.is_empty():
 		return
 	
 	var noise: FastNoiseLite = FastNoiseLite.new()
 	noise.seed = seed_value
 	
-	# Map noise type string to enum
-	var noise_type_str: String = arch.get("noise_type", "TYPE_SIMPLEX")
+	# Map noise type string to enum - support both old flat format and new grouped format
+	var noise_type_str: String
+	if current_archetype.has("noise"):
+		noise_type_str = current_archetype["noise"].get("noise_type", "TYPE_SIMPLEX")
+	else:
+		noise_type_str = current_archetype.get("noise_type", "TYPE_SIMPLEX")
 	var noise_type: FastNoiseLite.NoiseType = FastNoiseLite.NoiseType.TYPE_SIMPLEX
 	match noise_type_str:
 		"TYPE_SIMPLEX":
@@ -212,11 +272,20 @@ func _on_generate_map() -> void:
 			noise_type = FastNoiseLite.NoiseType.TYPE_CELLULAR
 	
 	noise.noise_type = noise_type
-	noise.frequency = arch.get("frequency", 0.004)
-	noise.fractal_octaves = arch.get("octaves", 6)
-	noise.fractal_gain = arch.get("gain", 0.5)
-	noise.fractal_lacunarity = arch.get("lacunarity", 2.0)
-	var height_scale: float = arch.get("height_scale", 0.8)
+	# Support both old flat format and new grouped format
+	var height_scale: float = 0.8
+	if current_archetype.has("noise"):
+		noise.frequency = current_archetype["noise"].get("frequency", 0.004)
+		noise.fractal_octaves = current_archetype["noise"].get("octaves", 6)
+		noise.fractal_gain = current_archetype["noise"].get("gain", 0.5)
+		noise.fractal_lacunarity = current_archetype["noise"].get("lacunarity", 2.0)
+		height_scale = current_archetype["noise"].get("height_scale", 0.8)
+	else:
+		noise.frequency = current_archetype.get("frequency", 0.004)
+		noise.fractal_octaves = current_archetype.get("octaves", 6)
+		noise.fractal_gain = current_archetype.get("gain", 0.5)
+		noise.fractal_lacunarity = current_archetype.get("lacunarity", 2.0)
+		height_scale = current_archetype.get("height_scale", 0.8)
 	
 	# Generate heightmap
 	for y: int in map_height:
@@ -245,7 +314,15 @@ func _on_generate_map() -> void:
 			pass
 	
 	# NOW paint the biomes using the selected archetype
-	var colors: Dictionary = arch["biome_colors"]
+	# Support both old flat format and new grouped format
+	var colors: Dictionary
+	if current_archetype.has("biomes") and current_archetype["biomes"].has("colors"):
+		colors = current_archetype["biomes"]["colors"]
+	elif current_archetype.has("biome_colors"):
+		colors = current_archetype["biome_colors"]
+	else:
+		push_error("MapEditor: No biome colors found in archetype")
+		return
 	
 	for y: int in map_height:
 		for x: int in map_width:

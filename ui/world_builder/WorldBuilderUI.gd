@@ -113,6 +113,7 @@ func _ready() -> void:
 	_load_fantasy_archetypes()
 	_load_landmass_types()
 	_apply_theme()
+	_apply_ui_constants_to_scene()
 	_ensure_visibility()
 	_setup_navigation()
 	_setup_step_content()
@@ -125,7 +126,16 @@ func _ready() -> void:
 		MythosLogger.debug("UI/WorldBuilder", "ProceduralWorldMap hidden by default (fallback only)")
 	
 	_update_step_display()
+	# Update viewport size after layout is ready
+	await get_tree().process_frame
+	_update_viewport_size()
 	MythosLogger.info("UI/WorldBuilder", "Wizard-style UI ready")
+
+
+func _notification(what: int) -> void:
+	"""Handle window resize events for responsive UI."""
+	if what == NOTIFICATION_WM_SIZE_CHANGED or what == NOTIFICATION_RESIZED:
+		_update_viewport_size()
 
 
 func _load_map_icons() -> void:
@@ -293,6 +303,30 @@ func _apply_theme() -> void:
 		overlay.visible = true
 
 
+func _apply_ui_constants_to_scene() -> void:
+	"""Apply UIConstants to scene elements that can't reference constants directly."""
+	if left_nav != null:
+		left_nav.custom_minimum_size = Vector2(UIConstants.PANEL_WIDTH_NAV, 0)
+	if right_content != null:
+		right_content.custom_minimum_size = Vector2(UIConstants.PANEL_WIDTH_CONTENT, 0)
+	# Spacer in ButtonContainer
+	var spacer: Control = get_node_or_null("BackgroundPanel/ButtonContainer/Spacer")
+	if spacer != null:
+		spacer.custom_minimum_size = Vector2(UIConstants.SPACING_MEDIUM, 0)
+	# Make viewport size dynamic
+	if preview_viewport != null:
+		_update_viewport_size()
+
+
+func _update_viewport_size() -> void:
+	"""Update viewport size dynamically based on container."""
+	if preview_viewport == null or terrain_3d_view == null:
+		return
+	var container_size: Vector2 = terrain_3d_view.get_visible_rect().size
+	if container_size.x > 0 and container_size.y > 0:
+		preview_viewport.size = Vector2i(int(container_size.x), int(container_size.y))
+
+
 func _ensure_visibility() -> void:
 	"""Ensure UI elements are visible with proper styling."""
 	self.visible = true
@@ -316,7 +350,7 @@ func _setup_navigation() -> void:
 		var step_button: Button = Button.new()
 		step_button.name = "Step" + str(i + 1) + "Button"
 		step_button.text = str(i + 1) + ". " + STEPS[i]
-		step_button.custom_minimum_size = Vector2(0, 50)
+		step_button.custom_minimum_size = Vector2(0, UIConstants.BUTTON_HEIGHT_SMALL)
 		step_button.pressed.connect(func(): _on_step_button_pressed(i))
 		step_buttons.append(step_button)
 		nav_container.add_child(step_button)
@@ -331,7 +365,7 @@ func _setup_step_content() -> void:
 	var step_container: VBoxContainer = VBoxContainer.new()
 	step_container.name = "StepContainer"
 	step_container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	step_container.add_theme_constant_override("separation", 10)
+	step_container.add_theme_constant_override("separation", UIConstants.SPACING_SMALL)
 	right_content.add_child(step_container)
 	
 	# Initialize step data
@@ -750,7 +784,7 @@ func _create_step_map_gen_editor(parent: VBoxContainer) -> void:
 	var seed_container: HBoxContainer = HBoxContainer.new()
 	var seed_label: Label = Label.new()
 	seed_label.text = "Seed:"
-	seed_label.custom_minimum_size = Vector2(150, 0)
+	seed_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_STANDARD, 0)
 	seed_container.add_child(seed_label)
 	
 	var seed_input: LineEdit = LineEdit.new()
@@ -867,7 +901,7 @@ func _create_step_map_gen_editor(parent: VBoxContainer) -> void:
 	var noise_freq_container: HBoxContainer = HBoxContainer.new()
 	var noise_freq_label: Label = Label.new()
 	noise_freq_label.text = "Noise Frequency:"
-	noise_freq_label.custom_minimum_size = Vector2(150, 0)
+	noise_freq_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_STANDARD, 0)
 	noise_freq_container.add_child(noise_freq_label)
 	
 	var noise_freq_slider: HSlider = HSlider.new()
@@ -881,7 +915,7 @@ func _create_step_map_gen_editor(parent: VBoxContainer) -> void:
 	
 	var noise_freq_value_label: Label = Label.new()
 	noise_freq_value_label.name = "noise_frequency_value"
-	noise_freq_value_label.custom_minimum_size = Vector2(80, 0)
+	noise_freq_value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
 	noise_freq_value_label.text = "0.0005"
 	noise_freq_container.add_child(noise_freq_value_label)
 	container.add_child(noise_freq_container)
@@ -893,7 +927,7 @@ func _create_step_map_gen_editor(parent: VBoxContainer) -> void:
 	var octaves_container: HBoxContainer = HBoxContainer.new()
 	var octaves_label: Label = Label.new()
 	octaves_label.text = "Octaves:"
-	octaves_label.custom_minimum_size = Vector2(150, 0)
+	octaves_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_STANDARD, 0)
 	octaves_container.add_child(octaves_label)
 	
 	var octaves_spinbox: SpinBox = SpinBox.new()
@@ -911,7 +945,7 @@ func _create_step_map_gen_editor(parent: VBoxContainer) -> void:
 	var persistence_container: HBoxContainer = HBoxContainer.new()
 	var persistence_label: Label = Label.new()
 	persistence_label.text = "Persistence:"
-	persistence_label.custom_minimum_size = Vector2(150, 0)
+	persistence_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_STANDARD, 0)
 	persistence_container.add_child(persistence_label)
 	
 	var persistence_slider: HSlider = HSlider.new()
@@ -925,7 +959,7 @@ func _create_step_map_gen_editor(parent: VBoxContainer) -> void:
 	
 	var persistence_value_label: Label = Label.new()
 	persistence_value_label.name = "noise_persistence_value"
-	persistence_value_label.custom_minimum_size = Vector2(80, 0)
+	persistence_value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
 	persistence_value_label.text = "0.50"
 	persistence_container.add_child(persistence_value_label)
 	container.add_child(persistence_container)
@@ -937,7 +971,7 @@ func _create_step_map_gen_editor(parent: VBoxContainer) -> void:
 	var lacunarity_container: HBoxContainer = HBoxContainer.new()
 	var lacunarity_label: Label = Label.new()
 	lacunarity_label.text = "Lacunarity:"
-	lacunarity_label.custom_minimum_size = Vector2(150, 0)
+	lacunarity_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_STANDARD, 0)
 	lacunarity_container.add_child(lacunarity_label)
 	
 	var lacunarity_slider: HSlider = HSlider.new()
@@ -951,7 +985,7 @@ func _create_step_map_gen_editor(parent: VBoxContainer) -> void:
 	
 	var lacunarity_value_label: Label = Label.new()
 	lacunarity_value_label.name = "noise_lacunarity_value"
-	lacunarity_value_label.custom_minimum_size = Vector2(80, 0)
+	lacunarity_value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
 	lacunarity_value_label.text = "2.00"
 	lacunarity_container.add_child(lacunarity_value_label)
 	container.add_child(lacunarity_container)
@@ -974,7 +1008,7 @@ func _create_step_map_gen_editor(parent: VBoxContainer) -> void:
 	var sea_level_container: HBoxContainer = HBoxContainer.new()
 	var sea_level_label: Label = Label.new()
 	sea_level_label.text = "Sea Level:"
-	sea_level_label.custom_minimum_size = Vector2(150, 0)
+	sea_level_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_STANDARD, 0)
 	sea_level_container.add_child(sea_level_label)
 	
 	var sea_level_slider: HSlider = HSlider.new()
@@ -988,7 +1022,7 @@ func _create_step_map_gen_editor(parent: VBoxContainer) -> void:
 	
 	var sea_level_value_label: Label = Label.new()
 	sea_level_value_label.name = "sea_level_value"
-	sea_level_value_label.custom_minimum_size = Vector2(80, 0)
+	sea_level_value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
 	sea_level_value_label.text = "0.40"
 	sea_level_container.add_child(sea_level_value_label)
 	container.add_child(sea_level_container)
@@ -1000,7 +1034,7 @@ func _create_step_map_gen_editor(parent: VBoxContainer) -> void:
 	var erosion_container: HBoxContainer = HBoxContainer.new()
 	var erosion_label: Label = Label.new()
 	erosion_label.text = "Enable Erosion:"
-	erosion_label.custom_minimum_size = Vector2(150, 0)
+	erosion_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_STANDARD, 0)
 	erosion_container.add_child(erosion_label)
 	
 	var erosion_check: CheckBox = CheckBox.new()
@@ -1033,7 +1067,7 @@ func _create_step_terrain(parent: VBoxContainer) -> void:
 	var seed_container: HBoxContainer = HBoxContainer.new()
 	var seed_label: Label = Label.new()
 	seed_label.text = "Seed (from Step 1):"
-	seed_label.custom_minimum_size = Vector2(200, 0)
+	seed_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, 0)
 	seed_container.add_child(seed_label)
 	
 	var seed_spinbox: SpinBox = SpinBox.new()
@@ -1052,7 +1086,7 @@ func _create_step_terrain(parent: VBoxContainer) -> void:
 	var height_container: HBoxContainer = HBoxContainer.new()
 	var height_label: Label = Label.new()
 	height_label.text = "Height Scale:"
-	height_label.custom_minimum_size = Vector2(200, 0)
+	height_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, 0)
 	height_container.add_child(height_label)
 	
 	var height_slider: HSlider = HSlider.new()
@@ -1066,7 +1100,7 @@ func _create_step_terrain(parent: VBoxContainer) -> void:
 	
 	var height_value_label: Label = Label.new()
 	height_value_label.name = "height_scale_value"
-	height_value_label.custom_minimum_size = Vector2(80, 0)
+	height_value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
 	height_value_label.text = "20.00"
 	height_container.add_child(height_value_label)
 	container.add_child(height_container)
@@ -1078,7 +1112,7 @@ func _create_step_terrain(parent: VBoxContainer) -> void:
 	var freq_container: HBoxContainer = HBoxContainer.new()
 	var freq_label: Label = Label.new()
 	freq_label.text = "Noise Frequency:"
-	freq_label.custom_minimum_size = Vector2(200, 0)
+	freq_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, 0)
 	freq_container.add_child(freq_label)
 	
 	var freq_slider: HSlider = HSlider.new()
@@ -1092,7 +1126,7 @@ func _create_step_terrain(parent: VBoxContainer) -> void:
 	
 	var freq_value_label: Label = Label.new()
 	freq_value_label.name = "noise_frequency_value"
-	freq_value_label.custom_minimum_size = Vector2(80, 0)
+	freq_value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
 	freq_value_label.text = "0.000500"
 	freq_container.add_child(freq_value_label)
 	container.add_child(freq_container)
@@ -1104,7 +1138,7 @@ func _create_step_terrain(parent: VBoxContainer) -> void:
 	var octaves_container: HBoxContainer = HBoxContainer.new()
 	var octaves_label: Label = Label.new()
 	octaves_label.text = "Octaves:"
-	octaves_label.custom_minimum_size = Vector2(200, 0)
+	octaves_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, 0)
 	octaves_container.add_child(octaves_label)
 	
 	var octaves_slider: HSlider = HSlider.new()
@@ -1118,7 +1152,7 @@ func _create_step_terrain(parent: VBoxContainer) -> void:
 	
 	var octaves_value_label: Label = Label.new()
 	octaves_value_label.name = "octaves_value"
-	octaves_value_label.custom_minimum_size = Vector2(80, 0)
+	octaves_value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
 	octaves_value_label.text = "4"
 	octaves_container.add_child(octaves_value_label)
 	container.add_child(octaves_container)
@@ -1130,7 +1164,7 @@ func _create_step_terrain(parent: VBoxContainer) -> void:
 	var persistence_container: HBoxContainer = HBoxContainer.new()
 	var persistence_label: Label = Label.new()
 	persistence_label.text = "Persistence:"
-	persistence_label.custom_minimum_size = Vector2(200, 0)
+	persistence_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, 0)
 	persistence_container.add_child(persistence_label)
 	
 	var persistence_slider: HSlider = HSlider.new()
@@ -1144,7 +1178,7 @@ func _create_step_terrain(parent: VBoxContainer) -> void:
 	
 	var persistence_value_label: Label = Label.new()
 	persistence_value_label.name = "persistence_value"
-	persistence_value_label.custom_minimum_size = Vector2(80, 0)
+	persistence_value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
 	persistence_value_label.text = "0.50"
 	persistence_container.add_child(persistence_value_label)
 	container.add_child(persistence_container)
@@ -1156,7 +1190,7 @@ func _create_step_terrain(parent: VBoxContainer) -> void:
 	var lacunarity_container: HBoxContainer = HBoxContainer.new()
 	var lacunarity_label: Label = Label.new()
 	lacunarity_label.text = "Lacunarity:"
-	lacunarity_label.custom_minimum_size = Vector2(200, 0)
+	lacunarity_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, 0)
 	lacunarity_container.add_child(lacunarity_label)
 	
 	var lacunarity_slider: HSlider = HSlider.new()
@@ -1170,7 +1204,7 @@ func _create_step_terrain(parent: VBoxContainer) -> void:
 	
 	var lacunarity_value_label: Label = Label.new()
 	lacunarity_value_label.name = "lacunarity_value"
-	lacunarity_value_label.custom_minimum_size = Vector2(80, 0)
+	lacunarity_value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
 	lacunarity_value_label.text = "2.00"
 	lacunarity_container.add_child(lacunarity_value_label)
 	container.add_child(lacunarity_container)
@@ -1182,7 +1216,7 @@ func _create_step_terrain(parent: VBoxContainer) -> void:
 	var noise_type_container: HBoxContainer = HBoxContainer.new()
 	var noise_type_label: Label = Label.new()
 	noise_type_label.text = "Noise Type:"
-	noise_type_label.custom_minimum_size = Vector2(200, 0)
+	noise_type_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, 0)
 	noise_type_container.add_child(noise_type_label)
 	
 	var noise_type_option: OptionButton = OptionButton.new()
@@ -1227,7 +1261,7 @@ func _create_step_climate(parent: VBoxContainer) -> void:
 	var temp_container: HBoxContainer = HBoxContainer.new()
 	var temp_label: Label = Label.new()
 	temp_label.text = "Temperature Intensity:"
-	temp_label.custom_minimum_size = Vector2(200, 0)
+	temp_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, 0)
 	temp_container.add_child(temp_label)
 	
 	var temp_slider: HSlider = HSlider.new()
@@ -1241,7 +1275,7 @@ func _create_step_climate(parent: VBoxContainer) -> void:
 	
 	var temp_value_label: Label = Label.new()
 	temp_value_label.name = "temperature_intensity_value"
-	temp_value_label.custom_minimum_size = Vector2(80, 0)
+	temp_value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
 	temp_value_label.text = "0.50"
 	temp_container.add_child(temp_value_label)
 	container.add_child(temp_container)
@@ -1254,7 +1288,7 @@ func _create_step_climate(parent: VBoxContainer) -> void:
 	var rain_container: HBoxContainer = HBoxContainer.new()
 	var rain_label: Label = Label.new()
 	rain_label.text = "Rainfall Intensity:"
-	rain_label.custom_minimum_size = Vector2(200, 0)
+	rain_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, 0)
 	rain_container.add_child(rain_label)
 	
 	var rain_slider: HSlider = HSlider.new()
@@ -1268,7 +1302,7 @@ func _create_step_climate(parent: VBoxContainer) -> void:
 	
 	var rain_value_label: Label = Label.new()
 	rain_value_label.name = "rainfall_intensity_value"
-	rain_value_label.custom_minimum_size = Vector2(80, 0)
+	rain_value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
 	rain_value_label.text = "0.50"
 	rain_container.add_child(rain_value_label)
 	container.add_child(rain_container)
@@ -1280,7 +1314,7 @@ func _create_step_climate(parent: VBoxContainer) -> void:
 	var wind_strength_container: HBoxContainer = HBoxContainer.new()
 	var wind_strength_label: Label = Label.new()
 	wind_strength_label.text = "Wind Strength:"
-	wind_strength_label.custom_minimum_size = Vector2(200, 0)
+	wind_strength_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, 0)
 	wind_strength_container.add_child(wind_strength_label)
 	
 	var wind_strength_slider: HSlider = HSlider.new()
@@ -1294,7 +1328,7 @@ func _create_step_climate(parent: VBoxContainer) -> void:
 	
 	var wind_strength_value_label: Label = Label.new()
 	wind_strength_value_label.name = "wind_strength_value"
-	wind_strength_value_label.custom_minimum_size = Vector2(80, 0)
+	wind_strength_value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
 	wind_strength_value_label.text = "1.0"
 	wind_strength_container.add_child(wind_strength_value_label)
 	container.add_child(wind_strength_container)
@@ -1306,12 +1340,12 @@ func _create_step_climate(parent: VBoxContainer) -> void:
 	var wind_dir_container: HBoxContainer = HBoxContainer.new()
 	var wind_dir_label: Label = Label.new()
 	wind_dir_label.text = "Wind Direction:"
-	wind_dir_label.custom_minimum_size = Vector2(200, 0)
+	wind_dir_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, 0)
 	wind_dir_container.add_child(wind_dir_label)
 	
 	var wind_dir_x_label: Label = Label.new()
 	wind_dir_x_label.text = "X:"
-	wind_dir_x_label.custom_minimum_size = Vector2(30, 0)
+	wind_dir_x_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_COMPACT, 0)
 	wind_dir_container.add_child(wind_dir_x_label)
 	
 	var wind_dir_x_spinbox: SpinBox = SpinBox.new()
@@ -1325,7 +1359,7 @@ func _create_step_climate(parent: VBoxContainer) -> void:
 	
 	var wind_dir_y_label: Label = Label.new()
 	wind_dir_y_label.text = "Y:"
-	wind_dir_y_label.custom_minimum_size = Vector2(30, 0)
+	wind_dir_y_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_COMPACT, 0)
 	wind_dir_container.add_child(wind_dir_y_label)
 	
 	var wind_dir_y_spinbox: SpinBox = SpinBox.new()
@@ -1346,7 +1380,7 @@ func _create_step_climate(parent: VBoxContainer) -> void:
 	var temp_bias_container: HBoxContainer = HBoxContainer.new()
 	var temp_bias_label: Label = Label.new()
 	temp_bias_label.text = "Temperature Bias:"
-	temp_bias_label.custom_minimum_size = Vector2(200, 0)
+	temp_bias_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, 0)
 	temp_bias_container.add_child(temp_bias_label)
 	
 	var temp_bias_slider: HSlider = HSlider.new()
@@ -1360,7 +1394,7 @@ func _create_step_climate(parent: VBoxContainer) -> void:
 	
 	var temp_bias_value_label: Label = Label.new()
 	temp_bias_value_label.name = "temperature_bias_value"
-	temp_bias_value_label.custom_minimum_size = Vector2(80, 0)
+	temp_bias_value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
 	temp_bias_value_label.text = "0.00"
 	temp_bias_container.add_child(temp_bias_value_label)
 	container.add_child(temp_bias_container)
@@ -1372,7 +1406,7 @@ func _create_step_climate(parent: VBoxContainer) -> void:
 	var moist_bias_container: HBoxContainer = HBoxContainer.new()
 	var moist_bias_label: Label = Label.new()
 	moist_bias_label.text = "Moisture Bias:"
-	moist_bias_label.custom_minimum_size = Vector2(200, 0)
+	moist_bias_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, 0)
 	moist_bias_container.add_child(moist_bias_label)
 	
 	var moist_bias_slider: HSlider = HSlider.new()
@@ -1386,7 +1420,7 @@ func _create_step_climate(parent: VBoxContainer) -> void:
 	
 	var moist_bias_value_label: Label = Label.new()
 	moist_bias_value_label.name = "moisture_bias_value"
-	moist_bias_value_label.custom_minimum_size = Vector2(80, 0)
+	moist_bias_value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
 	moist_bias_value_label.text = "0.00"
 	moist_bias_container.add_child(moist_bias_value_label)
 	container.add_child(moist_bias_container)
@@ -1398,7 +1432,7 @@ func _create_step_climate(parent: VBoxContainer) -> void:
 	var temp_freq_container: HBoxContainer = HBoxContainer.new()
 	var temp_freq_label: Label = Label.new()
 	temp_freq_label.text = "Temperature Noise Frequency:"
-	temp_freq_label.custom_minimum_size = Vector2(200, 0)
+	temp_freq_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, 0)
 	temp_freq_container.add_child(temp_freq_label)
 	
 	var temp_freq_slider: HSlider = HSlider.new()
@@ -1412,7 +1446,7 @@ func _create_step_climate(parent: VBoxContainer) -> void:
 	
 	var temp_freq_value_label: Label = Label.new()
 	temp_freq_value_label.name = "temperature_noise_frequency_value"
-	temp_freq_value_label.custom_minimum_size = Vector2(80, 0)
+	temp_freq_value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
 	temp_freq_value_label.text = "0.002"
 	temp_freq_container.add_child(temp_freq_value_label)
 	container.add_child(temp_freq_container)
@@ -1424,7 +1458,7 @@ func _create_step_climate(parent: VBoxContainer) -> void:
 	var moist_freq_container: HBoxContainer = HBoxContainer.new()
 	var moist_freq_label: Label = Label.new()
 	moist_freq_label.text = "Moisture Noise Frequency:"
-	moist_freq_label.custom_minimum_size = Vector2(200, 0)
+	moist_freq_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, 0)
 	moist_freq_container.add_child(moist_freq_label)
 	
 	var moist_freq_slider: HSlider = HSlider.new()
@@ -1438,7 +1472,7 @@ func _create_step_climate(parent: VBoxContainer) -> void:
 	
 	var moist_freq_value_label: Label = Label.new()
 	moist_freq_value_label.name = "moisture_noise_frequency_value"
-	moist_freq_value_label.custom_minimum_size = Vector2(80, 0)
+	moist_freq_value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
 	moist_freq_value_label.text = "0.002"
 	moist_freq_container.add_child(moist_freq_value_label)
 	container.add_child(moist_freq_container)
@@ -1450,7 +1484,7 @@ func _create_step_climate(parent: VBoxContainer) -> void:
 	var time_container: HBoxContainer = HBoxContainer.new()
 	var time_label: Label = Label.new()
 	time_label.text = "Time of Day:"
-	time_label.custom_minimum_size = Vector2(200, 0)
+	time_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, 0)
 	time_container.add_child(time_label)
 	
 	var time_slider: HSlider = HSlider.new()
@@ -1464,7 +1498,7 @@ func _create_step_climate(parent: VBoxContainer) -> void:
 	
 	var time_value_label: Label = Label.new()
 	time_value_label.name = "time_of_day_value"
-	time_value_label.custom_minimum_size = Vector2(80, 0)
+	time_value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
 	time_value_label.text = "12.0"
 	time_container.add_child(time_value_label)
 	container.add_child(time_container)
@@ -1489,7 +1523,7 @@ func _create_step_biomes(parent: VBoxContainer) -> void:
 	var transition_container: HBoxContainer = HBoxContainer.new()
 	var transition_label: Label = Label.new()
 	transition_label.text = "Biome Transition Width:"
-	transition_label.custom_minimum_size = Vector2(200, 0)
+	transition_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, 0)
 	transition_container.add_child(transition_label)
 	
 	var transition_slider: HSlider = HSlider.new()
@@ -1503,7 +1537,7 @@ func _create_step_biomes(parent: VBoxContainer) -> void:
 	
 	var transition_value_label: Label = Label.new()
 	transition_value_label.name = "biome_transition_width_value"
-	transition_value_label.custom_minimum_size = Vector2(80, 0)
+	transition_value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
 	transition_value_label.text = "0.05"
 	transition_container.add_child(transition_value_label)
 	container.add_child(transition_container)
@@ -1516,7 +1550,7 @@ func _create_step_biomes(parent: VBoxContainer) -> void:
 	var overlay_container: HBoxContainer = HBoxContainer.new()
 	var overlay_label: Label = Label.new()
 	overlay_label.text = "Show Biome Overlay:"
-	overlay_label.custom_minimum_size = Vector2(200, 0)
+	overlay_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, 0)
 	overlay_container.add_child(overlay_label)
 	
 	var overlay_checkbox: CheckBox = CheckBox.new()
@@ -1535,7 +1569,7 @@ func _create_step_biomes(parent: VBoxContainer) -> void:
 	
 	var biome_list: ItemList = ItemList.new()
 	biome_list.name = "biome_list"
-	biome_list.custom_minimum_size = Vector2(0, 200)
+	biome_list.custom_minimum_size = Vector2(0, UIConstants.LIST_HEIGHT_STANDARD)
 	biome_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	
 	# Populate biome list from JSON
@@ -1552,7 +1586,7 @@ func _create_step_biomes(parent: VBoxContainer) -> void:
 	var mode_container: HBoxContainer = HBoxContainer.new()
 	var mode_label: Label = Label.new()
 	mode_label.text = "Generation Mode:"
-	mode_label.custom_minimum_size = Vector2(200, 0)
+	mode_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, 0)
 	mode_container.add_child(mode_label)
 	
 	var mode_option: OptionButton = OptionButton.new()
@@ -1611,7 +1645,7 @@ func _create_step_structures(parent: VBoxContainer) -> void:
 	
 	var city_list: ItemList = ItemList.new()
 	city_list.name = "city_list"
-	city_list.custom_minimum_size = Vector2(0, 200)
+	city_list.custom_minimum_size = Vector2(0, UIConstants.LIST_HEIGHT_STANDARD)
 	city_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	city_list.item_selected.connect(_on_city_selected)
 	container.add_child(city_list)
@@ -2143,7 +2177,7 @@ func _create_landmass_slider(parent: VBoxContainer, label_text: String, param_na
 	
 	var label: Label = Label.new()
 	label.text = label_text + ":"
-	label.custom_minimum_size = Vector2(120, 0)
+	label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_MEDIUM, 0)
 	container.add_child(label)
 	
 	var slider: HSlider = HSlider.new()
@@ -2157,7 +2191,7 @@ func _create_landmass_slider(parent: VBoxContainer, label_text: String, param_na
 	
 	var value_label: Label = Label.new()
 	value_label.name = param_name + "_value"
-	value_label.custom_minimum_size = Vector2(60, 0)
+	value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_COMPACT, 0)
 	value_label.text = "%.2f" % default_val
 	container.add_child(value_label)
 	
@@ -2173,7 +2207,7 @@ func _create_landmass_spinbox(parent: VBoxContainer, label_text: String, param_n
 	
 	var label: Label = Label.new()
 	label.text = label_text + ":"
-	label.custom_minimum_size = Vector2(120, 0)
+	label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_MEDIUM, 0)
 	container.add_child(label)
 	
 	var spinbox: SpinBox = SpinBox.new()
@@ -3015,7 +3049,7 @@ func _show_icon_type_selection_dialog() -> void:
 	var dialog: AcceptDialog = AcceptDialog.new()
 	var first_icon_id_str: String = str(first_icon.get("icon_id", "")) if first_icon.has("icon_id") else "icon"
 	dialog.title = "Select Type for " + first_icon_id_str.capitalize()
-	dialog.size = Vector2(600, 400)
+	dialog.size = Vector2(UIConstants.DIALOG_WIDTH_LARGE, UIConstants.DIALOG_HEIGHT_STANDARD)
 	
 	var vbox: VBoxContainer = VBoxContainer.new()
 	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -3023,14 +3057,14 @@ func _show_icon_type_selection_dialog() -> void:
 	
 	# Show icon at top
 	var icon_preview: ColorRect = ColorRect.new()
-	icon_preview.custom_minimum_size = Vector2(64, 64)
+	icon_preview.custom_minimum_size = Vector2(UIConstants.ICON_SIZE_MEDIUM, UIConstants.ICON_SIZE_MEDIUM)
 	var icon_color_val = first_icon.get("icon_color") if first_icon.has("icon_color") else Color.WHITE
 	icon_preview.color = icon_color_val
 	vbox.add_child(icon_preview)
 	
 	# Type selection buttons
 	var scroll: ScrollContainer = ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(0, 200)
+	scroll.custom_minimum_size = Vector2(0, UIConstants.LIST_HEIGHT_STANDARD)
 	var hbox: HBoxContainer = HBoxContainer.new()
 	scroll.add_child(hbox)
 	vbox.add_child(scroll)
@@ -3039,7 +3073,7 @@ func _show_icon_type_selection_dialog() -> void:
 	for type_name: String in types:
 		var type_button: Button = Button.new()
 		type_button.text = type_name.capitalize()
-		type_button.custom_minimum_size = Vector2(150, 100)
+		type_button.custom_minimum_size = UIConstants.BUTTON_SIZE_TYPE
 		type_button.pressed.connect(func(): _on_type_selected(type_name, group, dialog))
 		hbox.add_child(type_button)
 	
@@ -3112,7 +3146,7 @@ func _create_step_environment(parent: VBoxContainer) -> void:
 	var fog_density_container: HBoxContainer = HBoxContainer.new()
 	var fog_density_label: Label = Label.new()
 	fog_density_label.text = "Fog Density:"
-	fog_density_label.custom_minimum_size = Vector2(200, 0)
+	fog_density_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, 0)
 	fog_density_container.add_child(fog_density_label)
 	
 	var fog_density_slider: HSlider = HSlider.new()
@@ -3126,7 +3160,7 @@ func _create_step_environment(parent: VBoxContainer) -> void:
 	
 	var fog_density_value_label: Label = Label.new()
 	fog_density_value_label.name = "fog_density_value"
-	fog_density_value_label.custom_minimum_size = Vector2(80, 0)
+	fog_density_value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
 	fog_density_value_label.text = "0.10"
 	fog_density_container.add_child(fog_density_value_label)
 	container.add_child(fog_density_container)
@@ -3139,7 +3173,7 @@ func _create_step_environment(parent: VBoxContainer) -> void:
 	var fog_color_container: HBoxContainer = HBoxContainer.new()
 	var fog_color_label: Label = Label.new()
 	fog_color_label.text = "Fog Color:"
-	fog_color_label.custom_minimum_size = Vector2(200, 0)
+	fog_color_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, 0)
 	fog_color_container.add_child(fog_color_label)
 	
 	var fog_color_picker: ColorPickerButton = ColorPickerButton.new()
@@ -3155,7 +3189,7 @@ func _create_step_environment(parent: VBoxContainer) -> void:
 	var sky_type_container: HBoxContainer = HBoxContainer.new()
 	var sky_type_label: Label = Label.new()
 	sky_type_label.text = "Sky Type:"
-	sky_type_label.custom_minimum_size = Vector2(200, 0)
+	sky_type_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, 0)
 	sky_type_container.add_child(sky_type_label)
 	
 	var sky_type_option: OptionButton = OptionButton.new()
@@ -3174,7 +3208,7 @@ func _create_step_environment(parent: VBoxContainer) -> void:
 	var ambient_intensity_container: HBoxContainer = HBoxContainer.new()
 	var ambient_intensity_label: Label = Label.new()
 	ambient_intensity_label.text = "Ambient Light Intensity:"
-	ambient_intensity_label.custom_minimum_size = Vector2(200, 0)
+	ambient_intensity_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, 0)
 	ambient_intensity_container.add_child(ambient_intensity_label)
 	
 	var ambient_intensity_slider: HSlider = HSlider.new()
@@ -3188,7 +3222,7 @@ func _create_step_environment(parent: VBoxContainer) -> void:
 	
 	var ambient_intensity_value_label: Label = Label.new()
 	ambient_intensity_value_label.name = "ambient_intensity_value"
-	ambient_intensity_value_label.custom_minimum_size = Vector2(80, 0)
+	ambient_intensity_value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
 	ambient_intensity_value_label.text = "0.30"
 	ambient_intensity_container.add_child(ambient_intensity_value_label)
 	container.add_child(ambient_intensity_container)
@@ -3200,7 +3234,7 @@ func _create_step_environment(parent: VBoxContainer) -> void:
 	var ambient_color_container: HBoxContainer = HBoxContainer.new()
 	var ambient_color_label: Label = Label.new()
 	ambient_color_label.text = "Ambient Light Color:"
-	ambient_color_label.custom_minimum_size = Vector2(200, 0)
+	ambient_color_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, 0)
 	ambient_color_container.add_child(ambient_color_label)
 	
 	var ambient_color_picker: ColorPickerButton = ColorPickerButton.new()
@@ -3216,7 +3250,7 @@ func _create_step_environment(parent: VBoxContainer) -> void:
 	var water_level_container: HBoxContainer = HBoxContainer.new()
 	var water_level_label: Label = Label.new()
 	water_level_label.text = "Water Level:"
-	water_level_label.custom_minimum_size = Vector2(200, 0)
+	water_level_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, 0)
 	water_level_container.add_child(water_level_label)
 	
 	var water_level_slider: HSlider = HSlider.new()
@@ -3230,7 +3264,7 @@ func _create_step_environment(parent: VBoxContainer) -> void:
 	
 	var water_level_value_label: Label = Label.new()
 	water_level_value_label.name = "water_level_value"
-	water_level_value_label.custom_minimum_size = Vector2(80, 0)
+	water_level_value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
 	water_level_value_label.text = "0.0"
 	water_level_container.add_child(water_level_value_label)
 	container.add_child(water_level_container)
@@ -3242,7 +3276,7 @@ func _create_step_environment(parent: VBoxContainer) -> void:
 	var ocean_shader_container: HBoxContainer = HBoxContainer.new()
 	var ocean_shader_label: Label = Label.new()
 	ocean_shader_label.text = "Enable Ocean Shader:"
-	ocean_shader_label.custom_minimum_size = Vector2(200, 0)
+	ocean_shader_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, 0)
 	ocean_shader_container.add_child(ocean_shader_label)
 	
 	var ocean_shader_checkbox: CheckBox = CheckBox.new()
@@ -3271,7 +3305,7 @@ func _create_step_resources(parent: VBoxContainer) -> void:
 	var overlay_container: HBoxContainer = HBoxContainer.new()
 	var overlay_label: Label = Label.new()
 	overlay_label.text = "Show Resource Overlay:"
-	overlay_label.custom_minimum_size = Vector2(200, 0)
+	overlay_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, 0)
 	overlay_container.add_child(overlay_label)
 	
 	var overlay_checkbox: CheckBox = CheckBox.new()
@@ -3288,7 +3322,7 @@ func _create_step_resources(parent: VBoxContainer) -> void:
 	var magic_density_container: HBoxContainer = HBoxContainer.new()
 	var magic_density_label: Label = Label.new()
 	magic_density_label.text = "Magic Density:"
-	magic_density_label.custom_minimum_size = Vector2(200, 0)
+	magic_density_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, 0)
 	magic_density_container.add_child(magic_density_label)
 	
 	var magic_density_slider: HSlider = HSlider.new()
@@ -3302,7 +3336,7 @@ func _create_step_resources(parent: VBoxContainer) -> void:
 	
 	var magic_density_value_label: Label = Label.new()
 	magic_density_value_label.name = "magic_density_value"
-	magic_density_value_label.custom_minimum_size = Vector2(80, 0)
+	magic_density_value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
 	magic_density_value_label.text = "0.50"
 	magic_density_container.add_child(magic_density_value_label)
 	container.add_child(magic_density_container)
@@ -3334,7 +3368,7 @@ func _create_step_export(parent: VBoxContainer) -> void:
 	var name_container: HBoxContainer = HBoxContainer.new()
 	var name_label: Label = Label.new()
 	name_label.text = "World Name:"
-	name_label.custom_minimum_size = Vector2(200, 0)
+	name_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, 0)
 	name_container.add_child(name_label)
 	
 	var name_edit: LineEdit = LineEdit.new()
@@ -3355,7 +3389,7 @@ func _create_step_export(parent: VBoxContainer) -> void:
 	
 	var summary_text: RichTextLabel = RichTextLabel.new()
 	summary_text.name = "summary_text"
-	summary_text.custom_minimum_size = Vector2(0, 200)
+	summary_text.custom_minimum_size = Vector2(0, UIConstants.LIST_HEIGHT_STANDARD)
 	summary_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	summary_text.bbcode_enabled = true
 	container.add_child(summary_text)
@@ -3650,7 +3684,7 @@ func _show_civilization_selection_dialog(city_index: int) -> void:
 	# Create dialog
 	var dialog: AcceptDialog = AcceptDialog.new()
 	dialog.title = "Select Civilization for City " + str(city_index + 1)
-	dialog.size = Vector2(500, 400)
+	dialog.size = Vector2(UIConstants.DIALOG_WIDTH_MEDIUM, UIConstants.DIALOG_HEIGHT_STANDARD)
 	
 	var vbox: VBoxContainer = VBoxContainer.new()
 	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -3680,7 +3714,7 @@ func _show_civilization_selection_dialog(city_index: int) -> void:
 	vbox.add_child(civ_label)
 	
 	var civ_list: ItemList = ItemList.new()
-	civ_list.custom_minimum_size = Vector2(0, 200)
+	civ_list.custom_minimum_size = Vector2(0, UIConstants.LIST_HEIGHT_STANDARD)
 	var civilizations: Array = civilizations_data.get("civilizations", [])
 	for civ: Dictionary in civilizations:
 		civ_list.add_item(civ.get("name", "Unknown"))

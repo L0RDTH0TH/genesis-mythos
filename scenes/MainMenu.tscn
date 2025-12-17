@@ -1,6 +1,6 @@
 [gd_scene load_steps=3 format=3 uid="uid://cqukq54equ2cr"]
 
-[ext_resource type="Script" path="res://ui/main_menu/main_menu_controller.gd" id="1_0"]
+[ext_resource type="Script" uid="uid://dtvclsmx1ok2n" path="res://ui/main_menu/main_menu_controller.gd" id="1_0"]
 [ext_resource type="Theme" uid="uid://dpiqolc47bhf4" path="res://themes/bg3_theme.tres" id="2_0"]
 
 [node name="MainMenuRoot" type="Control"]
@@ -30,12 +30,31 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="VBoxContainer" type="GGVBox" parent="CenterContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer"]
+_import_path = NodePath("")
+unique_name_in_owner = false
+process_mode = 0
+process_priority = 0
+process_physics_priority = 0
+process_thread_group = 0
+physics_interpolation_mode = 0
+auto_translate_mode = 0
+editor_description = ""
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
+script = null
 
-[node name="TitleLabel" type="GGLabel" parent="CenterContainer/VBoxContainer"]
+[node name="TitleLabel" type="Label" parent="CenterContainer/VBoxContainer"]
+_import_path = NodePath("")
+unique_name_in_owner = false
+process_mode = 0
+process_priority = 0
+process_physics_priority = 0
+process_thread_group = 0
+physics_interpolation_mode = 0
+auto_translate_mode = 0
+editor_description = ""
 layout_mode = 2
 theme_override_colors/font_color = Color(0.95, 0.85, 0.6, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.5)
@@ -45,17 +64,36 @@ theme_override_font_sizes/font_size = 48
 text = "Main Menu"
 horizontal_alignment = 1
 vertical_alignment = 1
+script = null
 
-[node name="CharacterCreationButton" type="GGButton" parent="CenterContainer/VBoxContainer"]
+[node name="CharacterCreationButton" type="Button" parent="CenterContainer/VBoxContainer"]
+_import_path = NodePath("")
 unique_name_in_owner = true
+process_mode = 0
+process_priority = 0
+process_physics_priority = 0
+process_thread_group = 0
+physics_interpolation_mode = 0
+auto_translate_mode = 0
+editor_description = ""
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 0
 text = "Create Character"
+script = null
 
-[node name="WorldCreationButton" type="GGButton" parent="CenterContainer/VBoxContainer"]
+[node name="WorldCreationButton" type="Button" parent="CenterContainer/VBoxContainer"]
+_import_path = NodePath("")
 unique_name_in_owner = true
+process_mode = 0
+process_priority = 0
+process_physics_priority = 0
+process_thread_group = 0
+physics_interpolation_mode = 0
+auto_translate_mode = 0
+editor_description = ""
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 0
 text = "Create World"
+script = null

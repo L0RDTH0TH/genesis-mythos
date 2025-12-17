@@ -8,9 +8,9 @@ extends GutTest
 
 func before_all() -> void:
 	"""Setup before all tests."""
-	print("=" * 80)
+	print("=".repeat(80))
 	print("RUNNING GENERATE MAP BUTTON TEST")
-	print("=" * 80)
+	print("=".repeat(80))
 
 func test_generate_map_button_full_lifecycle() -> void:
 	"""Run the Generate Map button full lifecycle test."""
@@ -27,4 +27,5 @@ func test_generate_map_button_full_lifecycle() -> void:
 	test_instance.after_each()
 	
 	pass_test("Generate Map button test completed")
+
 

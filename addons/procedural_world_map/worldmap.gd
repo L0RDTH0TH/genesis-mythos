@@ -134,6 +134,9 @@ func get_detail():
 
 func set_datasource(ds:ProceduralWorldDatasource):
 	session.datasource=ds
+	# Ensure material is initialized before refreshing
+	if self.material == null:
+		self.material = get_shader_material()
 	refresh()
 
 func get_datasource()->ProceduralWorldDatasource:
@@ -209,7 +212,8 @@ func _update_map_task(mat:ShaderMaterial,res_idx:int,params,is_incremental:bool=
 		thread_cancel.erase(task_id)
 		return
 	else:
-		mat.set_shader_parameter("DATA",tex)
+		if mat != null:
+			mat.set_shader_parameter("DATA",tex)
 	
 	if is_incremental and res_idx>0:
 		# schedule the next resolution to render
