@@ -222,3 +222,4 @@ Datasource → ImageTexture → ShaderMaterial → ColorRect → UI
 The current hybrid approach is optimal - each system serves its purpose without redundancy.
 
 
+
