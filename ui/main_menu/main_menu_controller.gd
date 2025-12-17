@@ -15,6 +15,9 @@ const WORLD_CREATION_SCENE : String = "res://core/scenes/world_root.tscn"
 
 func _ready() -> void:
 	"""Initialize button connections and visibility."""
+	# Apply UIConstants for consistent sizing
+	_apply_ui_constants()
+	
 	if character_button:
 		character_button.visible = true
 		character_button.pressed.connect(_on_create_character_pressed)
@@ -22,6 +25,18 @@ func _ready() -> void:
 	if world_button:
 		world_button.visible = true
 		world_button.pressed.connect(_on_create_world_pressed)
+
+func _apply_ui_constants() -> void:
+	"""Apply UIConstants values to UI elements for consistency."""
+	if character_button:
+		character_button.custom_minimum_size = Vector2(0, UIConstants.BUTTON_HEIGHT_LARGE)
+	if world_button:
+		world_button.custom_minimum_size = Vector2(0, UIConstants.BUTTON_HEIGHT_LARGE)
+	
+	# Apply spacing to VBoxContainer (GGVBox)
+	var vbox: Control = get_node_or_null("CenterContainer/VBoxContainer")
+	if vbox:
+		vbox.add_theme_constant_override("separation", UIConstants.SPACING_LARGE)
 
 func _on_create_character_pressed() -> void:
 	"""Transition to character creation scene."""

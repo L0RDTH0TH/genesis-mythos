@@ -30,11 +30,13 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer"]
+[node name="VBoxContainer" type="GGVBox" parent="CenterContainer"]
 layout_mode = 2
 theme_override_constants/separation = 40
+size_flags_horizontal = 3
+size_flags_vertical = 3
 
-[node name="TitleLabel" type="Label" parent="CenterContainer/VBoxContainer"]
+[node name="TitleLabel" type="GGLabel" parent="CenterContainer/VBoxContainer"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.95, 0.85, 0.6, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.5)
@@ -49,10 +51,14 @@ vertical_alignment = 1
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 120)
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 0
 text = "Create Character"
 
 [node name="WorldCreationButton" type="Button" parent="CenterContainer/VBoxContainer"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 120)
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 0
 text = "Create World"
