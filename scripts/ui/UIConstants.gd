@@ -31,21 +31,9 @@ const ICON_SIZE_SMALL: int = 32   ## Inline icons
 const ICON_SIZE_MEDIUM: int = 64  ## Buttons, previews
 const ICON_SIZE_LARGE: int = 128  ## Hero icons, logos
 
-# Panel Widths (for sidebars and content panels)
-const PANEL_WIDTH_NAV: int = 250     ## Navigation sidebar width
+# Panel Widths (for WorldBuilderUI)
+const PANEL_WIDTH_NAV: int = 250     ## Left navigation panel width
 const PANEL_WIDTH_CONTENT: int = 400 ## Right content panel width
 
-# List Heights (for scrollable lists)
-const LIST_HEIGHT_STANDARD: int = 200 ## Standard list height
-
-# Special Label Widths
-const LABEL_WIDTH_COMPACT: int = 60  ## Very compact labels
-const LABEL_WIDTH_MEDIUM: int = 120  ## Medium-width labels
-
-# Button Sizes (width x height)
-const BUTTON_SIZE_TYPE: Vector2 = Vector2(150, 100) ## Type selection buttons
-
-# Dialog Sizes
-const DIALOG_WIDTH_MEDIUM: int = 500  ## Medium dialog width
-const DIALOG_WIDTH_LARGE: int = 600   ## Large dialog width
-const DIALOG_HEIGHT_STANDARD: int = 400 ## Standard dialog height
+# List Heights
+const LIST_HEIGHT_STANDARD: int = 200 ## Standard list/scroll area height

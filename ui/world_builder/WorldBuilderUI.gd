@@ -305,14 +305,51 @@ func _apply_theme() -> void:
 
 func _apply_ui_constants_to_scene() -> void:
 	"""Apply UIConstants to scene elements that can't reference constants directly."""
+	# Left navigation panel
 	if left_nav != null:
 		left_nav.custom_minimum_size = Vector2(UIConstants.PANEL_WIDTH_NAV, 0)
+	
+	# Right content panel
 	if right_content != null:
 		right_content.custom_minimum_size = Vector2(UIConstants.PANEL_WIDTH_CONTENT, 0)
+	
+	# Title label margins (top padding)
+	var title_label: Control = get_node_or_null("BackgroundPanel/TitleLabel")
+	if title_label != null:
+		title_label.offset_top = UIConstants.SPACING_SMALL
+		title_label.offset_bottom = UIConstants.SPACING_LARGE * 1.25  # 50px for title height
+	
+	# Main container margins (account for title)
+	var main_container: Control = get_node_or_null("BackgroundPanel/MainContainer")
+	if main_container != null:
+		title_label = get_node_or_null("BackgroundPanel/TitleLabel")
+		if title_label != null:
+			var title_height: int = int(title_label.offset_bottom - title_label.offset_top)
+			main_container.offset_top = title_height
+			main_container.offset_bottom = -UIConstants.BUTTON_HEIGHT_LARGE - UIConstants.SPACING_SMALL
+	
+	# Button container positioning (centered, above bottom)
+	var button_container: Control = get_node_or_null("BackgroundPanel/ButtonContainer")
+	if button_container != null:
+		var button_width: int = UIConstants.BUTTON_HEIGHT_LARGE * 3  # Approximate button width
+		button_container.offset_left = -button_width / 2
+		button_container.offset_right = button_width / 2
+		button_container.offset_top = -UIConstants.BUTTON_HEIGHT_LARGE - UIConstants.SPACING_SMALL
+		button_container.offset_bottom = -UIConstants.SPACING_SMALL
+	
+	# Buttons in button container
+	var back_button: Button = get_node_or_null("BackgroundPanel/ButtonContainer/BackButton")
+	if back_button != null:
+		back_button.custom_minimum_size = Vector2(0, UIConstants.BUTTON_HEIGHT_MEDIUM)
+	var next_button: Button = get_node_or_null("BackgroundPanel/ButtonContainer/NextButton")
+	if next_button != null:
+		next_button.custom_minimum_size = Vector2(0, UIConstants.BUTTON_HEIGHT_MEDIUM)
+	
 	# Spacer in ButtonContainer
 	var spacer: Control = get_node_or_null("BackgroundPanel/ButtonContainer/Spacer")
 	if spacer != null:
 		spacer.custom_minimum_size = Vector2(UIConstants.SPACING_MEDIUM, 0)
+	
 	# Make viewport size dynamic
 	if preview_viewport != null:
 		_update_viewport_size()
@@ -342,7 +379,7 @@ func _setup_navigation() -> void:
 	var nav_container: VFlowContainer = VFlowContainer.new()
 	nav_container.name = "NavContainer"
 	nav_container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	nav_container.add_theme_constant_override("separation", 10)
+	nav_container.add_theme_constant_override("separation", UIConstants.SPACING_SMALL)
 	left_nav.add_child(nav_container)
 	
 	# Create step buttons
@@ -3400,7 +3437,7 @@ func _create_step_export(parent: VBoxContainer) -> void:
 	
 	# Export buttons
 	var buttons_container: VBoxContainer = VBoxContainer.new()
-	buttons_container.add_theme_constant_override("separation", 5)
+	buttons_container.add_theme_constant_override("separation", UIConstants.SPACING_SMALL / 2)
 	
 	var save_config_button: Button = Button.new()
 	save_config_button.text = "Save World Config"
