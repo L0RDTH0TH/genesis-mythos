@@ -1,0 +1,38 @@
+[gd_scene load_steps=3 format=3 uid="uid://class_tab"]
+
+[ext_resource type="Script" path="res://scripts/character_creation/tabs/ClassTab.gd" id="1_classtab"]
+[ext_resource type="Theme" uid="uid://dpiqolc47bhf4" path="res://themes/bg3_theme.tres" id="2_theme"]
+
+[node name="ClassTab" type="VBoxContainer"]
+theme = ExtResource("2_theme")
+script = ExtResource("1_classtab")
+
+[node name="TitleLabel" type="Label" parent="."]
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+theme_override_colors/font_color = Color(1, 0.843137, 0, 1)
+text = "Select Your Class"
+horizontal_alignment = 1
+
+[node name="ClassList" type="ItemList" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="DescriptionArea" type="VBoxContainer" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 0
+
+[node name="DescriptionLabel" type="Label" parent="DescriptionArea"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 3
+text = "Select a class to view its details."
+
+[node name="FeaturesLabel" type="Label" parent="DescriptionArea"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 3
+text = ""

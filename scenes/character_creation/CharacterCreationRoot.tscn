@@ -1,0 +1,138 @@
+[gd_scene load_steps=4 format=3 uid="uid://character_creation_root"]
+
+[ext_resource type="Script" path="res://scripts/character_creation/CharacterCreationRoot.gd" id="1_ccroot"]
+[ext_resource type="Theme" uid="uid://dpiqolc47bhf4" path="res://themes/bg3_theme.tres" id="2_theme"]
+[ext_resource type="Script" path="res://scripts/character_creation/CharacterPreview3D.gd" id="3_preview3d"]
+
+[node name="CharacterCreationRoot" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("2_theme")
+script = ExtResource("1_ccroot")
+
+[node name="BackgroundRect" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.1, 0.1, 0.1, 1)
+
+[node name="MainContainer" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="TitleArea" type="CenterContainer" parent="MainContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 0
+
+[node name="TitleLabel" type="Label" parent="MainContainer/TitleArea"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 48
+theme_override_colors/font_color = Color(1, 0.843137, 0, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.5)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+text = "Character Creation"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ContentArea" type="HSplitContainer" parent="MainContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="LeftPanel" type="Panel" parent="MainContainer/ContentArea"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="LeftContent" type="ScrollContainer" parent="MainContainer/ContentArea/LeftPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="OptionsContainer" type="VBoxContainer" parent="MainContainer/ContentArea/LeftPanel/LeftContent"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="RightPanel" type="Panel" parent="MainContainer/ContentArea"]
+layout_mode = 2
+size_flags_horizontal = 0
+size_flags_vertical = 3
+
+[node name="PreviewContainer" type="SubViewportContainer" parent="MainContainer/ContentArea/RightPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+stretch = true
+
+[node name="PreviewViewport" type="SubViewport" parent="MainContainer/ContentArea/RightPanel/PreviewContainer"]
+size = Vector2(512, 512)
+transparent_bg = false
+handle_input_locally = false
+render_target_update_mode = 0
+
+[node name="PreviewWorld" type="Node3D" parent="MainContainer/ContentArea/RightPanel/PreviewContainer/PreviewViewport"]
+
+[node name="CharacterPreview3D" type="Node3D" parent="MainContainer/ContentArea/RightPanel/PreviewContainer/PreviewViewport/PreviewWorld"]
+script = ExtResource("3_preview3d")
+
+[node name="PreviewCamera" type="Camera3D" parent="MainContainer/ContentArea/RightPanel/PreviewContainer/PreviewViewport/PreviewWorld"]
+transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 2, 0)
+fov = 60.0
+
+[node name="PreviewLight" type="DirectionalLight3D" parent="MainContainer/ContentArea/RightPanel/PreviewContainer/PreviewViewport/PreviewWorld"]
+transform = Transform3D(0.707107, -0.5, 0.5, 0, 0.707107, 0.707107, -0.707107, -0.5, 0.5, 0, 5, 0)
+light_color = Color(1, 0.863, 0.706, 1)
+light_energy = 1.5
+shadow_enabled = true
+
+[node name="NavigationArea" type="HBoxContainer" parent="MainContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 0
+alignment = 1
+
+[node name="SpacerLeft" type="Control" parent="MainContainer/NavigationArea"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BackButton" type="Button" parent="MainContainer/NavigationArea"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 0
+text = "Back"
+
+[node name="SpacerMiddle" type="Control" parent="MainContainer/NavigationArea"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="NextButton" type="Button" parent="MainContainer/NavigationArea"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 0
+text = "Next"
+
+[node name="SpacerRight" type="Control" parent="MainContainer/NavigationArea"]
+layout_mode = 2
+size_flags_horizontal = 3
+

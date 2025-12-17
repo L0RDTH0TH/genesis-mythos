@@ -1,0 +1,127 @@
+{
+	"backgrounds": [
+		{
+			"id": "acolyte",
+			"name": "Acolyte",
+			"description": "You have spent your life in service to a temple, learning sacred rites and providing assistance to priests.",
+			"skill_proficiencies": ["Insight", "Religion"],
+			"languages": {
+				"choose": 2
+			},
+			"equipment": ["Holy symbol", "Prayer book", "5 sticks of incense", "Vestments", "Common clothes", "15 gp"],
+			"feature": "Shelter of the Faithful"
+		},
+		{
+			"id": "criminal",
+			"name": "Criminal",
+			"description": "You are an experienced criminal with a history of breaking the law.",
+			"skill_proficiencies": ["Deception", "Stealth"],
+			"tool_proficiencies": {
+				"choose": 1,
+				"from": ["Gaming set", "Thieves' tools"]
+			},
+			"equipment": ["Crowbar", "Dark common clothes with hood", "15 gp"],
+			"feature": "Criminal Contact"
+		},
+		{
+			"id": "folk_hero",
+			"name": "Folk Hero",
+			"description": "You come from a humble social rank, but you are destined for so much more.",
+			"skill_proficiencies": ["Animal Handling", "Survival"],
+			"tool_proficiencies": {
+				"choose": 1,
+				"from": ["Artisan's tools", "Vehicles (land)"]
+			},
+			"equipment": ["Artisan's tools", "Shovel", "Iron pot", "Common clothes", "10 gp"],
+			"feature": "Rustic Hospitality"
+		},
+		{
+			"id": "noble",
+			"name": "Noble",
+			"description": "You understand wealth, power, and privilege. You carry a noble title.",
+			"skill_proficiencies": ["History", "Persuasion"],
+			"languages": {
+				"choose": 1
+			},
+			"equipment": ["Fine clothes", "Signet ring", "Scroll of pedigree", "Purse with 25 gp"],
+			"feature": "Position of Privilege"
+		},
+		{
+			"id": "sage",
+			"name": "Sage",
+			"description": "You spent years learning the lore of the multiverse, poring over tomes and scrolls.",
+			"skill_proficiencies": ["Arcana", "History"],
+			"languages": {
+				"choose": 2
+			},
+			"equipment": ["Bottle of black ink", "Quill", "Small knife", "Letter from a dead colleague", "Common clothes", "10 gp"],
+			"feature": "Researcher"
+		},
+		{
+			"id": "soldier",
+			"name": "Soldier",
+			"description": "War has been your life for as long as you care to remember.",
+			"skill_proficiencies": ["Athletics", "Intimidation"],
+			"tool_proficiencies": {
+				"choose": 1,
+				"from": ["Gaming set", "Vehicles (land)"]
+			},
+			"equipment": ["Insignia of rank", "Trophy taken from a fallen enemy", "Gaming set", "Common clothes", "10 gp"],
+			"feature": "Military Rank"
+		},
+		{
+			"id": "hermit",
+			"name": "Hermit",
+			"description": "You lived in seclusion, either in a sheltered community or entirely alone.",
+			"skill_proficiencies": ["Medicine", "Religion"],
+			"tool_proficiencies": ["Herbalism kit"],
+			"languages": {
+				"choose": 1
+			},
+			"equipment": ["Scroll case stuffed with notes", "Winter blanket", "Common clothes", "Herbalism kit", "5 gp"],
+			"feature": "Discovery"
+		},
+		{
+			"id": "outlander",
+			"name": "Outlander",
+			"description": "You grew up in the wilds, far from civilization and the comforts of town and city.",
+			"skill_proficiencies": ["Athletics", "Survival"],
+			"tool_proficiencies": {
+				"choose": 1,
+				"from": ["Musical instrument", "Gaming set"]
+			},
+			"languages": {
+				"choose": 1
+			},
+			"equipment": ["Staff", "Hunting trap", "Trophy from an animal", "Traveler's clothes", "10 gp"],
+			"feature": "Wanderer"
+		},
+		{
+			"id": "guild_artisan",
+			"name": "Guild Artisan",
+			"description": "You are a member of an artisan's guild, skilled in a particular field.",
+			"skill_proficiencies": ["Insight", "Persuasion"],
+			"tool_proficiencies": {
+				"choose": 1,
+				"from": ["Artisan's tools"]
+			},
+			"languages": {
+				"choose": 1
+			},
+			"equipment": ["Artisan's tools", "Letter of introduction from your guild", "Traveler's clothes", "15 gp"],
+			"feature": "Guild Membership"
+		},
+		{
+			"id": "entertainer",
+			"name": "Entertainer",
+			"description": "You thrive in front of an audience, telling stories, playing music, or dancing.",
+			"skill_proficiencies": ["Acrobatics", "Performance"],
+			"tool_proficiencies": {
+				"choose": 1,
+				"from": ["Disguise kit", "Musical instrument"]
+			},
+			"equipment": ["Musical instrument", "Favor of an admirer", "Costume", "15 gp"],
+			"feature": "By Popular Demand"
+		}
+	]
+}

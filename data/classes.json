@@ -1,0 +1,160 @@
+{
+	"classes": [
+		{
+			"id": "fighter",
+			"name": "Fighter",
+			"description": "Masters of weapon combat, fighters are versatile warriors.",
+			"hit_die": 10,
+			"primary_ability": "strength",
+			"saving_throw_proficiencies": ["strength", "constitution"],
+			"skill_proficiencies": {
+				"choose": 2,
+				"from": ["Acrobatics", "Animal Handling", "Athletics", "History", "Insight", "Intimidation", "Perception", "Survival"]
+			},
+			"features": ["Fighting Style", "Second Wind", "Action Surge"]
+		},
+		{
+			"id": "wizard",
+			"name": "Wizard",
+			"description": "Scholars of arcane magic, wizards master spells through study.",
+			"hit_die": 6,
+			"primary_ability": "intelligence",
+			"saving_throw_proficiencies": ["intelligence", "wisdom"],
+			"skill_proficiencies": {
+				"choose": 2,
+				"from": ["Arcana", "History", "Insight", "Investigation", "Medicine", "Religion"]
+			},
+			"features": ["Spellcasting", "Arcane Recovery", "Arcane Tradition"]
+		},
+		{
+			"id": "rogue",
+			"name": "Rogue",
+			"description": "Skilled in stealth and precision, rogues excel at dealing damage from the shadows.",
+			"hit_die": 8,
+			"primary_ability": "dexterity",
+			"saving_throw_proficiencies": ["dexterity", "intelligence"],
+			"skill_proficiencies": {
+				"choose": 4,
+				"from": ["Acrobatics", "Athletics", "Deception", "Insight", "Intimidation", "Investigation", "Perception", "Performance", "Persuasion", "Sleight of Hand", "Stealth"]
+			},
+			"features": ["Expertise", "Sneak Attack", "Thieves' Cant", "Cunning Action"]
+		},
+		{
+			"id": "cleric",
+			"name": "Cleric",
+			"description": "Divine spellcasters who channel the power of their deities.",
+			"hit_die": 8,
+			"primary_ability": "wisdom",
+			"saving_throw_proficiencies": ["wisdom", "charisma"],
+			"skill_proficiencies": {
+				"choose": 2,
+				"from": ["History", "Insight", "Medicine", "Persuasion", "Religion"]
+			},
+			"features": ["Spellcasting", "Divine Domain", "Channel Divinity"]
+		},
+		{
+			"id": "ranger",
+			"name": "Ranger",
+			"description": "Warriors of the wilderness, rangers are skilled trackers and survivalists.",
+			"hit_die": 10,
+			"primary_ability": "dexterity",
+			"saving_throw_proficiencies": ["strength", "dexterity"],
+			"skill_proficiencies": {
+				"choose": 3,
+				"from": ["Animal Handling", "Athletics", "Insight", "Investigation", "Nature", "Perception", "Stealth", "Survival"]
+			},
+			"features": ["Favored Enemy", "Natural Explorer", "Spellcasting"]
+		},
+		{
+			"id": "paladin",
+			"name": "Paladin",
+			"description": "Holy warriors who combine martial prowess with divine magic.",
+			"hit_die": 10,
+			"primary_ability": "strength",
+			"saving_throw_proficiencies": ["wisdom", "charisma"],
+			"skill_proficiencies": {
+				"choose": 2,
+				"from": ["Athletics", "Insight", "Intimidation", "Medicine", "Persuasion", "Religion"]
+			},
+			"features": ["Divine Sense", "Lay on Hands", "Spellcasting", "Divine Smite"]
+		},
+		{
+			"id": "barbarian",
+			"name": "Barbarian",
+			"description": "Fierce warriors who channel primal rage in battle.",
+			"hit_die": 12,
+			"primary_ability": "strength",
+			"saving_throw_proficiencies": ["strength", "constitution"],
+			"skill_proficiencies": {
+				"choose": 2,
+				"from": ["Animal Handling", "Athletics", "Intimidation", "Nature", "Perception", "Survival"]
+			},
+			"features": ["Rage", "Unarmored Defense", "Reckless Attack"]
+		},
+		{
+			"id": "bard",
+			"name": "Bard",
+			"description": "Masters of music and magic, bards inspire allies and confound enemies.",
+			"hit_die": 8,
+			"primary_ability": "charisma",
+			"saving_throw_proficiencies": ["dexterity", "charisma"],
+			"skill_proficiencies": {
+				"choose": 3,
+				"from": ["Acrobatics", "Animal Handling", "Arcana", "Athletics", "Deception", "History", "Insight", "Intimidation", "Investigation", "Medicine", "Nature", "Perception", "Performance", "Persuasion", "Religion", "Sleight of Hand", "Stealth", "Survival"]
+			},
+			"features": ["Spellcasting", "Bardic Inspiration", "Jack of All Trades"]
+		},
+		{
+			"id": "sorcerer",
+			"name": "Sorcerer",
+			"description": "Spellcasters who draw magic from their bloodline.",
+			"hit_die": 6,
+			"primary_ability": "charisma",
+			"saving_throw_proficiencies": ["constitution", "charisma"],
+			"skill_proficiencies": {
+				"choose": 2,
+				"from": ["Arcana", "Deception", "Insight", "Intimidation", "Persuasion", "Religion"]
+			},
+			"features": ["Spellcasting", "Sorcerous Origin", "Font of Magic", "Metamagic"]
+		},
+		{
+			"id": "warlock",
+			"name": "Warlock",
+			"description": "Wielders of otherworldly power granted by pacts with powerful entities.",
+			"hit_die": 8,
+			"primary_ability": "charisma",
+			"saving_throw_proficiencies": ["wisdom", "charisma"],
+			"skill_proficiencies": {
+				"choose": 2,
+				"from": ["Arcana", "Deception", "History", "Intimidation", "Investigation", "Nature", "Religion"]
+			},
+			"features": ["Otherworldly Patron", "Pact Magic", "Eldritch Invocations"]
+		},
+		{
+			"id": "druid",
+			"name": "Druid",
+			"description": "Guardians of nature who draw power from the natural world.",
+			"hit_die": 8,
+			"primary_ability": "wisdom",
+			"saving_throw_proficiencies": ["intelligence", "wisdom"],
+			"skill_proficiencies": {
+				"choose": 2,
+				"from": ["Arcana", "Animal Handling", "Insight", "Medicine", "Nature", "Perception", "Religion", "Survival"]
+			},
+			"features": ["Spellcasting", "Druidic", "Wild Shape"]
+		},
+		{
+			"id": "monk",
+			"name": "Monk",
+			"description": "Masters of unarmed combat who channel inner energy.",
+			"hit_die": 8,
+			"primary_ability": "dexterity",
+			"saving_throw_proficiencies": ["strength", "dexterity"],
+			"skill_proficiencies": {
+				"choose": 2,
+				"from": ["Acrobatics", "Athletics", "History", "Insight", "Religion", "Stealth"]
+			},
+			"features": ["Unarmored Defense", "Martial Arts", "Ki", "Unarmored Movement"]
+		}
+	]
+}

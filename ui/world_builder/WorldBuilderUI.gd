@@ -313,29 +313,25 @@ func _apply_ui_constants_to_scene() -> void:
 	if right_content != null:
 		right_content.custom_minimum_size = Vector2(UIConstants.PANEL_WIDTH_CONTENT, 0)
 	
-	# Set split container offsets using UIConstants
-	var main_container: HSplitContainer = get_node_or_null("BackgroundPanel/MainContainer")
-	if main_container != null:
-		main_container.split_offset = UIConstants.PANEL_WIDTH_NAV
-	
-	var right_split: HSplitContainer = get_node_or_null("BackgroundPanel/MainContainer/RightSplit")
-	if right_split != null:
-		right_split.split_offset = UIConstants.PANEL_WIDTH_CONTENT
-	
 	# Title label margins (top padding)
 	var title_label: Control = get_node_or_null("BackgroundPanel/TitleLabel")
 	if title_label != null:
 		title_label.offset_top = UIConstants.SPACING_SMALL
 		title_label.offset_bottom = UIConstants.SPACING_LARGE * 1.25  # 50px for title height
 	
-	# Main container margins (account for title)
-	var main_container: Control = get_node_or_null("BackgroundPanel/MainContainer")
+	# Set split container offsets using UIConstants and main container margins
+	var main_container: HSplitContainer = get_node_or_null("BackgroundPanel/MainContainer")
 	if main_container != null:
-		title_label = get_node_or_null("BackgroundPanel/TitleLabel")
+		main_container.split_offset = UIConstants.PANEL_WIDTH_NAV
+		# Main container margins (account for title)
 		if title_label != null:
 			var title_height: int = int(title_label.offset_bottom - title_label.offset_top)
 			main_container.offset_top = title_height
 			main_container.offset_bottom = -UIConstants.BUTTON_HEIGHT_LARGE - UIConstants.SPACING_SMALL
+	
+	var right_split: HSplitContainer = get_node_or_null("BackgroundPanel/MainContainer/RightSplit")
+	if right_split != null:
+		right_split.split_offset = UIConstants.PANEL_WIDTH_CONTENT
 	
 	# Button container positioning (centered, above bottom)
 	var button_container: Control = get_node_or_null("BackgroundPanel/ButtonContainer")
@@ -368,10 +364,16 @@ func _update_viewport_size() -> void:
 	"""Update viewport size dynamically based on container."""
 	if preview_viewport == null or terrain_3d_view == null:
 		return
-	var container_size: Vector2 = terrain_3d_view.get_visible_rect().size
-	if container_size.x > 0 and container_size.y > 0:
-		preview_viewport.size = Vector2i(int(container_size.x), int(container_size.y))
-		MythosLogger.debug("UI/WorldBuilder", "Viewport size updated to: %s" % container_size)
+	
+	# SubViewportContainer with stretch enabled automatically manages viewport size
+	# Only update if stretch is disabled
+	if not terrain_3d_view.stretch:
+		var container_size: Vector2 = terrain_3d_view.size
+		if container_size.x > 0 and container_size.y > 0:
+			preview_viewport.size = Vector2i(int(container_size.x), int(container_size.y))
+			MythosLogger.debug("UI/WorldBuilder", "Viewport size updated to: %s" % container_size)
+	else:
+		MythosLogger.debug("UI/WorldBuilder", "Viewport size managed automatically by SubViewportContainer.stretch")
 
 
 func _ensure_visibility() -> void:
@@ -818,7 +820,7 @@ func _create_step_map_gen_editor(parent: VBoxContainer) -> void:
 	
 	var container: VBoxContainer = VBoxContainer.new()
 	container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	container.add_theme_constant_override("separation", 10)
+	container.add_theme_constant_override("separation", UIConstants.SPACING_SMALL)
 	step_panel.add_child(container)
 	
 	# Info label
@@ -1107,7 +1109,7 @@ func _create_step_terrain(parent: VBoxContainer) -> void:
 	
 	var container: VBoxContainer = VBoxContainer.new()
 	container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	container.add_theme_constant_override("separation", 10)
+	container.add_theme_constant_override("separation", UIConstants.SPACING_SMALL)
 	step_panel.add_child(container)
 	
 	# Seed field (read-only, auto-filled from Step 1)
@@ -1301,7 +1303,7 @@ func _create_step_climate(parent: VBoxContainer) -> void:
 	
 	var container: VBoxContainer = VBoxContainer.new()
 	container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	container.add_theme_constant_override("separation", 10)
+	container.add_theme_constant_override("separation", UIConstants.SPACING_SMALL)
 	step_panel.add_child(container)
 	
 	# Temperature map intensity
@@ -1563,7 +1565,7 @@ func _create_step_biomes(parent: VBoxContainer) -> void:
 	
 	var container: VBoxContainer = VBoxContainer.new()
 	container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	container.add_theme_constant_override("separation", 10)
+	container.add_theme_constant_override("separation", UIConstants.SPACING_SMALL)
 	step_panel.add_child(container)
 	
 	# Biome Transition Width (for blending)
@@ -1668,7 +1670,7 @@ func _create_step_structures(parent: VBoxContainer) -> void:
 	
 	var container: VBoxContainer = VBoxContainer.new()
 	container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	container.add_theme_constant_override("separation", 10)
+	container.add_theme_constant_override("separation", UIConstants.SPACING_SMALL)
 	step_panel.add_child(container)
 	
 	# Info label
@@ -3186,7 +3188,7 @@ func _create_step_environment(parent: VBoxContainer) -> void:
 	
 	var container: VBoxContainer = VBoxContainer.new()
 	container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	container.add_theme_constant_override("separation", 10)
+	container.add_theme_constant_override("separation", UIConstants.SPACING_SMALL)
 	step_panel.add_child(container)
 	
 	# Fog density
@@ -3345,7 +3347,7 @@ func _create_step_resources(parent: VBoxContainer) -> void:
 	
 	var container: VBoxContainer = VBoxContainer.new()
 	container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	container.add_theme_constant_override("separation", 10)
+	container.add_theme_constant_override("separation", UIConstants.SPACING_SMALL)
 	step_panel.add_child(container)
 	
 	# Resource overlay toggle
@@ -3408,7 +3410,7 @@ func _create_step_export(parent: VBoxContainer) -> void:
 	
 	var container: VBoxContainer = VBoxContainer.new()
 	container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	container.add_theme_constant_override("separation", 10)
+	container.add_theme_constant_override("separation", UIConstants.SPACING_SMALL)
 	step_panel.add_child(container)
 	
 	# World name
@@ -3735,7 +3737,7 @@ func _show_civilization_selection_dialog(city_index: int) -> void:
 	
 	var vbox: VBoxContainer = VBoxContainer.new()
 	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	vbox.add_theme_constant_override("separation", 10)
+	vbox.add_theme_constant_override("separation", UIConstants.SPACING_SMALL)
 	dialog.add_child(vbox)
 	
 	# City name input

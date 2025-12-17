@@ -1,0 +1,61 @@
+{
+	"abilities": [
+		{
+			"id": "strength",
+			"name": "Strength",
+			"full_name": "Strength",
+			"description": "Physical power and athletic ability.",
+			"skills": ["Athletics"]
+		},
+		{
+			"id": "dexterity",
+			"name": "Dexterity",
+			"full_name": "Dexterity",
+			"description": "Agility, reflexes, and balance.",
+			"skills": ["Acrobatics", "Sleight of Hand", "Stealth"]
+		},
+		{
+			"id": "constitution",
+			"name": "Constitution",
+			"full_name": "Constitution",
+			"description": "Endurance, health, and stamina.",
+			"skills": []
+		},
+		{
+			"id": "intelligence",
+			"name": "Intelligence",
+			"full_name": "Intelligence",
+			"description": "Reasoning, memory, and analytical ability.",
+			"skills": ["Arcana", "History", "Investigation", "Nature", "Religion"]
+		},
+		{
+			"id": "wisdom",
+			"name": "Wisdom",
+			"full_name": "Wisdom",
+			"description": "Awareness, intuition, and insight.",
+			"skills": ["Animal Handling", "Insight", "Medicine", "Perception", "Survival"]
+		},
+		{
+			"id": "charisma",
+			"name": "Charisma",
+			"full_name": "Charisma",
+			"description": "Force of personality, persuasiveness, and leadership.",
+			"skills": ["Deception", "Intimidation", "Performance", "Persuasion"]
+		}
+	],
+	"point_buy": {
+		"starting_points": 27,
+		"min_score": 8,
+		"max_score": 15,
+		"costs": {
+			"8": 0,
+			"9": 1,
+			"10": 2,
+			"11": 3,
+			"12": 4,
+			"13": 5,
+			"14": 7,
+			"15": 9
+		}
+	}
+}

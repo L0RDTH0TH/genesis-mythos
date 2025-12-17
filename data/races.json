@@ -1,0 +1,93 @@
+{
+	"races": [
+		{
+			"id": "human",
+			"name": "Human",
+			"description": "Versatile and ambitious, humans are the most adaptable of races.",
+			"ability_bonuses": {
+				"strength": 1,
+				"dexterity": 1,
+				"constitution": 1,
+				"intelligence": 1,
+				"wisdom": 1,
+				"charisma": 1
+			},
+			"traits": ["Versatile", "Extra Skill"]
+		},
+		{
+			"id": "elf",
+			"name": "Elf",
+			"description": "Graceful and long-lived, elves are attuned to magic and nature.",
+			"ability_bonuses": {
+				"dexterity": 2
+			},
+			"traits": ["Darkvision", "Keen Senses", "Fey Ancestry", "Trance"]
+		},
+		{
+			"id": "dwarf",
+			"name": "Dwarf",
+			"description": "Hardy and resilient, dwarves are known for their craftsmanship and endurance.",
+			"ability_bonuses": {
+				"constitution": 2
+			},
+			"traits": ["Darkvision", "Dwarven Resilience", "Stonecunning"]
+		},
+		{
+			"id": "halfling",
+			"name": "Halfling",
+			"description": "Small but brave, halflings are known for their luck and courage.",
+			"ability_bonuses": {
+				"dexterity": 2
+			},
+			"traits": ["Lucky", "Brave", "Halfling Nimbleness"]
+		},
+		{
+			"id": "dragonborn",
+			"name": "Dragonborn",
+			"description": "Proud and powerful, dragonborn are descended from dragons.",
+			"ability_bonuses": {
+				"strength": 2,
+				"charisma": 1
+			},
+			"traits": ["Draconic Ancestry", "Breath Weapon", "Damage Resistance"]
+		},
+		{
+			"id": "gnome",
+			"name": "Gnome",
+			"description": "Curious and inventive, gnomes are masters of illusion and tinkering.",
+			"ability_bonuses": {
+				"intelligence": 2
+			},
+			"traits": ["Darkvision", "Gnome Cunning"]
+		},
+		{
+			"id": "half_elf",
+			"name": "Half-Elf",
+			"description": "Combining human versatility with elven grace.",
+			"ability_bonuses": {
+				"charisma": 2
+			},
+			"traits": ["Darkvision", "Fey Ancestry", "Skill Versatility"]
+		},
+		{
+			"id": "half_orc",
+			"name": "Half-Orc",
+			"description": "Strong and fierce, half-orcs combine human ambition with orcish might.",
+			"ability_bonuses": {
+				"strength": 2,
+				"constitution": 1
+			},
+			"traits": ["Darkvision", "Menacing", "Relentless Endurance", "Savage Attacks"]
+		},
+		{
+			"id": "tiefling",
+			"name": "Tiefling",
+			"description": "Descended from fiends, tieflings bear infernal heritage.",
+			"ability_bonuses": {
+				"intelligence": 1,
+				"charisma": 2
+			},
+			"traits": ["Darkvision", "Hellish Resistance", "Infernal Legacy"]
+		}
+	]
+}

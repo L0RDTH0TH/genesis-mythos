@@ -272,11 +272,67 @@ window/stretch/scale_mode = "fractional" # Enables UI scaling
    - Replace with `UIConstants`-driven sizes or anchor/margin-based layouts.
    - Ensure each modified scene passes resize tests.
 
-5. **Phase 3: Character Creation (Future)**
-   - Build new character creation scenes using only built-in containers and `UIConstants`:
-     - `res://scenes/character_creation/CharacterCreator.tscn`
-     - `res://scripts/character_creation/CharacterCreator.gd`
-   - Follow guidelines from Section 2.4.
+5. **Phase 3: Character Creation (Fresh Build)**
+   - **Historical Context:** Character creation system previously existed but was removed 2025-01-09 (commit "Nuked busted UI systems for clean restart"). The old system suffered from **insurmountable issues due to fundamental design choices made at the beginning**—not GameGUI-related, but architectural decisions that made the system unmaintainable. Rather than attempting migration, we will build a fresh implementation using current best practices.
+   
+   - **Build Approach:** Create new character creation system from scratch using:
+     - Built-in containers (`VBoxContainer`, `HBoxContainer`, `HSplitContainer`, etc.) with explicit size flags and anchors
+     - `UIConstants.gd` for all sizing (no magic numbers)
+     - Theme `res://themes/bg3_theme.tres` for styling
+     - Follow guidelines from Section 2.4 (Character Creation Menus)
+   
+   - **Implementation Steps:**
+     1. **Create folder structure:**
+        - `res://scenes/character_creation/` (main scene folder)
+        - `res://scripts/character_creation/` (main script folder)
+        - `res://scripts/character_creation/tabs/` (tab scripts)
+        - `res://scripts/character_creation/components/` (reusable UI components)
+     
+     2. **Main Scene:** `res://scenes/character_creation/CharacterCreationRoot.tscn`
+        - Root: Full-screen `Control` with `anchors_preset = PRESET_FULL_RECT`
+        - Layout: Follow Section 2.4 structure (Title area, HSplitContainer for left/right panels, bottom navigation)
+        - Attach script: `res://scripts/character_creation/CharacterCreationRoot.gd`
+     
+     3. **Main Script:** `res://scripts/character_creation/CharacterCreationRoot.gd`
+        - Handle wizard-style flow (multi-step navigation)
+        - Manage tab switching and data persistence
+        - Integrate 3D preview system (SubViewport for character model)
+        - Use signals for tab completion and navigation
+     
+     4. **Tab Scenes & Scripts:** Create tab scenes for each step:
+        - `RaceTab.tscn` / `RaceTab.gd` - Race selection
+        - `ClassTab.tscn` / `ClassTab.gd` - Class selection
+        - `BackgroundTab.tscn` / `BackgroundTab.gd` - Background selection
+        - `AbilityScoreTab.tscn` / `AbilityScoreTab.gd` - Ability score allocation
+        - `AppearanceTab.tscn` / `AppearanceTab.gd` - Appearance customization with 3D preview
+        - `NameConfirmTab.tscn` / `NameConfirmTab.gd` - Final confirmation
+        - Each tab follows Section 2.4 guidelines (left panel options, right panel preview)
+     
+     5. **Data Files:** Create JSON data files (if not already present):
+        - `res://data/races.json` - Race definitions
+        - `res://data/classes.json` - Class definitions
+        - `res://data/backgrounds.json` - Background definitions
+        - `res://data/abilities.json` - Ability score definitions
+     
+     6. **3D Preview System:**
+        - Create `CharacterPreview3D.gd` script for managing 3D character model in SubViewport
+        - Support race/model switching, rotation via raycast interaction
+        - Integrate with AppearanceTab for real-time preview updates
+     
+     7. **Testing:**
+        - Test responsive layout (1080p, 4K, ultrawide, window resize)
+        - Verify tab navigation flow
+        - Test 3D preview interaction
+        - Validate data loading from JSON files
+     
+     8. **Commit:** `"feat/genesis: Implement fresh character creation system with built-in responsive UI"`
+   
+   - **Key Principles:**
+     - **No legacy code dependencies** - Fresh implementation avoids old architectural issues
+     - **Data-driven** - All content from JSON files (races, classes, backgrounds)
+     - **Responsive by design** - Built-in containers + UIConstants from the start
+     - **Theme-consistent** - Use `bg3_theme.tres` throughout
+     - **Modular** - Reusable component scenes for common UI patterns
 
 6. **Phase 4: Global Polish**
    - Make progress dialogs and overlays fully responsive:
