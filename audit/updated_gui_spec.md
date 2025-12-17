@@ -27,7 +27,7 @@ Our GUI design blends classic tabletop RPG tactility (e.g., character sheets, di
 - **Root Node:** Always a Control or CanvasLayer for menus. Use `anchors_preset = 15` (PRESET_FULL_RECT) for full-screen coverage, ensuring it expands to viewport size.
 
 - **Layout Containers as Default:** Build with nested containers for responsiveness:
-  - Prefer GameGUI nodes for complex/dynamic sections: `GGHBox`/`GGVBox` for vertical/horizontal stacking (e.g., stat rows in character creation), `GGComponent` for dynamic sizing (modes: Expand, Fit, etc.).
+  - Prefer GameGUI nodes for complex/dynamic sections: `GGHBox`/`GGVBox` for vertical/horizontal stacking (e.g., stat rows in character creation), `GGComponent`-derived nodes like `GGMarginLayout` for dynamic sizing (modes: Expand, Fit, etc.).
   - `CenterContainer` for centering main content (e.g., title labels or 3D preview windows).
   - `MarginContainer` for consistent padding (pull margins from theme constants, not hard-codes).
   - `HSplitContainer`/`VSplitContainer` for resizable panels (e.g., left-side options, right-side preview in world gen).
@@ -40,7 +40,7 @@ Our GUI design blends classic tabletop RPG tactility (e.g., character sheets, di
 
 ### 2.2 Sizing & Positioning Rules
 - **No Magic Numbers:** Ban hard-coded pixels (e.g., no `custom_minimum_size = Vector2(150, 0)`). Replace with:
-  - UIConstants.gd (primary source for semantic sizes like button heights). Location: `res://scripts/ui/UIConstants.gd` with `class_name UIConstants` (not autoload).
+  - UIConstants.gd (primary source for semantic sizes like button heights) - located at `res://scripts/ui/UIConstants.gd`, uses `class_name UIConstants` (not autoload).
   - Theme constants (add to bg3_theme.tres: e.g., `constant/button_height_small = 50` for built-in styling).
   - Runtime calculations: e.g., `size = get_viewport().get_visible_rect().size * Vector2(0.8, 0.6)` for 80% width/60% height.
   - GameGUI parameters for dynamic overrides (e.g., min_size, max_size from constants).
@@ -81,7 +81,7 @@ Our GUI design blends classic tabletop RPG tactility (e.g., character sheets, di
   - Root: Full-screen GGVBox (or VBoxContainer for simplicity).
   - Top: Title (CenterContainer with large font).
   - Middle: HSplitContainer – Left: Options (GGVBox with rows for race/class/stats, using AbilityScoreRow.tscn prefab).
-  - Right: 3D Preview Window (SubViewport in a GGComponent/Panel; size 40% of screen, centered, with orbit camera for model rotation).
+  - Right: 3D Preview Window (SubViewport in a GGComponent-derived node like GGMarginLayout/Panel; size 40% of screen, centered, with orbit camera for model rotation).
   - Bottom: Navigation buttons (GGHBox, centered, medium size).
 
 - **Interactivity:** Raycasts for 3D model interaction (e.g., click to rotate). Stats update preview dynamically via signals.
@@ -98,7 +98,7 @@ Our GUI design blends classic tabletop RPG tactility (e.g., character sheets, di
 
 - **3D Integration:** Post-2D map baking, embed a minimal 3D scene in the preview (e.g., fly-cam for quick inspection). Use signals to update on param changes.
 
-- **Progress Dialog:** Responsive popup (no fixed 400x120 size—use content_size instead, via GGComponent or GGMarginLayout).
+- **Progress Dialog:** Responsive popup (no fixed 400x120 size—use content_size instead, via GGComponent-derived nodes like GGMarginLayout).
 
 ### 2.6 Performance & Testing
 - **Optimization:** Limit draw calls; use GGNinePatchRect for scalable backgrounds. Test FPS with full UI active.
@@ -120,7 +120,14 @@ Error states (e.g., failed world generation, invalid character data) should use 
 - **Rationale:** GameGUI (https://godotengine.org/asset-library/asset/2168) provides advanced nodes for dynamic layout and scaling, addressing audit issues like clipping and inconsistent sizing.
 - **Setup:** Folder: `res://addons/gamegui/`. Enable in Project Settings > Plugins.
 - **Usage:** Primary for complex menus; compatible with themes and existing Controls.
-- **Node Names:** Use exact names: `GGHBox`, `GGVBox`, `GGLabel`, `GGButton`, `GGNinePatchRect`, `GGMarginLayout`, `GGComponent` (base class).
+- **Node Names:** Use exact names from GameGUI plugin:
+  - `GGHBox` (not GGHBoxContainer)
+  - `GGVBox` (not GGVBoxContainer)
+  - `GGLabel`
+  - `GGButton`
+  - `GGNinePatchRect`
+  - `GGMarginLayout` (for padding)
+  - `GGComponent` (base class for dynamic sizing)
 
 ## 4. Project Settings (Add to project.godot)
 ```
@@ -129,6 +136,9 @@ window/stretch/mode = "viewport"
 window/stretch/aspect = "expand"
 window/stretch/scale = 1.0
 window/stretch/scale_mode = "fractional" # Enables UI scaling
+
+[plugins]
+gamegui="res://addons/gamegui/plugin.cfg"
 ```
 
 ## 5. Implementation Workflow (For Grok/Cursor Prompts)
@@ -141,9 +151,9 @@ window/stretch/scale_mode = "fractional" # Enables UI scaling
 ## 6. Migration Plan (Phased & Safe)
 1. **Phase 0: Setup**
    - Install/enable GameGUI (verify res://addons/gamegui/ exists and plugin is enabled).
-   - Create `res://scripts/ui/UIConstants.gd` with canonical table.
+   - Create `UIConstants.gd` at `res://scripts/ui/UIConstants.gd` with canonical table.
    - Update project.godot with display settings from Section 4.
-   - Commit: "feat/genesis: Add GameGUI addon and UIConstants"
+   - Commit: "feat/genesis: Add GameGUI addon, UIConstants.gd, and update project settings"
 
 2. **Phase 1: Quick Wins (Low Risk)**
    - Refactor MainMenu.tscn: Replace VBox/HBox with GGVBox/GGHBox, use GGLabel.
@@ -151,7 +161,7 @@ window/stretch/scale_mode = "fractional" # Enables UI scaling
    - Test responsiveness.
 
 3. **Phase 2: World Generation Menus**
-   - Update res://ui/world_builder/WorldBuilderUI.tscn/.gd (highest magic number count).
+   - Update WorldBuilderUI.tscn/.gd at res://ui/world_builder/ (highest magic number count).
    - Migrate splits/previews to GameGUI nodes.
    - Make preview viewports dynamic via GameGUI sizing.
 
@@ -159,7 +169,7 @@ window/stretch/scale_mode = "fractional" # Enables UI scaling
    - Build new using GameGUI from start (HSplit: options left, 3D preview right).
 
 5. **Phase 4: Global Polish**
-   - Progress dialogs: Use GGComponent for content-based sizing.
+   - Progress dialogs: Use GGComponent-derived nodes for content-based sizing.
    - Debug overlay: GameGUI positioning with safe margins.
    - Audit: No remaining hard-codes.
 
