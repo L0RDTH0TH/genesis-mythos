@@ -38,6 +38,7 @@ var current_log_file: FileAccess = null
 var current_log_date: String = ""
 var file: FileAccess = null
 var dev_path: String = ""
+var dev_mirror_failed: bool = false  ## Track if dev mirror write has failed (suppress repeated warnings)
 
 ## Timestamp format
 var timestamp_format: String = "%Y-%m-%d %H:%M:%S"
@@ -164,6 +165,7 @@ func _setup_file_logging() -> void:
 	var filename: String = prefix + date_str + ".txt"
 	var full_path: String = log_dir_path + filename if log_dir_path.ends_with("/") else log_dir_path + "/" + filename
 	dev_path = "/home/darth/Documents/Mythos-gen/Final-Approach/" + filename
+	dev_mirror_failed = false  ## Reset on new log file setup
 
 	_force_console_log("Logger", LogLevel.DEBUG, "Setting up file logging - path: " + full_path + ", dev: " + dev_path)
 
@@ -333,7 +335,7 @@ func _output_to_file(message: String) -> void:
 			push_error("Log file write failed mid-session: " + str(FileAccess.get_open_error()))
 
 	# Dev mirror - independent open/write/close each time to avoid locks
-	if config.get("dev_mode", true):
+	if config.get("dev_mode", true) and not dev_mirror_failed:
 		var dev_file: FileAccess = FileAccess.open(dev_path, FileAccess.READ_WRITE)
 		if dev_file == null:
 			dev_file = FileAccess.open(dev_path, FileAccess.WRITE)
@@ -343,7 +345,10 @@ func _output_to_file(message: String) -> void:
 			dev_file.flush()
 			dev_file.close()
 		else:
-			push_warning("Failed to write to dev mirror: " + dev_path + " - err: " + str(FileAccess.get_open_error()))
+			# Only warn once, then silently skip subsequent attempts
+			if not dev_mirror_failed:
+				push_warning("Failed to write to dev mirror: " + dev_path + " - err: " + str(FileAccess.get_open_error()) + " (subsequent failures will be silent)")
+				dev_mirror_failed = true
 
 ## Convenience methods for each log level
 
