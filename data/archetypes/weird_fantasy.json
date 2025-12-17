@@ -1,0 +1,21 @@
+{
+  "name": "Weird Fantasy",
+  "description": "Surreal dreamscapes with floating crystals and impossible colors.",
+  "recommended_size": "Medium",
+  "default_landmass": "Archipelago",
+  "noise_type": "TYPE_CELLULAR",
+  "frequency": 0.012,
+  "octaves": 6,
+  "gain": 0.6,
+  "lacunarity": 1.8,
+  "height_scale": 0.7,
+  "biome_colors": {
+    "water": "#ff00ff",
+    "beach": "#00ffff",
+    "grass": "#ff00ff",
+    "forest": "#00ff00",
+    "hill": "#ffff00",
+    "mountain": "#ff0000",
+    "snow": "#00ff00"
+  }
+}

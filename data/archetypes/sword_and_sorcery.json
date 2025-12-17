@@ -1,0 +1,21 @@
+{
+  "name": "Sword and Sorcery",
+  "description": "Deserts, jungles, and ancient ruins full of treasure and danger.",
+  "recommended_size": "Small",
+  "default_landmass": "Island Chain",
+  "noise_type": "TYPE_SIMPLEX",
+  "frequency": 0.01,
+  "octaves": 5,
+  "gain": 0.45,
+  "lacunarity": 2.0,
+  "height_scale": 0.5,
+  "biome_colors": {
+    "water": "#1e90ff",
+    "beach": "#f4a460",
+    "grass": "#8fbc8f",
+    "forest": "#228b22",
+    "hill": "#cd853f",
+    "mountain": "#8b4513",
+    "snow": "#fffacd"
+  }
+}

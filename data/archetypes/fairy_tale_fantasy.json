@@ -1,0 +1,21 @@
+{
+  "name": "Fairy Tale Fantasy",
+  "description": "Candy groves, gingerbread hills, and golden-hour enchantment.",
+  "recommended_size": "Small",
+  "default_landmass": "Single Island",
+  "noise_type": "TYPE_SIMPLEX_SMOOTH",
+  "frequency": 0.01,
+  "octaves": 4,
+  "gain": 0.4,
+  "lacunarity": 2.2,
+  "height_scale": 0.4,
+  "biome_colors": {
+    "water": "#87ceeb",
+    "beach": "#ffb6c1",
+    "grass": "#ff69b4",
+    "forest": "#ff1493",
+    "hill": "#ffa07a",
+    "mountain": "#ffd700",
+    "snow": "#fff0f5"
+  }
+}

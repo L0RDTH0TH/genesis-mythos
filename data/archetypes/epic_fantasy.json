@@ -1,0 +1,21 @@
+{
+  "name": "Epic Fantasy",
+  "description": "Vast kingdoms, divine mountains, and world-shaping rivers.",
+  "recommended_size": "Extra Large",
+  "default_landmass": "Pangea",
+  "noise_type": "TYPE_SIMPLEX",
+  "frequency": 0.003,
+  "octaves": 8,
+  "gain": 0.5,
+  "lacunarity": 2.0,
+  "height_scale": 0.9,
+  "biome_colors": {
+    "water": "#006994",
+    "beach": "#deb887",
+    "grass": "#228b22",
+    "forest": "#1a5f1a",
+    "hill": "#8fbc8f",
+    "mountain": "#a9a9a9",
+    "snow": "#f8f8ff"
+  }
+}

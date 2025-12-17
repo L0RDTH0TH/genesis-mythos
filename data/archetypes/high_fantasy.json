@@ -1,0 +1,90 @@
+{
+  "name": "High Fantasy",
+  "description": "A vibrant world of magic, with lush forests, towering mountains, and mystical landscapes teeming with wonder and adventure.",
+  "recommended_size": "Large",
+  "default_landmass": "Continents",
+  
+  "noise": {
+    "noise_type": "TYPE_SIMPLEX",
+    "frequency": 0.004,
+    "octaves": 6,
+    "gain": 0.5,
+    "lacunarity": 2.0,
+    "height_scale": 0.8
+  },
+  
+  "terrain": {
+    "sea_level": 0.35,
+    "erosion": {
+      "enabled": false,
+      "strength": 0.3,
+      "iterations": 5
+    },
+    "rivers": {
+      "enabled": false,
+      "count": 15,
+      "start_elevation": 0.7
+    }
+  },
+  
+  "climate": {
+    "temperature_noise_frequency": 0.002,
+    "moisture_noise_frequency": 0.002,
+    "temperature_bias": 0.0,
+    "moisture_bias": 0.1
+  },
+  
+  "biomes": {
+    "colors": {
+      "water": "#2a6d9e",
+      "beach": "#d4b56a",
+      "grass": "#3d8c40",
+      "forest": "#2d5a3d",
+      "hill": "#8b7355",
+      "mountain": "#c0c0c0",
+      "snow": "#ffffff",
+      "enchanted_forest": "#4b0082",
+      "ancient_ruins": "#808080",
+      "crystal_lake": "#00ffff"
+    },
+    "thresholds": {
+      "water": 0.35,
+      "beach": 0.38,
+      "grass": 0.5,
+      "forest": 0.65,
+      "hill": 0.8,
+      "mountain": 0.95,
+      "snow": 1.0,
+      "enchanted_forest": 0.55,
+      "ancient_ruins": 0.7,
+      "crystal_lake": 0.3
+    },
+    "generation_mode": "height_and_climate",
+    "fantasy_biomes": {
+      "enchanted_forest": {
+        "height_range": [0.5, 0.65],
+        "temperature_range": [0.3, 0.7],
+        "moisture_range": [0.6, 1.0],
+        "spawn_chance": 0.15
+      },
+      "ancient_ruins": {
+        "height_range": [0.6, 0.8],
+        "temperature_range": [0.0, 1.0],
+        "moisture_range": [0.0, 0.5],
+        "spawn_chance": 0.05
+      },
+      "crystal_lake": {
+        "height_range": [0.25, 0.35],
+        "temperature_range": [0.0, 1.0],
+        "moisture_range": [0.8, 1.0],
+        "spawn_chance": 0.1
+      }
+    }
+  },
+  
+  "additional_params": {
+    "magic_density": "high",
+    "creature_diversity": "abundant",
+    "weather_variety": ["sunny", "rainy", "mystical fog"]
+  }
+}

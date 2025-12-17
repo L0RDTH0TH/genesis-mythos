@@ -1,0 +1,21 @@
+{
+  "name": "Dark Fantasy",
+  "description": "Cursed forests, undead hordes, and eternal twilight horror.",
+  "recommended_size": "Medium",
+  "default_landmass": "Single Island",
+  "noise_type": "TYPE_CELLULAR",
+  "frequency": 0.007,
+  "octaves": 5,
+  "gain": 0.5,
+  "lacunarity": 2.1,
+  "height_scale": 0.6,
+  "biome_colors": {
+    "water": "#1a0033",
+    "beach": "#330033",
+    "grass": "#1a1a33",
+    "forest": "#002200",
+    "hill": "#2b1b2b",
+    "mountain": "#4c2f4c",
+    "snow": "#b3b3cc"
+  }
+}

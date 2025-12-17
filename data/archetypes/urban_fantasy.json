@@ -1,0 +1,21 @@
+{
+  "name": "Urban Fantasy",
+  "description": "Hidden magic in modern-style cities and enchanted alleys.",
+  "recommended_size": "Small",
+  "default_landmass": "Coastal",
+  "noise_type": "TYPE_VALUE",
+  "frequency": 0.015,
+  "octaves": 3,
+  "gain": 0.3,
+  "lacunarity": 2.0,
+  "height_scale": 0.2,
+  "biome_colors": {
+    "water": "#4682b4",
+    "beach": "#808080",
+    "grass": "#556b2f",
+    "forest": "#2f4f2f",
+    "hill": "#696969",
+    "mountain": "#778899",
+    "snow": "#b0c4de"
+  }
+}

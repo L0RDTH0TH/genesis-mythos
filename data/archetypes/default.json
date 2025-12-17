@@ -1,0 +1,64 @@
+{
+  "name": "Default",
+  "description": "Standard fantasy world with balanced terrain and climate.",
+  "recommended_size": "Medium",
+  "default_landmass": "Continents",
+  
+  "noise": {
+    "noise_type": "TYPE_SIMPLEX",
+    "frequency": 0.004,
+    "octaves": 6,
+    "gain": 0.5,
+    "lacunarity": 2.0,
+    "height_scale": 0.8
+  },
+  
+  "terrain": {
+    "sea_level": 0.4,
+    "erosion": {
+      "enabled": false,
+      "strength": 0.3,
+      "iterations": 5
+    },
+    "rivers": {
+      "enabled": false,
+      "count": 12,
+      "start_elevation": 0.7
+    }
+  },
+  
+  "climate": {
+    "temperature_noise_frequency": 0.002,
+    "moisture_noise_frequency": 0.002,
+    "temperature_bias": 0.0,
+    "moisture_bias": 0.0
+  },
+  
+  "biomes": {
+    "colors": {
+      "water": "#2a6d9e",
+      "beach": "#d4b56a",
+      "grass": "#3d8c40",
+      "forest": "#2d5a3d",
+      "hill": "#8b7355",
+      "mountain": "#c0c0c0",
+      "snow": "#ffffff"
+    },
+    "thresholds": {
+      "water": 0.35,
+      "beach": 0.38,
+      "grass": 0.5,
+      "forest": 0.65,
+      "hill": 0.8,
+      "mountain": 0.95,
+      "snow": 1.0
+    },
+    "generation_mode": "height_only"
+  },
+  
+  "additional_params": {
+    "magic_density": "moderate",
+    "creature_diversity": "standard",
+    "weather_variety": ["sunny", "cloudy", "rainy"]
+  }
+}

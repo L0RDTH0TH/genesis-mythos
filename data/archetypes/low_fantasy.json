@@ -1,0 +1,21 @@
+{
+  "name": "Low Fantasy",
+  "description": "Rare magic, muddy villages, and human intrigue in a grounded world.",
+  "recommended_size": "Medium",
+  "default_landmass": "Continents",
+  "noise_type": "TYPE_PERLIN",
+  "frequency": 0.008,
+  "octaves": 4,
+  "gain": 0.4,
+  "lacunarity": 2.2,
+  "height_scale": 0.4,
+  "biome_colors": {
+    "water": "#4a5568",
+    "beach": "#a0896b",
+    "grass": "#6b7a5e",
+    "forest": "#3e4b3a",
+    "hill": "#6b5a47",
+    "mountain": "#8c7b6b",
+    "snow": "#d4d4d4"
+  }
+}

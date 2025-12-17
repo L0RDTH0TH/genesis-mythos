@@ -1,0 +1,21 @@
+{
+  "name": "Mythic Fantasy",
+  "description": "God-forged islands, divine stairways, and sacred rivers.",
+  "recommended_size": "Large",
+  "default_landmass": "Archipelago",
+  "noise_type": "TYPE_SIMPLEX",
+  "frequency": 0.004,
+  "octaves": 7,
+  "gain": 0.5,
+  "lacunarity": 2.0,
+  "height_scale": 0.9,
+  "biome_colors": {
+    "water": "#00ced1",
+    "beach": "#f0e68c",
+    "grass": "#adff2f",
+    "forest": "#006400",
+    "hill": "#daa520",
+    "mountain": "#b0c4de",
+    "snow": "#e0ffff"
+  }
+}

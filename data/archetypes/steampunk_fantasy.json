@@ -1,0 +1,21 @@
+{
+  "name": "Steampunk Fantasy",
+  "description": "Clockwork cities, airship docks, and brass highlands.",
+  "recommended_size": "Medium",
+  "default_landmass": "Continents",
+  "noise_type": "TYPE_PERLIN",
+  "frequency": 0.009,
+  "octaves": 5,
+  "gain": 0.45,
+  "lacunarity": 2.1,
+  "height_scale": 0.6,
+  "biome_colors": {
+    "water": "#3b444b",
+    "beach": "#cd7f32",
+    "grass": "#808000",
+    "forest": "#556b2f",
+    "hill": "#b87333",
+    "mountain": "#8b6914",
+    "snow": "#f5f5dc"
+  }
+}

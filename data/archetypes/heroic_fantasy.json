@@ -1,0 +1,21 @@
+{
+  "name": "Heroic Fantasy",
+  "description": "Dragon lairs, heroic passes, and sunlit savannas.",
+  "recommended_size": "Large",
+  "default_landmass": "Continents",
+  "noise_type": "TYPE_SIMPLEX",
+  "frequency": 0.005,
+  "octaves": 6,
+  "gain": 0.5,
+  "lacunarity": 2.0,
+  "height_scale": 0.8,
+  "biome_colors": {
+    "water": "#1e90ff",
+    "beach": "#f4a460",
+    "grass": "#32cd32",
+    "forest": "#228b22",
+    "hill": "#9acd32",
+    "mountain": "#ffd700",
+    "snow": "#ffffff"
+  }
+}
