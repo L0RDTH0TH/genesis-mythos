@@ -30,7 +30,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer"]
+[node name="VBoxContainer" type="GGVBox" parent="CenterContainer"]
 _import_path = NodePath("")
 unique_name_in_owner = false
 process_mode = 0
@@ -45,7 +45,7 @@ size_flags_horizontal = 3
 size_flags_vertical = 3
 script = null
 
-[node name="TitleLabel" type="Label" parent="CenterContainer/VBoxContainer"]
+[node name="TitleLabel" type="GGLabel" parent="CenterContainer/VBoxContainer"]
 _import_path = NodePath("")
 unique_name_in_owner = false
 process_mode = 0

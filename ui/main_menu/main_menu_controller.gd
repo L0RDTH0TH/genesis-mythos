@@ -12,7 +12,7 @@ const WORLD_CREATION_SCENE : String = "res://core/scenes/world_root.tscn"
 
 @onready var character_button : Button = %CharacterCreationButton
 @onready var world_button     : Button = %WorldCreationButton
-@onready var vbox_container   : VBoxContainer = $CenterContainer/VBoxContainer
+@onready var vbox_container   : GGVBox = $CenterContainer/VBoxContainer
 
 func _ready() -> void:
 	"""Initialize button connections and visibility."""
