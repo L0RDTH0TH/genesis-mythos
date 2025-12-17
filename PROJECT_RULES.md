@@ -126,4 +126,46 @@ Always add the exact script header shown in rule 3.
 
 ---
 
+## 9. GUI Specification: Philosophy & Structural Guidelines
+
+**Status:** Finalized as of 2025-12-16 | Valid for Grok AND Cursor
+
+See complete specification at: `res://audit/updated_gui_spec.md`
+
+**Key Principles:**
+- Immersion & Diegesis: UI elements feel "in-world" (floating scrolls, engraved tablets)
+- Clarity & Intuitiveness: AAA RPG principles, clear hierarchy, consistent icons
+- Responsiveness & Accessibility: Adapts to any resolution, no fixed pixels, scalable fonts
+- Data-Driven & Extensible: 100% JSON/Resources for content
+- Consistency: Zero hard-coded values, use UIConstants.gd and theme overrides
+- GameGUI Integration: Primary tool for complex menus (res://addons/gamegui/)
+
+**Mandatory Practices:**
+- Root nodes: Control or CanvasLayer with `anchors_preset = 15` (PRESET_FULL_RECT)
+- Layout containers: Prefer GameGUI nodes (GGHBox, GGVBox, GGLabel) for dynamic scaling
+- Sizing: Use UIConstants.gd (res://scripts/ui/UIConstants.gd) - no magic numbers
+- Theme: All UI uses res://themes/bg3_theme.tres
+- Testing: Must pass UI Change Checklist (see full spec)
+
+**UIConstants Standard Sizes:**
+- Button Heights: SMALL=50, MEDIUM=80, LARGE=120
+- Label Widths: NARROW=80, STANDARD=150, WIDE=200
+- Spacing: SMALL=10, MEDIUM=20, LARGE=40
+- Icon Sizes: SMALL=32, MEDIUM=64, LARGE=128
+
+**Project Settings (project.godot):**
+```
+[display]
+window/stretch/mode = "viewport"
+window/stretch/aspect = "expand"
+window/stretch/scale = 1.0
+window/stretch/scale_mode = "fractional"
+```
+
+**Migration Plan:** Phased approach - see full spec for details (Phase 0: Setup, Phase 1: MainMenu, Phase 2: WorldBuilderUI, Phase 3: Character Creation, Phase 4: Global Polish)
+
+**For complete details, implementation workflow, and migration plan, see:** `res://audit/updated_gui_spec.md`
+
+---
+
 **THESE RULES ARE NOW 100% LOCKED. NO FURTHER MODIFICATIONS WILL EVER BE ACCEPTED.**
