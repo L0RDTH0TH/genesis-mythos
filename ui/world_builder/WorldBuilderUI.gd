@@ -313,6 +313,15 @@ func _apply_ui_constants_to_scene() -> void:
 	if right_content != null:
 		right_content.custom_minimum_size = Vector2(UIConstants.PANEL_WIDTH_CONTENT, 0)
 	
+	# Set split container offsets using UIConstants
+	var main_container: HSplitContainer = get_node_or_null("BackgroundPanel/MainContainer")
+	if main_container != null:
+		main_container.split_offset = UIConstants.PANEL_WIDTH_NAV
+	
+	var right_split: HSplitContainer = get_node_or_null("BackgroundPanel/MainContainer/RightSplit")
+	if right_split != null:
+		right_split.split_offset = UIConstants.PANEL_WIDTH_CONTENT
+	
 	# Title label margins (top padding)
 	var title_label: Control = get_node_or_null("BackgroundPanel/TitleLabel")
 	if title_label != null:
@@ -362,6 +371,7 @@ func _update_viewport_size() -> void:
 	var container_size: Vector2 = terrain_3d_view.get_visible_rect().size
 	if container_size.x > 0 and container_size.y > 0:
 		preview_viewport.size = Vector2i(int(container_size.x), int(container_size.y))
+		MythosLogger.debug("UI/WorldBuilder", "Viewport size updated to: %s" % container_size)
 
 
 func _ensure_visibility() -> void:

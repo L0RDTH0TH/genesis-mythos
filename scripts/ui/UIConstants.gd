@@ -28,3 +28,22 @@ const SPACING_LARGE: int = 40  ## Section breaks
 const ICON_SIZE_SMALL: int = 32  ## Inline icons
 const ICON_SIZE_MEDIUM: int = 64  ## Buttons, previews
 const ICON_SIZE_LARGE: int = 128  ## Hero icons, logos
+
+# Panel Widths
+const PANEL_WIDTH_NAV: int = 250  ## Left navigation panel width
+const PANEL_WIDTH_CONTENT: int = 300  ## Right content panel width
+
+# Additional Label Widths
+const LABEL_WIDTH_COMPACT: int = 60  ## Compact labels (e.g., X/Y coordinates)
+const LABEL_WIDTH_MEDIUM: int = 120  ## Medium-width labels
+
+# List Heights
+const LIST_HEIGHT_STANDARD: int = 200  ## Standard list/scroll container height
+
+# Dialog Sizes
+const DIALOG_WIDTH_MEDIUM: int = 400  ## Medium dialog width
+const DIALOG_WIDTH_LARGE: int = 600  ## Large dialog width
+const DIALOG_HEIGHT_STANDARD: int = 300  ## Standard dialog height
+
+# Button Sizes (Vector2)
+const BUTTON_SIZE_TYPE: Vector2 = Vector2(100, 40)  ## Type selection button size

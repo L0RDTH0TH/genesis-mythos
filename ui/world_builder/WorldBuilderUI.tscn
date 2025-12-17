@@ -59,7 +59,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="TitleLabel" type="GGLabel" parent="BackgroundPanel"]
+[node name="TitleLabel" type="Label" parent="BackgroundPanel"]
 layout_mode = 1
 anchors_preset = 6
 anchor_left = 0.0
@@ -96,7 +96,7 @@ split_offset = 250
 
 [node name="LeftNav" type="Panel" parent="BackgroundPanel/MainContainer"]
 layout_mode = 2
-custom_minimum_size = Vector2(250, 0)
+size_flags_horizontal = 0
 
 [node name="RightSplit" type="HSplitContainer" parent="BackgroundPanel/MainContainer"]
 layout_mode = 2
@@ -140,7 +140,7 @@ stretch = true
 visible = false
 
 [node name="PreviewViewport" type="SubViewport" parent="BackgroundPanel/MainContainer/RightSplit/CenterPanel/Terrain3DView"]
-size = Vector2(1024, 1024)
+size = Vector2(512, 512)
 transparent_bg = false
 handle_input_locally = false
 render_target_update_mode = 0
@@ -166,8 +166,9 @@ visible = false
 
 [node name="RightContent" type="PanelContainer" parent="BackgroundPanel/MainContainer/RightSplit"]
 layout_mode = 2
+size_flags_horizontal = 0
 
-[node name="ButtonContainer" type="GGHBox" parent="BackgroundPanel"]
+[node name="ButtonContainer" type="HBoxContainer" parent="BackgroundPanel"]
 layout_mode = 1
 anchors_preset = 7
 anchor_left = 0.5
@@ -180,14 +181,18 @@ offset_right = 0.0
 offset_bottom = 0.0
 grow_horizontal = 2
 grow_vertical = 0
+alignment = 1
 
-[node name="BackButton" type="GGButton" parent="BackgroundPanel/ButtonContainer"]
+[node name="BackButton" type="Button" parent="BackgroundPanel/ButtonContainer"]
 layout_mode = 2
+size_flags_horizontal = 0
 text = "Back"
 
 [node name="Spacer" type="Control" parent="BackgroundPanel/ButtonContainer"]
 layout_mode = 2
+size_flags_horizontal = 3
 
-[node name="NextButton" type="GGButton" parent="BackgroundPanel/ButtonContainer"]
+[node name="NextButton" type="Button" parent="BackgroundPanel/ButtonContainer"]
 layout_mode = 2
+size_flags_horizontal = 0
 text = "Next"

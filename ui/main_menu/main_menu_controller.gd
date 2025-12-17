@@ -7,12 +7,12 @@ class_name MainMenuController
 
 extends Control
 
-const CHARACTER_CREATION_SCENE : String = "res://scenes/character_creation/CharacterCreationRoot.tscn"
-const WORLD_CREATION_SCENE : String = "res://core/scenes/world_root.tscn"
+const CHARACTER_CREATION_SCENE: String = "res://scenes/character_creation/CharacterCreationRoot.tscn"
+const WORLD_CREATION_SCENE: String = "res://core/scenes/world_root.tscn"
 
-@onready var character_button : Button = %CharacterCreationButton
-@onready var world_button     : Button = %WorldCreationButton
-@onready var vbox_container   : GGVBox = $CenterContainer/VBoxContainer
+@onready var character_button: Button = %CharacterCreationButton
+@onready var world_button: Button = %WorldCreationButton
+@onready var vbox_container: VBoxContainer = $CenterContainer/VBoxContainer
 
 func _ready() -> void:
 	"""Initialize button connections and visibility."""
@@ -36,9 +36,9 @@ func _notification(what: int) -> void:
 func _apply_ui_constants() -> void:
 	"""Apply UIConstants values to UI elements for consistency."""
 	if character_button:
-		character_button.custom_minimum_size = Vector2(0, UIConstants.BUTTON_HEIGHT_LARGE)
+		character_button.custom_minimum_size = Vector2(0, UIConstants.BUTTON_HEIGHT_MEDIUM)
 	if world_button:
-		world_button.custom_minimum_size = Vector2(0, UIConstants.BUTTON_HEIGHT_LARGE)
+		world_button.custom_minimum_size = Vector2(0, UIConstants.BUTTON_HEIGHT_MEDIUM)
 	
 	# Apply spacing to GGVBox container using UIConstants
 	if vbox_container:

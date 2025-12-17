@@ -56,7 +56,6 @@ size_flags_vertical = 3
 
 [node name="status_bar" type="Panel" parent="MarginContainer/root_layout"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 30)
 
 [node name="preview_panel" type="SubViewportContainer" parent="."]
 layout_mode = 1
@@ -87,10 +86,6 @@ layout_mode = 1
 anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
-offset_left = 10.0
-offset_top = -40.0
-offset_right = 200.0
-offset_bottom = -10.0
 
 [node name="BiomeOverlayToggle" type="CheckBox" parent="preview_panel/PreviewControls"]
 layout_mode = 2

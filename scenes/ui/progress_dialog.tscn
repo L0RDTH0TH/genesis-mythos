@@ -5,7 +5,6 @@
 
 [node name="ProgressDialog" type="Window"]
 title = "Forging the World…"
-size = Vector2i(400, 120)
 theme = ExtResource("1_0")
 mode = 4
 visible = false
@@ -14,23 +13,27 @@ borderless = false
 script = ExtResource("1_1")
 
 [node name="StatusLabel" type="Label" parent="."]
-layout_mode = 0
-anchors_preset = 0
-offset_left = 20.0
-offset_top = 20.0
-offset_right = 380.0
-offset_bottom = 50.0
+layout_mode = 1
+anchors_preset = 10
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+grow_horizontal = 2
+grow_vertical = 0
 text = "Generating terrain mesh..."
 horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="ProgressBar" type="ProgressBar" parent="."]
-layout_mode = 0
-anchors_preset = 0
-offset_left = 20.0
-offset_top = 60.0
-offset_right = 380.0
-offset_bottom = 80.0
+layout_mode = 1
+anchors_preset = 12
+anchor_left = 0.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 0
 min_value = 0.0
 max_value = 1.0
 value = 0.0

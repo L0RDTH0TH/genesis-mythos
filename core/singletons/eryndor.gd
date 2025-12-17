@@ -7,51 +7,41 @@
 extends Node
 
 ## Force-load GameGUI classes at startup to ensure they're available at runtime
-## The plugin's add_custom_type() only works in editor, so we must force load at runtime
-## @tool scripts are not loaded at runtime by default, so we explicitly load them here
+## NOTE: GameGUI now uses class_name declarations (migrated from add_custom_type).
+## With class_name, classes are globally available, but we still preload to ensure
+## early initialization and proper script parsing order.
 const _gamegui_loader = preload("res://addons/GameGUI/runtime_loader.gd")
 
-# Force load scripts by preloading them - this should parse class_name declarations
-# However, @tool scripts may still not register, so we also try in _init()
-const _gg_component_script = preload("res://addons/GameGUI/GGComponent.gd")
-const _gg_button_script = preload("res://addons/GameGUI/GGButton.gd")
-const _gg_vbox_script = preload("res://addons/GameGUI/GGVBox.gd")
+# Force load all GameGUI scripts by accessing runtime_loader constants
+# This ensures all scripts are loaded and their class_name declarations are registered
+const _gg_component = _gamegui_loader.GGComponent
+const _gg_button = _gamegui_loader.GGButton
+const _gg_hbox = _gamegui_loader.GGHBox
+const _gg_label = _gamegui_loader.GGLabel
+const _gg_vbox = _gamegui_loader.GGVBox
 
 func _init() -> void:
 	## Force GameGUI class registration at runtime
-	## @tool scripts with class_name declarations need special handling
-	## We load the scripts and attempt to register them via ClassDB
+	## @tool scripts with class_name declarations must be loaded and parsed to register
+	## Accessing the preloaded constants from runtime_loader forces the scripts to parse
+	## This registers the class_name declarations before any scenes try to use them
 	
-	# Load scripts to ensure they're parsed
-	# The class_name declarations should register automatically when parsed
-	# but @tool scripts may need explicit handling
+	# Force load all GameGUI scripts by accessing the preloaded constants
+	# This ensures @tool scripts are parsed and their class_name declarations register
+	# The runtime_loader.gd file preloads all scripts, accessing them here forces parsing
+	var _unused_component = _gg_component
+	var _unused_button = _gg_button  
+	var _unused_hbox = _gg_hbox
+	var _unused_label = _gg_label
+	var _unused_vbox = _gg_vbox
 	
-	# Try using ClassDB to check and force registration
-	# First ensure scripts are loaded
-	var component_script = _gg_component_script
-	var button_script = _gg_button_script
-	var vbox_script = _gg_vbox_script
-	
-	# Force script parsing by accessing resource paths
-	# This should trigger class_name registration
-	ResourceLoader.exists("res://addons/GameGUI/GGComponent.gd")
-	ResourceLoader.exists("res://addons/GameGUI/GGButton.gd")
-	ResourceLoader.exists("res://addons/GameGUI/GGVBox.gd")
-	
-	# Try to instantiate via ClassDB if class exists
-	# This forces the class to be fully registered
-	if ClassDB.class_exists("GGComponent"):
-		var _dummy = ClassDB.instantiate("GGComponent")
-		if _dummy:
-			_dummy.queue_free()
-	if ClassDB.class_exists("GGButton"):
-		var _dummy = ClassDB.instantiate("GGButton")
-		if _dummy:
-			_dummy.queue_free()
-	if ClassDB.class_exists("GGVBox"):
-		var _dummy = ClassDB.instantiate("GGVBox")
-		if _dummy:
-			_dummy.queue_free()
+	# Also explicitly load the scripts to ensure they're registered
+	# This double-checks that the classes are available
+	load("res://addons/GameGUI/GGComponent.gd")
+	load("res://addons/GameGUI/GGButton.gd")
+	load("res://addons/GameGUI/GGHBox.gd")
+	load("res://addons/GameGUI/GGLabel.gd")
+	load("res://addons/GameGUI/GGVBox.gd")
 
 func _ready() -> void:
 	MythosLogger.verbose("Core", "_ready() called")

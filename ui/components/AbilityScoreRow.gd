@@ -24,6 +24,7 @@ var racial_bonus: int = 0
 
 func _ready() -> void:
 	"""Initialize the ability score row"""
+	_apply_ui_constants()
 	if name_label:
 		var ability_data: Dictionary = GameData.abilities.get(ability_key, {})
 		name_label.text = ability_data.get("full", ability_key.capitalize())
@@ -39,6 +40,24 @@ func _ready() -> void:
 			PlayerData.points_changed.connect(_on_points_changed)
 		if not PlayerData.stats_changed.is_connected(_on_stats_changed):
 			PlayerData.stats_changed.connect(_on_stats_changed)
+
+
+func _apply_ui_constants() -> void:
+	"""Apply UIConstants-based sizing for labels and buttons."""
+	if name_label:
+		name_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_STANDARD, 0)
+	if base_label:
+		base_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
+	if bonus_label:
+		bonus_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
+	if final_label:
+		final_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_COMPACT, 0)
+	if mod_label:
+		mod_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_COMPACT, 0)
+	if minus_btn:
+		minus_btn.custom_minimum_size = Vector2(UIConstants.ICON_SIZE_SMALL, UIConstants.ICON_SIZE_SMALL)
+	if plus_btn:
+		plus_btn.custom_minimum_size = Vector2(UIConstants.ICON_SIZE_SMALL, UIConstants.ICON_SIZE_SMALL)
 
 func setup(initial_base: int, bonus: int) -> void:
 	"""Setup the row with initial base value and racial bonus"""

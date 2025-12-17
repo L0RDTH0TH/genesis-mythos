@@ -220,7 +220,7 @@ func _setup_ui() -> void:
 	# Create toolbar panel
 	toolbar_panel = Panel.new()
 	toolbar_panel.name = "ToolbarPanel"
-	toolbar_panel.custom_minimum_size = Vector2(0, 50)
+	toolbar_panel.custom_minimum_size = Vector2(0, UIConstants.BUTTON_HEIGHT_SMALL)
 	main_container.add_child(toolbar_panel)
 	
 	# Create map canvas (fills remaining space)
@@ -262,7 +262,7 @@ func _create_toolbar() -> void:
 	
 	# Tool buttons
 	var tool_sep: Control = Control.new()
-	tool_sep.custom_minimum_size = Vector2(20, 0)
+	tool_sep.custom_minimum_size = Vector2(UIConstants.SPACING_MEDIUM, 0)
 	toolbar.add_child(tool_sep)
 	
 	var tool_label: Label = Label.new()
@@ -286,7 +286,7 @@ func _create_toolbar() -> void:
 	
 	# Regenerate button
 	var regen_sep: Control = Control.new()
-	regen_sep.custom_minimum_size = Vector2(20, 0)
+	regen_sep.custom_minimum_size = Vector2(UIConstants.SPACING_MEDIUM, 0)
 	toolbar.add_child(regen_sep)
 	
 	var regen_btn: Button = Button.new()
@@ -296,7 +296,7 @@ func _create_toolbar() -> void:
 	
 	# Generate 3D World button
 	var generate_3d_sep: Control = Control.new()
-	generate_3d_sep.custom_minimum_size = Vector2(20, 0)
+	generate_3d_sep.custom_minimum_size = Vector2(UIConstants.SPACING_MEDIUM, 0)
 	toolbar.add_child(generate_3d_sep)
 	
 	var generate_3d_btn: Button = Button.new()
@@ -320,7 +320,7 @@ func _create_param_slider(parent: VBoxContainer, label_text: String, param_name:
 	
 	var label: Label = Label.new()
 	label.text = label_text + ":"
-	label.custom_minimum_size = Vector2(150, 0)
+	label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_STANDARD, 0)
 	container.add_child(label)
 	
 	var slider: HSlider = HSlider.new()
@@ -334,7 +334,7 @@ func _create_param_slider(parent: VBoxContainer, label_text: String, param_name:
 	
 	var value_label: Label = Label.new()
 	value_label.name = param_name + "_value"
-	value_label.custom_minimum_size = Vector2(80, 0)
+	value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
 	value_label.text = str(default_val)
 	container.add_child(value_label)
 	
@@ -349,7 +349,7 @@ func _create_param_spinbox(parent: VBoxContainer, label_text: String, param_name
 	
 	var label: Label = Label.new()
 	label.text = label_text + ":"
-	label.custom_minimum_size = Vector2(150, 0)
+	label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_STANDARD, 0)
 	container.add_child(label)
 	
 	var spinbox: SpinBox = SpinBox.new()

@@ -10,20 +10,17 @@ script = ExtResource("1_0")
 [node name="NameLabel" type="Label" parent="."]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(150, 0)
 text = "Strength"
 
 [node name="BaseLabel" type="Label" parent="."]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(40, 0)
 text = "8"
 horizontal_alignment = 1
 
 [node name="BonusLabel" type="Label" parent="."]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(40, 0)
 text = "+0"
 horizontal_alignment = 1
 visible = false
@@ -31,25 +28,21 @@ visible = false
 [node name="FinalLabel" type="Label" parent="."]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(60, 0)
 text = "10"
 horizontal_alignment = 1
 
 [node name="ModLabel" type="Label" parent="."]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(50, 0)
 text = "+0"
 horizontal_alignment = 1
 
 [node name="MinusButton" type="Button" parent="."]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(40, 40)
 text = "-"
 
 [node name="PlusButton" type="Button" parent="."]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(40, 40)
 text = "+"

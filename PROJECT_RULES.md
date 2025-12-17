@@ -138,7 +138,7 @@ See complete specification at: `res://audit/updated_gui_spec.md`
 - Responsiveness & Accessibility: Adapts to any resolution, no fixed pixels, scalable fonts
 - Data-Driven & Extensible: 100% JSON/Resources for content
 - Consistency: Zero hard-coded values, use UIConstants.gd and theme overrides
-- GameGUI Integration: Primary tool for complex menus (res://addons/gamegui/)
+- GameGUI Integration: Primary tool for complex menus (res://addons/GameGUI/)
 
 **Mandatory Practices:**
 - Root nodes: Control or CanvasLayer with `anchors_preset = 15` (PRESET_FULL_RECT)
