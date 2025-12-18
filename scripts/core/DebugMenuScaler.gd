@@ -129,7 +129,7 @@ func _apply_responsive_positioning() -> void:
 
 func _notification(what: int) -> void:
 	"""Handle window resize notifications."""
-	if what == NOTIFICATION_WM_SIZE_CHANGED or what == NOTIFICATION_RESIZED:
+	if what == NOTIFICATION_WM_SIZE_CHANGED:
 		# Defer to next frame to avoid async issues in notification handler
 		call_deferred("_apply_responsive_positioning")
 		MythosLogger.debug("UI/DebugMenu", "Debug menu repositioned via notification")
