@@ -123,26 +123,4 @@ These guidelines are designed to ensure consistent, rule-compliant integration o
        Enhance res://scripts/core/WorldStreamer.gd with Terrain3D chunk loading based on player position. Use MCP to update scenes, add tests, and run project for verification.
        ```
 
-## 6. GameGUI (latest version from AssetLib/GitHub)
-   - **Author:** brombres
-   - **Description:** Advanced dynamic layout and sizing system for responsive UI, including scaling text/controls, improved NinePatchRect, safe areas, etc.
-   - **Purpose in Project:** Development tool to accelerate the upcoming full GUI revamp (HUD, menus, character sheets, tabletop overlays). Enables more flexible, resolution-independent, and scalable UI elements while maintaining theme consistency.
-   - **Usage Guidelines:**
-     - **Integration:** Use as optional/replaceable nodes in UI scenes (e.g., `res://scenes/ui/`). Wrap where needed in custom managers for extensibility.
-     - **Implementation Steps:**
-       1. Use GG* nodes (e.g., GGBoxContainer, GGLabel, GGNinePatchRect) via MCP add_node in UI scenes.
-       2. Wrap complex layouts in a manager script if needed (e.g., `res://scripts/managers/UILayoutManager.gd`).
-       3. Ensure all UI still applies `res://themes/bg3_theme.tres` overrides.
-       4. Add GUT tests for any custom integrations involving GameGUI nodes.
-     - **Best Practices:**
-       - Use for responsive scaling in HUD, menus, and diegetic tabletop UI.
-       - Combine with central theme for fantasy styling.
-       - Optional in release: Can be used freely as it adds no runtime overhead beyond standard Controls.
-       - Prioritize for tomorrow's GUI revamp work.
-     - **Potential Issues:** Ensure compatibility with Godot 4.5.1; test layouts on different resolutions.
-     - **Example Prompt Snippet for Cursor:**  
-       ```
-       Replace standard Container/Label nodes in res://scenes/ui/HUD.tscn with GameGUI equivalents (e.g., GGVBoxContainer, GGLabel) via MCP for better scaling. Apply theme overrides. Add GUT tests and run project to verify responsiveness.
-       ```
-
 **Final Notes for Cursor:** Always start prompts with the required header from project rules. Reference these guidelines explicitly (e.g., "Follow addon guidelines for Terrain3D integration"). If conflicts arise, prioritize master project rules and seek clarification. Commit after successful tests.
