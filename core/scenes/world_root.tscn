@@ -1,9 +1,11 @@
-[gd_scene load_steps=5 format=3 uid="uid://world_root"]
+[gd_scene load_steps=7 format=3 uid="uid://world_root"]
 
 [ext_resource type="Environment" path="res://assets/environments/eryndor_base.tres" id="1_eryndor_env"]
 [ext_resource type="Script" path="res://core/utils/creative_fly_camera.gd" id="5_camera_script"]
 [ext_resource type="Script" path="res://core/scenes/world_root.gd" id="6_world_root"]
 [ext_resource type="Script" path="res://core/world_generation/Terrain3DManager.gd" id="7_terrain_manager"]
+[ext_resource type="PackedScene" uid="uid://performance_overlay" path="res://scenes/ui/PerformanceOverlay.tscn" id="8_performance_overlay"]
+[ext_resource type="Script" path="res://scripts/ui/PerformanceOverlayController.gd" id="9_performance_controller"]
 
 [node name="WorldRoot" type="Node3D"]
 script = ExtResource("6_world_root")
@@ -33,3 +35,12 @@ environment = ExtResource("1_eryndor_env")
 
 [node name="Terrain3DManager" type="Node3D" parent="."]
 script = ExtResource("7_terrain_manager")
+
+[node name="PerformanceOverlayCanvasLayer" type="CanvasLayer" parent="."]
+layer = 10
+
+[node name="PerformanceOverlayController" type="Node" parent="PerformanceOverlayCanvasLayer"]
+script = ExtResource("9_performance_controller")
+
+[node name="PerformanceOverlay" parent="PerformanceOverlayCanvasLayer/PerformanceOverlayController" instance=ExtResource("8_performance_overlay")]
+visible = false
