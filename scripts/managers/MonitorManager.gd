@@ -10,7 +10,7 @@ class_name MonitorManager
 extends CanvasLayer
 
 @onready var margin_container: MarginContainer = $MarginContainer
-@onready var overlay: MonitorOverlay = $MarginContainer/MonitorOverlay
+@onready var overlay: VBoxContainer = $MarginContainer/MonitorOverlay
 
 var _theme_resource: Theme
 
@@ -21,7 +21,9 @@ func _ready() -> void:
 	
 	# Load theme
 	_theme_resource = preload("res://themes/bg3_theme.tres")
-	theme = _theme_resource
+	# Apply theme to child nodes (CanvasLayer doesn't have theme property)
+	if margin_container:
+		margin_container.theme = _theme_resource
 	
 	# Hide by default (player toggles with F3)
 	visible = false
@@ -30,8 +32,9 @@ func _ready() -> void:
 	_apply_theme_and_sizing()
 	
 	# Connect to viewport resize
-	if not get_viewport().resized.is_connected(_on_viewport_resized):
-		get_viewport().resized.connect(_on_viewport_resized)
+	var viewport: Viewport = get_viewport()
+	if viewport and not viewport.size_changed.is_connected(_on_viewport_resized):
+		viewport.size_changed.connect(_on_viewport_resized)
 
 
 func _input(event: InputEvent) -> void:
@@ -44,7 +47,7 @@ func _input(event: InputEvent) -> void:
 
 func _notification(what: int) -> void:
 	"""Handle notifications for viewport resize."""
-	if what == NOTIFICATION_RESIZED:
+	if what == NOTIFICATION_WM_SIZE_CHANGED:
 		_on_viewport_resized()
 
 
@@ -78,29 +81,23 @@ func _apply_theme_and_sizing() -> void:
 	# Set minimum width based on viewport size (20% of width, clamped)
 	overlay.custom_minimum_size.x = overlay_width
 	
-	# Apply theme font if available
-	if _theme_resource:
-		var default_font: Font = _theme_resource.get_default_font()
-		if default_font:
-			# Override font size from theme if available
-			var font_size: int = _theme_resource.get_font_size("default_font_size", "Label")
-			if font_size > 0:
-				overlay.font_size = font_size
-			
-			# Apply font to graphs (they use get_theme_default_font internally)
-			# The overlay will propagate this via its _create_graph_for method
-	
-	# Apply theme colors for fantasy aesthetic
-	if _theme_resource:
+	# Apply theme font and colors to MonitorOverlay addon properties
+	# MonitorOverlay extends VBoxContainer and has export properties (font_size, graph_color, background_color)
+	if _theme_resource and overlay.get_script() != null:
+		# Apply theme font size if available
+		var font_size: int = _theme_resource.get_font_size("default_font_size", "Label")
+		if font_size > 0:
+			overlay.set("font_size", font_size)
+		
+		# Apply theme colors for fantasy aesthetic
 		# Use gold color for graphs (BG3-inspired)
 		var gold_color: Color = _theme_resource.get_color("font_color", "Label")
 		if gold_color == Color.TRANSPARENT:
 			# Fallback to BG3-inspired gold if theme doesn't have it
 			gold_color = Color(1.0, 0.843, 0.0, 1.0)  # Gold
-		overlay.graph_color = gold_color
 		
-		# Use semi-transparent dark background for readability
-		overlay.background_color = Color(0.0, 0.0, 0.0, 0.6)  # Slightly more opaque for better readability
+		overlay.set("graph_color", gold_color)
+		overlay.set("background_color", Color(0.0, 0.0, 0.0, 0.6))  # Slightly more opaque for better readability
 
 
 func toggle() -> void:
@@ -110,7 +107,7 @@ func toggle() -> void:
 		_apply_theme_and_sizing()
 
 
-func set_visible(value: bool) -> void:
+func set_overlay_visible(value: bool) -> void:
 	"""Public method to set overlay visibility."""
 	visible = value
 	if visible:
