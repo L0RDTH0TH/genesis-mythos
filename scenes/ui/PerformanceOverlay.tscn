@@ -1,7 +1,6 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=2 format=3]
 
 [ext_resource type="Theme" path="res://themes/bg3_theme.tres" id="2_0"]
-[ext_resource type="Script" path="res://addons/monitor_overlay/monitor_overlay.gd" id="3_0"]
 
 [node name="PerformanceOverlay" type="CanvasLayer"]
 layer = 128
@@ -28,24 +27,3 @@ theme = ExtResource("2_0")
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-
-[node name="MonitorOverlay" type="VBoxContainer" parent="MarginContainer/Panel"]
-layout_mode = 2
-custom_minimum_size = Vector2(0, 0)
-script = ExtResource("3_0")
-fps = true
-total_draw_calls = true
-video_memory = true
-texture_memory = true
-objects_drawn = true
-primitives_drawn = true
-sampling_rate = 60.0
-normalize_units = true
-plot_graphs = true
-history = 100
-background_color = Color(0, 0, 0, 0.5)
-graph_color = Color(1, 0.843, 0, 1)
-graph_height = 50
-graph_thickness = 1.0
-graph_antialiased = false
-font_size = 14
