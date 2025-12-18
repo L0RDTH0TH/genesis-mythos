@@ -1,0 +1,47 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/managers/MonitorManager.gd" id="1_0"]
+[ext_resource type="Theme" path="res://themes/bg3_theme.tres" id="2_0"]
+
+[sub_resource type="Script" id="SubResource_1"]
+script/ext_resource path="res://addons/monitor_overlay/monitor_overlay.gd"
+
+[node name="PerformanceOverlay" type="CanvasLayer" parent="."]
+layer = 128
+script = ExtResource("1_0")
+theme = ExtResource("2_0")
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 12
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_left = -400.0
+offset_top = 40.0
+offset_right = 0.0
+offset_bottom = 0.0
+grow_horizontal = 0
+grow_vertical = 2
+theme = ExtResource("2_0")
+
+[node name="MonitorOverlay" type="VBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+script = SubResource("1_0")
+fps = true
+total_draw_calls = true
+video_memory = true
+texture_memory = true
+objects_drawn = true
+primitives_drawn = true
+sampling_rate = 60.0
+normalize_units = true
+plot_graphs = true
+history = 100
+background_color = Color(0, 0, 0, 0.5)
+graph_color = Color(1, 0.843, 0, 1)
+graph_height = 50
+graph_thickness = 1.0
+graph_antialiased = false
+font_size = 14
