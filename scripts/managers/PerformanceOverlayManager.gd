@@ -71,20 +71,6 @@ func _on_viewport_resized() -> void:
 		MythosLogger.debug("UI/PerformanceOverlay", "Overlay repositioned on viewport resize")
 
 
-func _setup_resize_handler() -> void:
-	"""Setup window resize handler."""
-	var viewport: Viewport = get_viewport()
-	if viewport != null:
-		viewport.size_changed.connect(_on_viewport_resized)
-
-
-func _on_viewport_resized() -> void:
-	"""Handle viewport size change."""
-	if overlay_root != null and overlay_root.visible:
-		_apply_positioning_and_theme()
-		MythosLogger.debug("UI/PerformanceOverlay", "Overlay repositioned on viewport resize")
-
-
 func _find_performance_overlay() -> CanvasLayer:
 	"""Search scene tree for PerformanceOverlay CanvasLayer."""
 	var root: Node = get_tree().root
