@@ -1,6 +1,6 @@
 # ╔═══════════════════════════════════════════════════════════
 # ║ MonitorManager.gd
-# ║ Desc: Manages the runtime performance overlay, toggling and styling.
+# ║ Desc: Manages toggling and responsiveness of performance overlay.
 # ║ Author: Lordthoth
 # ╚═══════════════════════════════════════════════════════════
 
@@ -10,7 +10,8 @@ class_name MonitorManager
 extends CanvasLayer
 
 @onready var margin_container: MarginContainer = $MarginContainer
-@onready var overlay: VBoxContainer = $MarginContainer/MonitorOverlay
+@onready var panel: Panel = $MarginContainer/Panel
+@onready var overlay: VBoxContainer = $MarginContainer/Panel/MonitorOverlay
 
 var _theme_resource: Theme
 
@@ -24,12 +25,15 @@ func _ready() -> void:
 	# Apply theme to child nodes (CanvasLayer doesn't have theme property)
 	if margin_container:
 		margin_container.theme = _theme_resource
+	if panel:
+		panel.theme = _theme_resource
 	
 	# Hide by default (player toggles with F3)
 	visible = false
 	
 	# Apply theme and responsive sizing
 	_apply_theme_and_sizing()
+	_apply_theme_to_labels()
 	
 	# Connect to viewport resize
 	var viewport: Viewport = get_viewport()
@@ -40,9 +44,7 @@ func _ready() -> void:
 func _input(event: InputEvent) -> void:
 	"""Handle input for toggling the overlay."""
 	if event.is_action_pressed("toggle_perf_overlay"):
-		visible = !visible
-		if visible:
-			_apply_theme_and_sizing()
+		toggle_overlay()
 
 
 func _notification(what: int) -> void:
@@ -63,31 +65,35 @@ func _apply_theme_and_sizing() -> void:
 	
 	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
 	
+	# Calculate dynamic width (25% of viewport, clamped)
+	var overlay_width: float = clamp(
+		viewport_size.x * 0.25,
+		UIConstants.OVERLAY_MIN_WIDTH,
+		800.0
+	)
+	
 	# Set MarginContainer offsets using UIConstants (anchored to top-right)
 	# offset_left = negative width to position from right edge
-	# offset_top = spacing from top
-	# offset_right = 0 (anchored to right edge)
+	# offset_top = margin from top
+	# offset_right = negative margin from right edge (positive inset)
 	# offset_bottom = 0 (no bottom margin needed)
-	var overlay_width: float = clamp(
-		viewport_size.x * 0.2,
-		UIConstants.OVERLAY_MIN_WIDTH,
-		600.0
-	)
 	margin_container.offset_left = -overlay_width
-	margin_container.offset_top = UIConstants.SPACING_LARGE
-	margin_container.offset_right = 0.0
+	margin_container.offset_top = UIConstants.OVERLAY_MARGIN_LARGE
+	margin_container.offset_right = -UIConstants.OVERLAY_MARGIN_LARGE
 	margin_container.offset_bottom = 0.0
 	
-	# Set minimum width based on viewport size (20% of width, clamped)
+	# Set minimum width based on viewport size
 	overlay.custom_minimum_size.x = overlay_width
 	
 	# Apply theme font and colors to MonitorOverlay addon properties
 	# MonitorOverlay extends VBoxContainer and has export properties (font_size, graph_color, background_color)
 	if _theme_resource and overlay.get_script() != null:
-		# Apply theme font size if available
-		var font_size: int = _theme_resource.get_font_size("default_font_size", "Label")
-		if font_size > 0:
-			overlay.set("font_size", font_size)
+		# Apply theme font size with larger multiplier for readability
+		var base_font_size: int = _theme_resource.get_font_size("default_font_size", "Label")
+		if base_font_size <= 0:
+			base_font_size = 14  # Fallback
+		var font_size: int = int(base_font_size * 1.5)  # 1.5x for readability
+		overlay.set("font_size", font_size)
 		
 		# Apply theme colors for fantasy aesthetic
 		# Use gold color for graphs (BG3-inspired)
@@ -100,11 +106,46 @@ func _apply_theme_and_sizing() -> void:
 		overlay.set("background_color", Color(0.0, 0.0, 0.0, 0.6))  # Slightly more opaque for better readability
 
 
-func toggle() -> void:
-	"""Public method to toggle overlay visibility."""
+func _apply_theme_to_labels() -> void:
+	"""Recursively apply theme to all Label nodes for better readability."""
+	if not _theme_resource or not overlay:
+		return
+	
+	# Recurse through all children and apply theme to Labels
+	_apply_theme_to_node_recursive(overlay)
+
+
+func _apply_theme_to_node_recursive(node: Node) -> void:
+	"""Recursively apply theme overrides to Label nodes."""
+	if node is Label:
+		var label: Label = node as Label
+		# Apply larger font size for readability
+		var base_font_size: int = _theme_resource.get_font_size("default_font_size", "Label")
+		if base_font_size <= 0:
+			base_font_size = 14
+		label.theme_override_font_sizes.font_size = int(base_font_size * 1.5)
+		
+		# Apply theme font color (gold/earthy)
+		var font_color: Color = _theme_resource.get_color("font_color", "Label")
+		if font_color != Color.TRANSPARENT:
+			label.theme_override_colors.font_color = font_color
+	
+	# Recurse to children
+	for child in node.get_children():
+		_apply_theme_to_node_recursive(child)
+
+
+func toggle_overlay() -> void:
+	"""Toggles visibility."""
 	visible = !visible
 	if visible:
 		_apply_theme_and_sizing()
+		_apply_theme_to_labels()
+
+
+func toggle() -> void:
+	"""Public method to toggle overlay visibility."""
+	toggle_overlay()
 
 
 func set_overlay_visible(value: bool) -> void:
@@ -112,3 +153,4 @@ func set_overlay_visible(value: bool) -> void:
 	visible = value
 	if visible:
 		_apply_theme_and_sizing()
+		_apply_theme_to_labels()

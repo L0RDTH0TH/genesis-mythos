@@ -97,6 +97,15 @@ toggle_perf_overlay={
 ]
 }
 
+[debug]
+
+settings/show_fps=false
+settings/show_memory=false
+settings/show_collision_shapes=false
+settings/show_navigation=false
+settings/show_paths=false
+settings/show_visibility_rects=false
+
 [physics]
 
 3d/physics_engine="Jolt"

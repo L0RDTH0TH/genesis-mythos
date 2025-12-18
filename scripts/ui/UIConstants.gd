@@ -47,3 +47,7 @@ const DIALOG_HEIGHT_STANDARD: int = 300  ## Standard dialog height
 
 # Button Sizes (Vector2)
 const BUTTON_SIZE_TYPE: Vector2 = Vector2(100, 40)  ## Type selection button size
+
+# Overlay Sizes
+const OVERLAY_MIN_WIDTH: int = 450  ## Minimum width for performance monitor overlay
+const OVERLAY_MARGIN_LARGE: int = 50  ## Larger margin to prevent clipping
