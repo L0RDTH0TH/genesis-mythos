@@ -60,4 +60,3 @@ func _on_create_world_pressed() -> void:
 	"""Transition to world creation scene."""
 	# TODO: Add transition animation if needed
 	get_tree().change_scene_to_file(WORLD_CREATION_SCENE)
-
