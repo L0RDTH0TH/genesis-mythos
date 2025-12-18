@@ -1,5 +1,5 @@
 72322a848ab928aa5c89f0cb78209805
-::res://::1766018341
+::res://::1766023027
 Fantasy archetypes _251206_024005.txt::TextFile::-1::1765006861::0::1::::<><><>0<>0<><>::
 FORENSIC_DEBUG_SCRIPT.txt::TextFile::-1::1764612538::0::1::::<><><>0<>0<><>::
 icon.png::CompressedTexture2D::557325075131260776::1743421832::1765424551::1::::<><><>0<>0<>d64e49bb3c5547d967251bf56759ba11<>res://godot/imported/icon.png-487276ed1e3a0c39cad0279d744ee560.bptc.ctex<*>res://godot/imported/icon.png-487276ed1e3a0c39cad0279d744ee560.astc.ctex::
@@ -525,11 +525,13 @@ parchment_stain_overlay.png::CompressedTexture2D::7820103648329580427::161110828
 ::res://assets/themes/::1764867475
 dark_fantasy_theme.tres::Theme::-1::1764867830::0::1::::<><><>0<>0<><>::
 ::res://assets/ui/::1765173111
-::res://audit/::1765956210
+::res://audit/::1766022498
+DEBUG_OVERLAY_DUPLICATION_AUDIT.md::TextFile::-1::1766022564::0::1::::<><><>0<>0<><>::
 gui_spec _v4.md::TextFile::-1::1765954538::0::1::::<><><>0<>0<><>::
 gui_spec_evaluation.md::TextFile::-1::1765826000::0::1::::<><><>0<>0<><>::
 gui_spec_evaluation_v2.md::TextFile::-1::1765926107::0::1::::<><><>0<>0<><>::
 gui_spec_v3.md::TextFile::-1::1765953578::0::1::::<><><>0<>0<><>::
+PERFORMANCE_OVERLAY_DIAGNOSTIC_REPORT.md::TextFile::-1::1766019135::0::1::::<><><>0<>0<><>::
 phase1_mainmenu_complete.md::TextFile::-1::1765937371::0::1::::<><><>0<>0<><>::
 phase2_worldbuilder_complete.md::TextFile::-1::1765947446::0::1::::<><><>0<>0<><>::
 ui_sizing_positioning_audit.md::TextFile::-1::1765826000::0::1::::<><><>0<>0<><>::
@@ -788,7 +790,7 @@ ClassTab.tscn::PackedScene::-1::1766004827::0::1::::<><><>0<>0<><>::res://script
 NameConfirmTab.tscn::PackedScene::-1::1766004827::0::1::::<><><>0<>0<><>::res://scripts/character_creation/tabs/NameConfirmTab.gd<>uid://dpiqolc47bhf4::::res://themes/bg3_theme.tres
 RaceTab.tscn::PackedScene::-1::1766004827::0::1::::<><><>0<>0<><>::res://scripts/character_creation/tabs/RaceTab.gd<>uid://dpiqolc47bhf4::::res://themes/bg3_theme.tres
 ::res://scenes/ui/::1766016079
-PerformanceOverlay.tscn::PackedScene::-1::1766017319::0::1::::<><><>0<>0<><>::res://scripts/managers/MonitorManager.gd<>res://themes/bg3_theme.tres<>res://addons/monitor_overlay/monitor_overlay.gd
+PerformanceOverlay.tscn::PackedScene::-1::1766021639::0::1::::<><><>0<>0<><>::res://scripts/managers/MonitorManager.gd<>res://themes/bg3_theme.tres<>res://addons/monitor_overlay/monitor_overlay.gd
 progress_dialog.tscn::PackedScene::-1::1765958690::0::1::::<><><>0<>0<><>::res://themes/bg3_theme.tres<>res://scripts/ui/progress_dialog.gd
 ::res://scenes/ui/components/::1764783572
 SkyrimSlider.tscn::PackedScene::-1::1764786250::0::1::::<><><>0<>0<><>::res://scripts/ui/components/SkyrimSlider.gd
@@ -816,13 +818,13 @@ DebugMenuScaler.gd::GDScript::1550336795325936310::1766017319::0::1::::<>Node<><
 auto_configure_parchment_textures.gd::GDScript::1711483961759385958::1766001179::0::1::::<>EditorPlugin<><>0<>1<><>::
 set_parchment_import_settings.gd::GDScript::6711794163723174771::1765938238::0::1::::<>EditorScript<><>0<>1<><>::
 ::res://scripts/managers/::1766018233
-MonitorManager.gd::GDScript::2031817144726708728::1766017166::0::1::::MonitorManager<>CanvasLayer<><>0<>0<><>::
+MonitorManager.gd::GDScript::2031817144726708728::1766021639::0::1::::MonitorManager<>CanvasLayer<><>0<>0<><>::
 ::res://scripts/preview/::1765663509
 PreviewManager.gd::GDScript::1161500945953968570::1765070942::0::1::::PreviewManager<>Node<><>0<>0<><>::
 ::res://scripts/singletons/::1765327687
 ::res://scripts/ui/::1766013601
 progress_dialog.gd::GDScript::2565764471291712936::1766012913::0::1::::<>Window<><>0<>0<><>::
-UIConstants.gd::GDScript::6503700145817242455::1766016055::0::1::::UIConstants<>RefCounted<><>0<>0<><>::
+UIConstants.gd::GDScript::6503700145817242455::1766018677::0::1::::UIConstants<>RefCounted<><>0<>0<><>::
 ::res://scripts/utils/::1765327691
 ::res://shaders/::1765663509
 blue_glow.gdshader::Shader::7857057117123478515::1764993532::0::1::::<><><>0<>0<><>::
