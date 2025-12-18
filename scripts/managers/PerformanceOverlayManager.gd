@@ -18,8 +18,16 @@ var _theme_resource: Theme = preload("res://themes/bg3_theme.tres")
 
 func _ready() -> void:
 	"""Initialize overlay as hidden and apply initial setup."""
+	# Auto-detect overlay if not manually assigned (like DebugMenuScaler pattern)
 	if overlay_root == null:
-		MythosLogger.warn("UI/PerformanceOverlay", "PerformanceOverlayManager: overlay_root not assigned in inspector")
+		await get_tree().process_frame  # Wait for scene tree to be ready
+		overlay_root = get_tree().root.get_node_or_null("PerformanceOverlay") as CanvasLayer
+		if overlay_root == null:
+			# Try searching in scene tree for any PerformanceOverlay
+			overlay_root = _find_performance_overlay()
+	
+	if overlay_root == null:
+		MythosLogger.warn("UI/PerformanceOverlay", "PerformanceOverlayManager: overlay_root not found. Add PerformanceOverlay.tscn to your main scene.")
 		return
 	
 	# Get child nodes
@@ -43,7 +51,57 @@ func _ready() -> void:
 		event.physical_keycode = KEY_F3
 		InputMap.action_add_event("toggle_perf_overlay", event)
 	
-	MythosLogger.debug("UI/PerformanceOverlay", "PerformanceOverlayManager initialized")
+	# Setup viewport resize handler
+	_setup_resize_handler()
+	
+	MythosLogger.debug("UI/PerformanceOverlay", "PerformanceOverlayManager initialized (overlay_root: %s)" % overlay_root.get_path())
+
+
+func _setup_resize_handler() -> void:
+	"""Setup window resize handler."""
+	var viewport: Viewport = get_viewport()
+	if viewport != null:
+		viewport.size_changed.connect(_on_viewport_resized)
+
+
+func _on_viewport_resized() -> void:
+	"""Handle viewport size change."""
+	if overlay_root != null and overlay_root.visible:
+		_apply_positioning_and_theme()
+		MythosLogger.debug("UI/PerformanceOverlay", "Overlay repositioned on viewport resize")
+
+
+func _setup_resize_handler() -> void:
+	"""Setup window resize handler."""
+	var viewport: Viewport = get_viewport()
+	if viewport != null:
+		viewport.size_changed.connect(_on_viewport_resized)
+
+
+func _on_viewport_resized() -> void:
+	"""Handle viewport size change."""
+	if overlay_root != null and overlay_root.visible:
+		_apply_positioning_and_theme()
+		MythosLogger.debug("UI/PerformanceOverlay", "Overlay repositioned on viewport resize")
+
+
+func _find_performance_overlay() -> CanvasLayer:
+	"""Search scene tree for PerformanceOverlay CanvasLayer."""
+	var root: Node = get_tree().root
+	return _search_for_overlay(root)
+
+
+func _search_for_overlay(node: Node) -> CanvasLayer:
+	"""Recursively search for PerformanceOverlay CanvasLayer."""
+	if node is CanvasLayer and node.name == "PerformanceOverlay":
+		return node as CanvasLayer
+	
+	for child in node.get_children():
+		var result: CanvasLayer = _search_for_overlay(child)
+		if result != null:
+			return result
+	
+	return null
 
 
 func _input(event: InputEvent) -> void:
@@ -110,12 +168,26 @@ func _apply_positioning_and_theme() -> void:
 	margin_container.offset_bottom = margin + content_size.y
 	
 	# Final screen bounds clamp (like DebugMenuScaler)
-	var container_rect: Rect2 = margin_container.get_rect()
-	if container_rect.end.x > viewport_size.x:
+	# Calculate actual edges from offsets (PRESET_TOP_LEFT: offsets are from top-left)
+	var left_edge: float = margin_container.offset_left
+	var top_edge: float = margin_container.offset_top
+	var right_edge: float = margin_container.offset_right
+	var bottom_edge: float = margin_container.offset_bottom
+	
+	# Clamp to viewport bounds
+	if right_edge > viewport_size.x:
+		var excess: float = right_edge - viewport_size.x
 		margin_container.offset_right = viewport_size.x - margin
-		margin_container.offset_left = margin
-	if container_rect.end.y > viewport_size.y:
+		margin_container.offset_left = max(margin, left_edge - excess)
+	if bottom_edge > viewport_size.y:
+		var excess: float = bottom_edge - viewport_size.y
 		margin_container.offset_bottom = viewport_size.y - margin
+		margin_container.offset_top = max(margin, top_edge - excess)
+	
+	# Ensure minimum margins
+	if margin_container.offset_left < margin:
+		margin_container.offset_left = margin
+	if margin_container.offset_top < margin:
 		margin_container.offset_top = margin
 	
 	MythosLogger.debug("UI/PerformanceOverlay", "Overlay positioned: size=%s, offsets L=%d T=%d R=%d B=%d" % [content_size, margin_container.offset_left, margin_container.offset_top, margin_container.offset_right, margin_container.offset_bottom])
