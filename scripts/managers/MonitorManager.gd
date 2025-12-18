@@ -14,6 +14,7 @@ extends CanvasLayer
 @onready var overlay: VBoxContainer = $MarginContainer/Panel/MonitorOverlay
 
 var _theme_resource: Theme
+var _sizing_scheduled: bool = false
 
 
 func _ready() -> void:
@@ -31,9 +32,8 @@ func _ready() -> void:
 	# Hide by default (player toggles with F3)
 	visible = false
 	
-	# Apply theme and responsive sizing
+	# Apply theme and responsive sizing (deferred to ensure layout is ready)
 	_apply_theme_and_sizing()
-	_apply_theme_to_labels()
 	
 	# Connect to viewport resize
 	var viewport: Viewport = get_viewport()
@@ -50,43 +50,44 @@ func _input(event: InputEvent) -> void:
 func _notification(what: int) -> void:
 	"""Handle notifications for viewport resize."""
 	if what == NOTIFICATION_WM_SIZE_CHANGED:
-		_on_viewport_resized()
+		# Defer to avoid async issues in notification handler
+		call_deferred("_apply_theme_and_sizing")
 
 
 func _on_viewport_resized() -> void:
 	"""Update overlay sizing when viewport resizes."""
-	_apply_theme_and_sizing()
+	call_deferred("_apply_theme_and_sizing")
 
 
 func _apply_theme_and_sizing() -> void:
-	"""Apply theme overrides and responsive sizing to the overlay."""
+	"""Apply theme overrides and responsive sizing to the overlay.
+	
+	Schedule async sizing operation that waits for layout to update.
+	"""
+	if _sizing_scheduled:
+		return
+	_sizing_scheduled = true
+	# Start async coroutine
+	_apply_theme_and_sizing_async()
+
+
+func _apply_theme_and_sizing_async() -> void:
+	"""Internal async function that applies theme and calculates responsive sizing.
+	
+	Follows the pattern from DebugMenuScaler.gd:
+	- Waits for layout to update before calculating sizes
+	- Measures actual content size
+	- Properly calculates offsets for PRESET_TOP_RIGHT anchors
+	- Ensures overlay is fully visible with proper margins
+	"""
 	if not overlay or not margin_container:
+		_sizing_scheduled = false
 		return
 	
-	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	# Ensure anchor is set to top-right (should already be set in .tscn, but ensure consistency)
+	margin_container.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	
-	# Calculate dynamic width (25% of viewport, clamped)
-	var overlay_width: float = clamp(
-		viewport_size.x * 0.25,
-		UIConstants.OVERLAY_MIN_WIDTH,
-		800.0
-	)
-	
-	# Set MarginContainer offsets using UIConstants (anchored to top-right)
-	# offset_left = negative width to position from right edge
-	# offset_top = margin from top
-	# offset_right = negative margin from right edge (positive inset)
-	# offset_bottom = 0 (no bottom margin needed)
-	margin_container.offset_left = -overlay_width
-	margin_container.offset_top = UIConstants.OVERLAY_MARGIN_LARGE
-	margin_container.offset_right = -UIConstants.OVERLAY_MARGIN_LARGE
-	margin_container.offset_bottom = 0.0
-	
-	# Set minimum width based on viewport size
-	overlay.custom_minimum_size.x = overlay_width
-	
-	# Apply theme font and colors to MonitorOverlay addon properties
-	# MonitorOverlay extends VBoxContainer and has export properties (font_size, graph_color, background_color)
+	# Apply theme font and colors first (before measuring, as it affects content size)
 	if _theme_resource and overlay.get_script() != null:
 		# Apply theme font size with larger multiplier for readability
 		var base_font_size: int = _theme_resource.get_font_size("default_font_size", "Label")
@@ -96,7 +97,6 @@ func _apply_theme_and_sizing() -> void:
 		overlay.set("font_size", font_size)
 		
 		# Apply theme colors for fantasy aesthetic
-		# Use gold color for graphs (BG3-inspired)
 		var gold_color: Color = _theme_resource.get_color("font_color", "Label")
 		if gold_color == Color.TRANSPARENT:
 			# Fallback to BG3-inspired gold if theme doesn't have it
@@ -104,6 +104,71 @@ func _apply_theme_and_sizing() -> void:
 		
 		overlay.set("graph_color", gold_color)
 		overlay.set("background_color", Color(0.0, 0.0, 0.0, 0.6))  # Slightly more opaque for better readability
+	
+	# Apply theme to labels for consistent styling
+	_apply_theme_to_labels()
+	
+	# Wait for layout to update to get actual content size
+	await get_tree().process_frame
+	await get_tree().process_frame  # Extra frame to ensure size is calculated
+	
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	
+	# Get the actual content size of the overlay
+	var content_size: Vector2 = overlay.get_combined_minimum_size()
+	if content_size == Vector2.ZERO or content_size.y <= 0:
+		# Fallback: estimate size based on enabled monitors
+		# Get graph_height from overlay property (default 50 if not set)
+		var graph_height: float = 50.0
+		if overlay.has("graph_height"):
+			graph_height = overlay.get("graph_height")
+		# Estimate: 6 enabled monitors * graph_height + padding
+		var estimated_height: float = (6.0 * graph_height) + (UIConstants.SPACING_MEDIUM * 2.0)
+		content_size = Vector2(UIConstants.OVERLAY_MIN_WIDTH, estimated_height)
+	
+	# Ensure minimum width
+	if content_size.x < UIConstants.OVERLAY_MIN_WIDTH:
+		content_size.x = UIConstants.OVERLAY_MIN_WIDTH
+	
+	# Clamp maximum width to 25% of viewport or 800px (whichever is smaller)
+	var max_width: float = min(viewport_size.x * 0.25, 800.0)
+	if content_size.x > max_width:
+		content_size.x = max_width
+	
+	# Apply margins from UIConstants
+	var safe_margin: int = UIConstants.OVERLAY_MARGIN_LARGE
+	
+	# For PRESET_TOP_RIGHT:
+	# - offset_left: negative value extends left from right edge (defines width)
+	# - offset_right: negative value creates margin from right edge
+	# - offset_top: positive value creates margin from top edge
+	# - offset_bottom: positive value sets bottom edge from top (defines height)
+	margin_container.offset_left = -content_size.x
+	margin_container.offset_top = safe_margin
+	margin_container.offset_right = -safe_margin
+	margin_container.offset_bottom = safe_margin + content_size.y
+	
+	# Final bounds check to ensure it's fully visible
+	var right_edge: float = viewport_size.x + margin_container.offset_right
+	var left_edge: float = right_edge - content_size.x
+	var top_edge: float = margin_container.offset_top
+	var bottom_edge: float = top_edge + content_size.y
+	
+	# Clamp if needed to ensure it fits on screen
+	if right_edge > viewport_size.x:
+		margin_container.offset_right = -safe_margin
+		margin_container.offset_left = -content_size.x
+	if left_edge < safe_margin:
+		margin_container.offset_right = -safe_margin
+		margin_container.offset_left = -(viewport_size.x - safe_margin * 2)
+	if top_edge < safe_margin:
+		margin_container.offset_top = safe_margin
+		margin_container.offset_bottom = safe_margin + content_size.y
+	if bottom_edge > viewport_size.y - safe_margin:
+		margin_container.offset_top = viewport_size.y - content_size.y - safe_margin
+		margin_container.offset_bottom = margin_container.offset_top + content_size.y
+	
+	_sizing_scheduled = false
 
 
 func _apply_theme_to_labels() -> void:
@@ -136,11 +201,11 @@ func _apply_theme_to_node_recursive(node: Node) -> void:
 
 
 func toggle_overlay() -> void:
-	"""Toggles visibility."""
+	"""Toggles visibility of the performance overlay."""
 	visible = !visible
 	if visible:
-		_apply_theme_and_sizing()
-		_apply_theme_to_labels()
+		# When becoming visible, ensure sizing happens after layout is ready
+		call_deferred("_apply_theme_and_sizing")
 
 
 func toggle() -> void:
@@ -152,5 +217,5 @@ func set_overlay_visible(value: bool) -> void:
 	"""Public method to set overlay visibility."""
 	visible = value
 	if visible:
-		_apply_theme_and_sizing()
-		_apply_theme_to_labels()
+		# When becoming visible, ensure sizing happens after layout is ready
+		call_deferred("_apply_theme_and_sizing")
