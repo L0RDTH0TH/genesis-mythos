@@ -99,7 +99,8 @@ var control_references: Dictionary = {}
 var map_preview_texture: ImageTexture = ImageTexture.new()
 
 ## Hardware profiler for adaptive quality
-var hardware_profiler: HardwareProfiler
+const HardwareProfilerScript = preload("res://core/utils/HardwareProfiler.gd")
+var hardware_profiler
 
 
 func _ready() -> void:
@@ -112,7 +113,7 @@ func _ready() -> void:
 	MythosLogger.verbose("UI/WorldBuilder", "_ready() called")
 	
 	# Initialize hardware profiler for adaptive quality
-	hardware_profiler = HardwareProfiler.new()
+	hardware_profiler = HardwareProfilerScript.new()
 	var quality_name: String = ["LOW", "MEDIUM", "HIGH"][hardware_profiler.detected_quality]
 	MythosLogger.info("UI/WorldBuilder", "Hardware profiler initialized", {
 		"quality": quality_name,

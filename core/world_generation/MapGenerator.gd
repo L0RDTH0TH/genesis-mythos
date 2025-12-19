@@ -44,7 +44,8 @@ var post_processing_config: Dictionary = {}
 var generation_thread: Thread
 
 ## Hardware profiler for adaptive quality
-var hardware_profiler: HardwareProfiler
+const HardwareProfilerScript = preload("res://core/utils/HardwareProfiler.gd")
+var hardware_profiler
 
 ## Progress callback (called with 0.0-1.0 progress)
 var progress_callback: Callable
@@ -61,7 +62,7 @@ func _init() -> void:
 	temperature_noise = FastNoiseLite.new()
 	moisture_noise = FastNoiseLite.new()
 	landmass_mask_noise = FastNoiseLite.new()
-	hardware_profiler = HardwareProfiler.new()
+	hardware_profiler = HardwareProfilerScript.new()
 	_load_landmass_configs()
 	_load_biome_configs()
 	_load_post_processing_config()
