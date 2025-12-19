@@ -56,5 +56,5 @@ const OVERLAY_MARGIN_LARGE: int = 50  ## Larger margin to prevent clipping
 const PERF_OVERLAY_PADDING: int = 10  ## Padding for performance monitor overlay
 const PERF_GRAPH_WIDTH_RATIO: float = 0.2  ## 20% of viewport width for graphs
 const PERF_GRAPH_HEIGHT: int = 100  ## Fixed height for performance graphs
-const PERF_LABEL_FONT_SIZE: int = 14  ## Smaller font size for performance text
+const PERF_LABEL_FONT_SIZE: int = 18  ## Smaller font size for performance text
 const PERF_HISTORY_SIZE: int = 120  ## ~2 seconds at 60 FPS for smoother graphs

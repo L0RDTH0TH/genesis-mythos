@@ -43,6 +43,15 @@ var post_processing_config: Dictionary = {}
 ## Generation thread
 var generation_thread: Thread
 
+## Hardware profiler for adaptive quality
+var hardware_profiler: HardwareProfiler
+
+## Progress callback (called with 0.0-1.0 progress)
+var progress_callback: Callable
+
+## Use low-res preview mode (skip expensive operations)
+var use_preview_mode: bool = false
+
 
 func _init() -> void:
 	"""Initialize noise generators."""
@@ -52,22 +61,31 @@ func _init() -> void:
 	temperature_noise = FastNoiseLite.new()
 	moisture_noise = FastNoiseLite.new()
 	landmass_mask_noise = FastNoiseLite.new()
+	hardware_profiler = HardwareProfiler.new()
 	_load_landmass_configs()
 	_load_biome_configs()
 	_load_post_processing_config()
 	MythosLogger.verbose("World/Generation", "MapGenerator._init() - All noise generators created")
 
 
-func generate_map(world_map_data: WorldMapData, use_thread: bool = true) -> void:
+func generate_map(world_map_data: WorldMapData, use_thread: bool = true, preview_mode: bool = false) -> void:
 	"""Generate complete map (heightmap, rivers, biomes). Use thread for large maps.
 	
 	For very large maps (8192x8192+), automatically uses threading and LOD optimizations.
+	
+	Args:
+		world_map_data: World map data to generate
+		use_thread: Whether to use threading (auto-determined if hardware profiler available)
+		preview_mode: If true, skip expensive post-processing for faster preview
 	"""
 	MythosLogger.verbose("World/Generation", "MapGenerator.generate_map() - Starting map generation", {
 		"width": world_map_data.world_width if world_map_data else 0,
 		"height": world_map_data.world_height if world_map_data else 0,
-		"use_thread": use_thread
+		"use_thread": use_thread,
+		"preview_mode": preview_mode
 	})
+	
+	use_preview_mode = preview_mode
 	
 	if world_map_data == null:
 		MythosLogger.error("World/Generation", "MapGenerator.generate_map() - world_map_data is null")
@@ -79,8 +97,34 @@ func generate_map(world_map_data: WorldMapData, use_thread: bool = true) -> void
 		return
 	
 	var map_size: int = world_map_data.world_width * world_map_data.world_height
-	# Auto-enable threading for large maps (8192x8192 = 67M pixels)
-	var use_threading: bool = use_thread and map_size > 512 * 512
+	
+	# Use hardware profiler to determine threading threshold if available
+	var use_threading: bool = false
+	if hardware_profiler != null:
+		var max_dimension: int = max(world_map_data.world_width, world_map_data.world_height)
+		use_threading = use_thread and hardware_profiler.should_use_threading(max_dimension)
+	else:
+		# Fallback: Auto-enable threading for large maps (512x512 = 262K pixels)
+		use_threading = use_thread and map_size > 512 * 512
+	
+	# Apply hardware-based optimizations
+	if hardware_profiler != null:
+		var preset: Dictionary = hardware_profiler.get_quality_preset()
+		
+		# Reduce post-processing iterations for low-end hardware
+		if preset.has("erosion_iterations") and world_map_data.erosion_enabled:
+			var max_iterations: int = preset.get("erosion_iterations", 5)
+			if world_map_data.erosion_iterations > max_iterations:
+				MythosLogger.info("World/Generation", "Reducing erosion iterations for hardware", {
+					"original": world_map_data.erosion_iterations,
+					"adapted": max_iterations
+				})
+				world_map_data.erosion_iterations = max_iterations
+		
+		# Skip post-processing in preview mode if hardware is low-end
+		if preview_mode and hardware_profiler.should_skip_post_processing_for_preview():
+			MythosLogger.info("World/Generation", "Skipping post-processing for preview on low-end hardware")
+			use_preview_mode = true
 	
 	# For very large maps, optimize post-processing
 	if map_size > 8192 * 8192:
@@ -92,7 +136,7 @@ func generate_map(world_map_data: WorldMapData, use_thread: bool = true) -> void
 				var orig_iterations: int = step.get("iterations", 5)
 				step["iterations"] = max(1, orig_iterations / 2)  # Reduce by half for very large maps
 	
-	MythosLogger.verbose("World/Generation", "MapGenerator.generate_map() - Map size: %d pixels, threading: %s" % [map_size, use_threading])
+	MythosLogger.verbose("World/Generation", "MapGenerator.generate_map() - Map size: %d pixels, threading: %s, preview: %s" % [map_size, use_threading, preview_mode])
 	
 	if use_threading:
 		MythosLogger.verbose("World/Generation", "MapGenerator.generate_map() - Using threaded generation")
@@ -104,14 +148,43 @@ func generate_map(world_map_data: WorldMapData, use_thread: bool = true) -> void
 
 func _generate_sync(world_map_data: WorldMapData) -> void:
 	"""Generate map synchronously (blocks main thread)."""
+	var start_time: int = Time.get_ticks_msec()
 	MythosLogger.verbose("World/Generation", "MapGenerator._generate_sync() - Starting synchronous generation")
+	_report_progress(0.0)
+	
+	var config_start: int = Time.get_ticks_msec()
 	_configure_noise(world_map_data)
+	var config_time: float = (Time.get_ticks_msec() - config_start) / 1000.0
+	MythosLogger.debug("World/Generation", "Noise configuration", {"time_sec": config_time})
+	_report_progress(0.1)
+	
+	var heightmap_start: int = Time.get_ticks_msec()
 	_generate_heightmap(world_map_data)
+	var heightmap_time: float = (Time.get_ticks_msec() - heightmap_start) / 1000.0
+	MythosLogger.debug("World/Generation", "Heightmap generation", {"time_sec": heightmap_time})
+	_report_progress(0.5)
 	
 	# Apply post-processing pipeline (replaces old erosion/rivers checks)
-	_apply_post_processing_pipeline(world_map_data)
+	var postproc_time: float = 0.0
+	if not use_preview_mode:
+		var postproc_start: int = Time.get_ticks_msec()
+		_apply_post_processing_pipeline(world_map_data)
+		postproc_time = (Time.get_ticks_msec() - postproc_start) / 1000.0
+		MythosLogger.debug("World/Generation", "Post-processing", {"time_sec": postproc_time})
+		_report_progress(0.9)
+	else:
+		MythosLogger.verbose("World/Generation", "Skipping post-processing in preview mode")
+		_report_progress(0.9)
 	
-	MythosLogger.verbose("World/Generation", "MapGenerator._generate_sync() - Synchronous generation complete")
+	_report_progress(1.0)
+	var total_time: float = (Time.get_ticks_msec() - start_time) / 1000.0
+	MythosLogger.info("World/Generation", "Synchronous generation complete", {
+		"total_time_sec": total_time,
+		"config_time_sec": config_time,
+		"heightmap_time_sec": heightmap_time,
+		"postproc_time_sec": postproc_time,
+		"preview_mode": use_preview_mode
+	})
 
 
 func _generate_in_thread(world_map_data: WorldMapData) -> void:
@@ -298,6 +371,17 @@ func _generate_heightmap(world_map_data: WorldMapData) -> void:
 			MythosLogger.verbose("World/Generation", "Heightmap sample", {"position": test_pos, "height": test_color.r})
 
 
+func set_progress_callback(callback: Callable) -> void:
+	"""Set progress callback function (called with 0.0-1.0 progress)."""
+	progress_callback = callback
+
+
+func _report_progress(progress: float) -> void:
+	"""Report generation progress (0.0-1.0)."""
+	if progress_callback.is_valid():
+		progress_callback.call(progress)
+
+
 func _load_post_processing_config() -> void:
 	"""Load post-processing pipeline configuration from JSON."""
 	const CONFIG_PATH: String = "res://data/config/terrain_generation.json"
@@ -335,8 +419,8 @@ func _use_default_post_processing() -> void:
 func _apply_post_processing_pipeline(world_map_data: WorldMapData) -> void:
 	"""Apply modular post-processing pipeline based on configuration."""
 	# Check if post-processing is enabled (can be disabled for previews)
-	if not post_processing_config.get("enabled", true):
-		MythosLogger.verbose("World/Generation", "Post-processing pipeline disabled")
+	if not post_processing_config.get("enabled", true) or use_preview_mode:
+		MythosLogger.verbose("World/Generation", "Post-processing pipeline disabled (preview mode or config)")
 		return
 	
 	var steps: Array = post_processing_config.get("steps", [])
@@ -346,6 +430,7 @@ func _apply_post_processing_pipeline(world_map_data: WorldMapData) -> void:
 	
 	MythosLogger.verbose("World/Generation", "Applying post-processing pipeline", {"step_count": steps.size()})
 	
+	var step_index: int = 0
 	for step_config: Dictionary in steps:
 		if not step_config.get("enabled", true):
 			continue
@@ -377,56 +462,90 @@ func _apply_post_processing_pipeline(world_map_data: WorldMapData) -> void:
 				_apply_river_carving(world_map_data, river_count, start_elevation, carving_strength)
 			_:
 				MythosLogger.warn("World/Generation", "Unknown post-processing step type: " + step_type)
+		
+		step_index += 1
+		# Report progress
+		var progress: float = 0.5 + (float(step_index) / float(steps.size())) * 0.4
+		_report_progress(progress)
 	
 	MythosLogger.info("World/Generation", "Post-processing pipeline complete")
 
 
 func _apply_advanced_erosion(world_map_data: WorldMapData, iterations: int, strength: float, sediment_factor: float, deposition_rate: float) -> void:
-	"""Apply advanced hydraulic erosion with sediment transport and deposition."""
+	"""Apply advanced hydraulic erosion with sediment transport and deposition.
+	
+	Optimized version that reduces image duplication and uses more efficient data structures.
+	"""
 	var img: Image = world_map_data.heightmap_image
 	var size: Vector2i = img.get_size()
 	
-	# Create sediment map for tracking material transport
+	# Pre-allocate height and sediment arrays for better performance
+	var height_data: Array[float] = []
 	var sediment_map: Array[float] = []
-	sediment_map.resize(size.x * size.y)
-	for i: int in sediment_map.size():
-		sediment_map[i] = 0.0
+	var pixel_count: int = size.x * size.y
+	height_data.resize(pixel_count)
+	sediment_map.resize(pixel_count)
 	
-	MythosLogger.verbose("World/Generation", "Starting advanced erosion", {
+	# Pre-load height data into array (faster than repeated get_pixel calls)
+	for y in range(size.y):
+		for x in range(size.x):
+			var idx: int = y * size.x + x
+			height_data[idx] = img.get_pixel(x, y).r
+			sediment_map[idx] = 0.0
+	
+	MythosLogger.verbose("World/Generation", "Starting optimized advanced erosion", {
 		"iterations": iterations,
 		"strength": strength,
-		"sediment_factor": sediment_factor
+		"sediment_factor": sediment_factor,
+		"size": size
 	})
 	
+	var start_time: int = Time.get_ticks_msec()
+	
 	for iteration in range(iterations):
-		var new_img: Image = img.duplicate()
+		# Use working arrays instead of duplicating entire image
+		var new_height_data: Array[float] = height_data.duplicate()
 		var new_sediment: Array[float] = sediment_map.duplicate()
 		
+		# Process pixels in chunks for better cache performance
 		for y in range(1, size.y - 1):
 			for x in range(1, size.x - 1):
-				var current_height: float = img.get_pixel(x, y).r
-				var current_sediment: float = sediment_map[y * size.x + x]
+				var idx: int = y * size.x + x
+				var current_height: float = height_data[idx]
+				var current_sediment: float = sediment_map[idx]
 				
-				# Find steepest downhill direction
-				var neighbors: Array[Vector2i] = [
-					Vector2i(x - 1, y),
-					Vector2i(x + 1, y),
-					Vector2i(x, y - 1),
-					Vector2i(x, y + 1)
-				]
+				# Pre-calculate neighbor indices
+				var idx_left: int = idx - 1
+				var idx_right: int = idx + 1
+				var idx_up: int = idx - size.x
+				var idx_down: int = idx + size.x
 				
+				# Find steepest downhill direction (optimized)
 				var max_slope: float = 0.0
-				var downhill_dir: Vector2i = Vector2i.ZERO
+				var downhill_idx: int = -1
 				
-				for neighbor in neighbors:
-					var neighbor_height: float = img.get_pixel(neighbor.x, neighbor.y).r
-					var slope: float = current_height - neighbor_height
-					if slope > max_slope:
-						max_slope = slope
-						downhill_dir = neighbor
+				var slope_left: float = current_height - height_data[idx_left]
+				if slope_left > max_slope:
+					max_slope = slope_left
+					downhill_idx = idx_left
+				
+				var slope_right: float = current_height - height_data[idx_right]
+				if slope_right > max_slope:
+					max_slope = slope_right
+					downhill_idx = idx_right
+				
+				var slope_up: float = current_height - height_data[idx_up]
+				if slope_up > max_slope:
+					max_slope = slope_up
+					downhill_idx = idx_up
+				
+				var slope_down: float = current_height - height_data[idx_down]
+				if slope_down > max_slope:
+					max_slope = slope_down
+					downhill_idx = idx_down
 				
 				# Calculate erosion and sediment transport
-				if max_slope > 0.0:
+				if max_slope > 0.0 and downhill_idx >= 0:
 					var erosion_amount: float = max_slope * strength * 0.1
 					var sediment_capacity: float = max_slope * sediment_factor
 					
@@ -442,10 +561,8 @@ func _apply_advanced_erosion(world_map_data: WorldMapData, iterations: int, stre
 						var excess: float = new_sediment_amount - sediment_capacity
 						new_sediment_amount = sediment_capacity
 						# Move excess to downhill neighbor
-						if downhill_dir != Vector2i.ZERO:
-							var neighbor_idx: int = downhill_dir.y * size.x + downhill_dir.x
-							if neighbor_idx >= 0 and neighbor_idx < new_sediment.size():
-								new_sediment[neighbor_idx] += excess * 0.5  # Some loss during transport
+						if downhill_idx >= 0 and downhill_idx < new_sediment.size():
+							new_sediment[downhill_idx] += excess * 0.5  # Some loss during transport
 					
 					# Deposit sediment if slope is low
 					if max_slope < 0.01:
@@ -453,20 +570,42 @@ func _apply_advanced_erosion(world_map_data: WorldMapData, iterations: int, stre
 						new_height = clamp(new_height + deposit, 0.0, 1.0)
 						new_sediment_amount = max(0.0, new_sediment_amount - deposit)
 					
-					new_img.set_pixel(x, y, Color(new_height, new_height, new_height, 1.0))
-					new_sediment[y * size.x + x] = new_sediment_amount
+					new_height_data[idx] = new_height
+					new_sediment[idx] = new_sediment_amount
 		
-		img = new_img
-		world_map_data.heightmap_image = img
+		# Update arrays
+		height_data = new_height_data
 		sediment_map = new_sediment
 		
-		if iteration % 2 == 0:
+		# Report progress every iteration
+		if progress_callback.is_valid():
+			var progress: float = 0.5 + (float(iteration + 1) / float(iterations)) * 0.3
+			_report_progress(progress)
+		
+		# Log every 2 iterations to reduce log spam
+		if iteration % 2 == 0 or iteration == iterations - 1:
+			var elapsed: float = (Time.get_ticks_msec() - start_time) / 1000.0
 			MythosLogger.debug("World/Generation", "Advanced erosion iteration", {
 				"current": iteration + 1,
-				"total": iterations
+				"total": iterations,
+				"elapsed_sec": elapsed
 			})
 	
-	MythosLogger.info("World/Generation", "Advanced erosion complete", {"iterations": iterations})
+	# Write back to image (batch operation)
+	for y in range(size.y):
+		for x in range(size.x):
+			var idx: int = y * size.x + x
+			var height_val: float = height_data[idx]
+			img.set_pixel(x, y, Color(height_val, height_val, height_val, 1.0))
+	
+	world_map_data.heightmap_image = img
+	
+	var total_time: float = (Time.get_ticks_msec() - start_time) / 1000.0
+	MythosLogger.info("World/Generation", "Advanced erosion complete", {
+		"iterations": iterations,
+		"time_sec": total_time,
+		"pixels_per_sec": float(pixel_count * iterations) / total_time if total_time > 0.0 else 0.0
+	})
 
 
 func _apply_smoothing(world_map_data: WorldMapData, iterations: int, radius: int) -> void:

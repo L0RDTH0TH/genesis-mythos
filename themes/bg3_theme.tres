@@ -1,4 +1,4 @@
-[gd_resource type="Theme" load_steps=42 format=3 uid="uid://dpiqolc47bhf4"]
+[gd_resource type="Theme" load_steps=43 format=3 uid="uid://dpiqolc47bhf4"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_24"]
 bg_color = Color(0.164706, 0.196078, 0.239216, 1)
@@ -397,6 +397,18 @@ corner_radius_bottom_left = 8
 shadow_color = Color(1, 0.843137, 0, 0.6)
 shadow_size = 8
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_44"]
+bg_color = Color(0.05, 0.05, 0.1, 0.85)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.843137, 0, 0.6)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
 [resource]
 default_font_size = 18
 Button/colors/font_color = Color(1, 0.843137, 0, 1)
@@ -454,6 +466,7 @@ PanelContainer/styles/bg3_background_entry_hover = SubResource("StyleBoxFlat_21"
 PanelContainer/styles/bg3_background_entry_normal = SubResource("StyleBoxFlat_20")
 PanelContainer/styles/bg3_background_entry_selected = SubResource("StyleBoxFlat_22")
 PanelContainer/styles/bg3_preview_panel = SubResource("StyleBoxFlat_39")
+PanelContainer/styles/perf_overlay = SubResource("StyleBoxFlat_44")
 PanelContainer/styles/race_button_hover = SubResource("StyleBoxFlat_35")
 PanelContainer/styles/race_button_normal = SubResource("StyleBoxFlat_34")
 PanelContainer/styles/race_button_pressed = SubResource("StyleBoxFlat_36")

@@ -98,6 +98,9 @@ var control_references: Dictionary = {}
 ## Persistent texture for map preview (prevents scaling issues)
 var map_preview_texture: ImageTexture = ImageTexture.new()
 
+## Hardware profiler for adaptive quality
+var hardware_profiler: HardwareProfiler
+
 
 func _ready() -> void:
 	"""
@@ -107,6 +110,19 @@ func _ready() -> void:
 	ProceduralWorldMap is used only as graceful fallback on custom failure.
 	"""
 	MythosLogger.verbose("UI/WorldBuilder", "_ready() called")
+	
+	# Initialize hardware profiler for adaptive quality
+	hardware_profiler = HardwareProfiler.new()
+	var quality_name: String = ["LOW", "MEDIUM", "HIGH"][hardware_profiler.detected_quality]
+	MythosLogger.info("UI/WorldBuilder", "Hardware profiler initialized", {
+		"quality": quality_name,
+		"cpu_count": hardware_profiler.cpu_count,
+		"benchmark_ms": hardware_profiler.benchmark_result_ms
+	})
+	
+	# Apply hardware-based viewport optimizations
+	_apply_hardware_viewport_optimizations()
+	
 	_load_map_icons()
 	_load_biomes()
 	_load_civilizations()
@@ -136,6 +152,53 @@ func _notification(what: int) -> void:
 	"""Handle window resize events for responsive UI."""
 	if what == NOTIFICATION_WM_SIZE_CHANGED or what == NOTIFICATION_RESIZED:
 		_update_viewport_size()
+
+
+func _apply_hardware_viewport_optimizations() -> void:
+	"""Apply hardware-based optimizations to viewports."""
+	if hardware_profiler == null:
+		return
+	
+	var preset: Dictionary = hardware_profiler.get_quality_preset()
+	
+	# Optimize 3D preview viewport
+	if preview_viewport != null:
+		var update_mode_str: String = preset.get("viewport_update_mode", "update_always")
+		match update_mode_str:
+			"update_when_visible":
+				preview_viewport.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE
+			"update_always":
+				preview_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+			"update_once":
+				preview_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+			_:
+				preview_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+		
+		MythosLogger.info("UI/WorldBuilder", "Applied viewport optimizations", {
+			"update_mode": update_mode_str,
+			"disable_shadows": preset.get("disable_shadows", false),
+			"disable_post_processing": preset.get("disable_post_processing", false)
+		})
+	
+	# Disable shadows in 3D preview if low-end hardware
+	if preset.get("disable_shadows", false) and preview_world != null:
+		# Disable shadows on all MeshInstance3D nodes in preview
+		_disable_shadows_recursive(preview_world)
+	
+	# Disable post-processing if low-end hardware
+	if preset.get("disable_post_processing", false) and preview_camera != null:
+		# Disable environment post-processing
+		preview_camera.environment = null
+
+
+func _disable_shadows_recursive(node: Node) -> void:
+	"""Recursively disable shadows on all MeshInstance3D nodes."""
+	if node is MeshInstance3D:
+		var mesh_instance: MeshInstance3D = node as MeshInstance3D
+		mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	
+	for child in node.get_children():
+		_disable_shadows_recursive(child)
 
 
 func _load_map_icons() -> void:
@@ -369,8 +432,8 @@ func _update_viewport_size() -> void:
 	# Only update if stretch is disabled
 	if not terrain_3d_view.stretch:
 		var container_size: Vector2 = terrain_3d_view.size
-	if container_size.x > 0 and container_size.y > 0:
-		preview_viewport.size = Vector2i(int(container_size.x), int(container_size.y))
+		if container_size.x > 0 and container_size.y > 0:
+			preview_viewport.size = Vector2i(int(container_size.x), int(container_size.y))
 			MythosLogger.debug("UI/WorldBuilder", "Viewport size updated to: %s" % container_size)
 	else:
 		MythosLogger.debug("UI/WorldBuilder", "Viewport size managed automatically by SubViewportContainer.stretch")
@@ -2309,7 +2372,7 @@ func _on_generate_map_pressed() -> void:
 		return
 	
 	# Collect all generation parameters for MapMakerModule
-	var generation_params: Dictionary = {
+	var base_params: Dictionary = {
 		"seed": seed_value,
 		"width": map_width,
 		"height": map_height,
@@ -2320,12 +2383,23 @@ func _on_generate_map_pressed() -> void:
 		"noise_lacunarity": step_data.get("Map Gen", {}).get("noise_lacunarity", 2.0),
 		"sea_level": step_data.get("Map Gen", {}).get("sea_level", 0.4),
 		"erosion_enabled": step_data.get("Map Gen", {}).get("erosion_enabled", true),
+		"erosion_iterations": step_data.get("Map Gen", {}).get("erosion_iterations", 5),
 		"temperature_bias": step_data.get("Climate", {}).get("temperature_bias", 0.0),
 		"moisture_bias": step_data.get("Climate", {}).get("moisture_bias", 0.0),
 		"temperature_noise_frequency": step_data.get("Climate", {}).get("temperature_noise_frequency", 0.002),
 		"moisture_noise_frequency": step_data.get("Climate", {}).get("moisture_noise_frequency", 0.002),
 		"biome_transition_width": step_data.get("Biomes", {}).get("biome_transition_width", 0.05)
 	}
+	
+	# Apply hardware adaptation to parameters
+	var generation_params: Dictionary = base_params
+	if hardware_profiler != null:
+		generation_params = hardware_profiler.get_adapted_generation_params(base_params)
+		MythosLogger.info("UI/WorldBuilder", "Applied hardware adaptation", {
+			"original_octaves": base_params.get("noise_octaves", 4),
+			"adapted_octaves": generation_params.get("noise_octaves", 4),
+			"erosion_enabled": generation_params.get("erosion_enabled", true)
+		})
 	
 	# Add landmass-specific parameters if they exist
 	var landmass_params: Array[String] = ["landmass_radius", "landmass_center_x", "landmass_center_y", "landmass_count", 
@@ -2357,11 +2431,25 @@ func _on_generate_map_pressed() -> void:
 		_initialize_map_maker_module()
 	
 	# Try custom MapMakerModule regeneration first (default path)
-	# Use low-res preview for faster initial generation, then full-res on final
-	var use_preview: bool = false  # Can be toggled for real-time parameter changes
+	# Use preview mode for faster initial generation on low-end hardware
+	var use_preview: bool = false
+	if hardware_profiler != null:
+		use_preview = hardware_profiler.should_skip_post_processing_for_preview()
+		# Also limit map size for preview
+		var max_preview_size: int = hardware_profiler.get_max_map_size_for_preview()
+		if map_width > max_preview_size or map_height > max_preview_size:
+			MythosLogger.info("UI/WorldBuilder", "Limiting preview size for hardware", {
+				"original": Vector2i(map_width, map_height),
+				"max_preview": max_preview_size
+			})
+			generation_params["width"] = min(map_width, max_preview_size)
+			generation_params["height"] = min(map_height, max_preview_size)
+	
 	var custom_success: bool = false
 	if map_maker_module != null and map_maker_module.has_method("regenerate_map"):
-		MythosLogger.info("UI/WorldBuilder", "Using custom MapMakerModule renderer for map generation")
+		MythosLogger.info("UI/WorldBuilder", "Using custom MapMakerModule renderer for map generation", {
+			"preview_mode": use_preview
+		})
 		custom_success = map_maker_module.regenerate_map(generation_params, use_preview)
 		
 		if custom_success:

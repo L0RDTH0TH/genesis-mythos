@@ -18,10 +18,26 @@ enum Mode { OFF, SIMPLE, DETAILED }
 
 var current_mode: Mode = Mode.OFF : set = set_mode
 
+# Frame counter for safe RenderingServer initialization (needs 2+ frames)
+var _frame_count: int = 0
+
+# Category system for metric filtering
+var current_category: int = 0  # 0=All, 1=Time, 2=Memory, 3=Rendering, 4=Objects
+const CATEGORIES: Array[String] = ["All", "Time", "Memory", "Rendering", "Objects"]
+
 # Detailed metric labels (created in _ready)
+# Time category
 var process_label: Label
 var physics_label: Label
+# Memory category
 var memory_label: Label
+var vram_label: Label
+var texture_mem_label: Label
+# Rendering category
+var draw_calls_label: Label
+var primitives_label: Label
+var objects_drawn_label: Label
+# Objects category
 var object_label: Label
 var node_label: Label
 
@@ -62,20 +78,57 @@ func _ready() -> void:
 	
 	MythosLogger.debug("PerformanceMonitor", "All @onready nodes validated successfully")
 	
-	# Create metric labels
+	# Create metric labels (organized by category)
+	# Time category
 	process_label = _create_metric_label("Process: -- ms")
 	physics_label = _create_metric_label("Physics: -- ms")
+	# Memory category
 	memory_label = _create_metric_label("Memory: --")
+	vram_label = _create_metric_label("VRAM: --")
+	texture_mem_label = _create_metric_label("Texture Mem: --")
+	# Rendering category
+	draw_calls_label = _create_metric_label("Draw Calls: --")
+	primitives_label = _create_metric_label("Primitives: --")
+	objects_drawn_label = _create_metric_label("Objects Drawn: --")
+	# Objects category
 	object_label = _create_metric_label("Objects: --")
 	node_label = _create_metric_label("Nodes: --")
 	
-	for label in [process_label, physics_label, memory_label, object_label, node_label]:
+	# Add all labels to container
+	var all_labels: Array[Label] = [
+		process_label, physics_label,  # Time
+		memory_label, vram_label, texture_mem_label,  # Memory
+		draw_calls_label, primitives_label, objects_drawn_label,  # Rendering
+		object_label, node_label  # Objects
+	]
+	
+	for label in all_labels:
 		metrics_container.add_child(label)
 	
-	# Apply smaller font
+	# Apply smaller font and attempt monospaced font for alignment
 	var small_size: int = UIConstants.PERF_LABEL_FONT_SIZE
-	for label in [fps_label, process_label, physics_label, memory_label, object_label, node_label]:
+	var all_font_labels: Array[Label] = []
+	all_font_labels.append(fps_label)
+	all_font_labels.append_array(all_labels)
+	
+	# Try to load monospaced font if available (optional enhancement)
+	var mono_font_paths: Array[String] = [
+		"res://assets/fonts/roboto_mono.ttf",
+		"res://assets/fonts/courier_new.ttf",
+		"res://assets/fonts/monospace.ttf"
+	]
+	var mono_font: Font = null
+	for path in mono_font_paths:
+		if ResourceLoader.exists(path):
+			mono_font = load(path) as Font
+			if mono_font:
+				MythosLogger.debug("PerformanceMonitor", "Loaded monospaced font: %s" % path)
+				break
+	
+	for label in all_font_labels:
 		label.add_theme_font_size_override("font_size", small_size)
+		if mono_font:
+			label.add_theme_font_override("font", mono_font)
 	
 	# Configure graphs
 	fps_graph.max_value = 60.0
@@ -84,19 +137,29 @@ func _ready() -> void:
 	process_graph.max_value = 16.67  # 60 FPS budget
 	process_graph.line_color = Color(1.0, 0.8, 0.2)
 	
-	# Create and apply custom stylebox for overlay
-	var stylebox := StyleBoxFlat.new()
-	stylebox.bg_color = Color(0.05, 0.05, 0.1, 0.85)
-	stylebox.border_width_left = 2
-	stylebox.border_width_top = 2
-	stylebox.border_width_right = 2
-	stylebox.border_width_bottom = 2
-	stylebox.border_color = Color(1, 0.843, 0, 0.6)
-	stylebox.corner_radius_top_left = 6
-	stylebox.corner_radius_top_right = 6
-	stylebox.corner_radius_bottom_right = 6
-	stylebox.corner_radius_bottom_left = 6
-	perf_panel.add_theme_stylebox_override("panel", stylebox)
+	# Apply theme stylebox for overlay (moved from programmatic creation to theme)
+	var theme_stylebox: StyleBox = perf_panel.get_theme_stylebox("perf_overlay", "PanelContainer")
+	if theme_stylebox:
+		perf_panel.add_theme_stylebox_override("panel", theme_stylebox)
+		MythosLogger.debug("PerformanceMonitor", "Applied perf_overlay stylebox from theme")
+	else:
+		# Fallback: create programmatically if theme stylebox not found
+		MythosLogger.warn("PerformanceMonitor", "perf_overlay stylebox not found in theme, using fallback")
+		var stylebox := StyleBoxFlat.new()
+		stylebox.bg_color = Color(0.05, 0.05, 0.1, 0.85)
+		stylebox.border_width_left = 2
+		stylebox.border_width_top = 2
+		stylebox.border_width_right = 2
+		stylebox.border_width_bottom = 2
+		stylebox.border_color = Color(1, 0.843, 0, 0.6)
+		stylebox.corner_radius_top_left = 6
+		stylebox.corner_radius_top_right = 6
+		stylebox.corner_radius_bottom_right = 6
+		stylebox.corner_radius_bottom_left = 6
+		perf_panel.add_theme_stylebox_override("panel", stylebox)
+	
+	# Apply panel positioning (remove magic numbers from scene)
+	_apply_panel_positioning()
 	
 	# Resize handling
 	get_viewport().connect("size_changed", _on_viewport_resized)
@@ -129,11 +192,20 @@ func _create_metric_label(text: String) -> Label:
 	return l
 
 func _input(event: InputEvent) -> void:
-	"""Handle input for toggling performance monitor."""
+	"""Handle input for toggling performance monitor and category filtering."""
 	if event is InputEventKey:
 		if event.is_action_pressed("toggle_perf_monitor"):
 			MythosLogger.debug("PerformanceMonitor", "F3 pressed via action - cycling mode")
 			cycle_mode()
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("perf_toggle_category"):
+			current_category = (current_category + 1) % CATEGORIES.size()
+			_apply_category_filter(CATEGORIES[current_category])
+			_save_category()
+			MythosLogger.debug("PerformanceMonitor", "Category changed to: %s" % CATEGORIES[current_category])
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("perf_export_data"):
+			export_snapshot()
 			get_viewport().set_input_as_handled()
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -189,6 +261,8 @@ func set_mode(new_mode: Mode) -> void:
 
 func _process(_delta: float) -> void:
 	"""Update performance metrics each frame."""
+	_frame_count += 1
+	
 	var fps: float = Engine.get_frames_per_second()
 	fps_label.text = "FPS: %.1f" % fps
 	
@@ -201,22 +275,41 @@ func _process(_delta: float) -> void:
 		fps_label.modulate = fps_bad_color
 	
 	if current_mode == Mode.DETAILED:
-		_update_detailed_metrics()
+		# RenderingServer data requires at least 2 frames
+		if _frame_count >= 3:
+			_update_detailed_metrics()
 		fps_graph.add_value(fps)
 		var process_ms: float = Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
 		process_graph.add_value(process_ms)
 
 func _update_detailed_metrics() -> void:
 	"""Update all detailed metric labels."""
+	# Time category metrics
 	var process_ms: float = Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
 	var physics_ms: float = Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
-	var mem_bytes: int = Performance.get_monitor(Performance.MEMORY_STATIC)
-	var obj_count: int = Performance.get_monitor(Performance.OBJECT_COUNT)
-	var node_count: int = Performance.get_monitor(Performance.OBJECT_NODE_COUNT)
-	
 	process_label.text = "Process: %.2f ms" % process_ms
 	physics_label.text = "Physics: %.2f ms" % physics_ms
+	
+	# Memory category metrics
+	var mem_bytes: int = Performance.get_monitor(Performance.MEMORY_STATIC)
 	memory_label.text = "Memory: %s" % _format_memory(mem_bytes)
+	
+	# RenderingServer metrics (requires 2+ frames, checked in _process)
+	var draw_calls: int = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)
+	var primitives: int = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME)
+	var objects_drawn: int = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME)
+	var vram_bytes: int = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_VIDEO_MEM_USED)
+	var texture_bytes: int = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TEXTURE_MEM_USED)
+	
+	draw_calls_label.text = "Draw Calls: %d" % draw_calls
+	primitives_label.text = "Primitives: %d" % primitives
+	objects_drawn_label.text = "Objects Drawn: %d" % objects_drawn
+	vram_label.text = "VRAM: %s" % _format_memory(vram_bytes)
+	texture_mem_label.text = "Texture Mem: %s" % _format_memory(texture_bytes)
+	
+	# Objects category metrics
+	var obj_count: int = Performance.get_monitor(Performance.OBJECT_COUNT)
+	var node_count: int = Performance.get_monitor(Performance.OBJECT_NODE_COUNT)
 	object_label.text = "Objects: %d" % obj_count
 	node_label.text = "Nodes: %d" % node_count
 
@@ -232,11 +325,31 @@ func _format_memory(bytes: int) -> String:
 	else:
 		return "%.2f GB" % (b / 1073741824.0)
 
+func _apply_panel_positioning() -> void:
+	"""Apply panel positioning using UIConstants instead of magic numbers."""
+	if not perf_panel:
+		return
+	
+	var margin: int = UIConstants.SPACING_SMALL
+	var min_width: int = UIConstants.OVERLAY_MIN_WIDTH
+	
+	# Set offsets using UIConstants (top-right positioning)
+	perf_panel.offset_left = -min_width - margin
+	perf_panel.offset_top = margin
+	perf_panel.offset_right = -margin
+	perf_panel.offset_bottom = margin
+	
+	# Set minimum size
+	perf_panel.custom_minimum_size = Vector2(min_width, 0)
+	
+	MythosLogger.debug("PerformanceMonitor", "Panel positioning applied (offset_left: %d, min_width: %d)" % [perf_panel.offset_left, min_width])
+
 func _on_viewport_resized() -> void:
-	"""Handle viewport resize to update graph sizes."""
+	"""Handle viewport resize to update graph sizes and panel positioning."""
 	var vp_size: Vector2 = get_viewport().get_visible_rect().size
 	MythosLogger.debug("PerformanceMonitor", "Viewport resized to: %s" % vp_size)
 	
+	# Update graph sizes
 	var graph_width: float = vp_size.x * UIConstants.PERF_GRAPH_WIDTH_RATIO
 	if fps_graph:
 		fps_graph.custom_minimum_size.x = graph_width
@@ -245,20 +358,36 @@ func _on_viewport_resized() -> void:
 		process_graph.custom_minimum_size.x = graph_width
 		process_graph.custom_minimum_size.y = UIConstants.PERF_GRAPH_HEIGHT
 	
-	# Ensure panel has minimum width to be visible
+	# Reapply panel positioning (responsive to viewport size)
+	_apply_panel_positioning()
+	
+	# Ensure panel has minimum width to be visible (responsive calculation)
 	if perf_panel:
-		# PanelContainer will size to content, but ensure it's not too narrow
-		var min_width: float = max(300.0, vp_size.x * 0.15)  # At least 300px or 15% of viewport
+		var min_width: float = max(float(UIConstants.OVERLAY_MIN_WIDTH), vp_size.x * 0.15)
 		perf_panel.custom_minimum_size.x = min_width
 		MythosLogger.debug("PerformanceMonitor", "Panel min width set to: %s" % min_width)
 
 func _save_mode() -> void:
 	"""Save current mode to user settings with error handling."""
 	var cfg := ConfigFile.new()
+	var err: Error = cfg.load("user://settings.cfg")
+	if err != OK:
+		cfg = ConfigFile.new()  # Create new if load failed
 	cfg.set_value("debug", "perf_monitor_mode", current_mode)
-	var err: Error = cfg.save("user://settings.cfg")
+	err = cfg.save("user://settings.cfg")
 	if err != OK:
 		MythosLogger.warn("PerformanceMonitor", "Failed to save monitor mode: %d" % err)
+
+func _save_category() -> void:
+	"""Save current category to user settings with error handling."""
+	var cfg := ConfigFile.new()
+	var err: Error = cfg.load("user://settings.cfg")
+	if err != OK:
+		cfg = ConfigFile.new()  # Create new if load failed
+	cfg.set_value("debug", "perf_monitor_category", current_category)
+	err = cfg.save("user://settings.cfg")
+	if err != OK:
+		MythosLogger.warn("PerformanceMonitor", "Failed to save monitor category: %d" % err)
 
 func _load_saved_mode() -> void:
 	"""Load saved mode from user settings with error handling."""
@@ -271,5 +400,109 @@ func _load_saved_mode() -> void:
 		else:
 			MythosLogger.warn("PerformanceMonitor", "Invalid saved mode: %d, using OFF" % saved)
 			set_mode(Mode.OFF)
+		
+		# Load saved category if available
+		var saved_category: int = cfg.get_value("debug", "perf_monitor_category", 0)
+		if saved_category >= 0 and saved_category < CATEGORIES.size():
+			current_category = saved_category
+			_apply_category_filter(CATEGORIES[current_category])
 	else:
 		set_mode(Mode.OFF)  # Default on first run or error
+
+func _apply_category_filter(category: String) -> void:
+	"""Show/hide metrics based on selected category."""
+	# Time category
+	var time_labels: Array[Label] = [process_label, physics_label]
+	# Memory category
+	var memory_labels: Array[Label] = [memory_label, vram_label, texture_mem_label]
+	# Rendering category
+	var rendering_labels: Array[Label] = [draw_calls_label, primitives_label, objects_drawn_label]
+	# Objects category
+	var objects_labels: Array[Label] = [object_label, node_label]
+	
+	match category:
+		"All":
+			for label in time_labels + memory_labels + rendering_labels + objects_labels:
+				if label:
+					label.visible = true
+		"Time":
+			for label in time_labels:
+				if label:
+					label.visible = true
+			for label in memory_labels + rendering_labels + objects_labels:
+				if label:
+					label.visible = false
+		"Memory":
+			for label in memory_labels:
+				if label:
+					label.visible = true
+			for label in time_labels + rendering_labels + objects_labels:
+				if label:
+					label.visible = false
+		"Rendering":
+			for label in rendering_labels:
+				if label:
+					label.visible = true
+			for label in time_labels + memory_labels + objects_labels:
+				if label:
+					label.visible = false
+		"Objects":
+			for label in objects_labels:
+				if label:
+					label.visible = true
+			for label in time_labels + memory_labels + rendering_labels:
+				if label:
+					label.visible = false
+
+func export_snapshot() -> void:
+	"""Export current performance metrics to CSV file."""
+	# Ensure export directory exists
+	var dir := DirAccess.open("user://")
+	if not dir.dir_exists("perf_exports"):
+		dir.make_dir("perf_exports")
+	
+	var timestamp: int = Time.get_unix_time_from_system()
+	var file_path: String = "user://perf_exports/snapshot_%d.csv" % timestamp
+	
+	var file := FileAccess.open(file_path, FileAccess.WRITE)
+	if not file:
+		MythosLogger.error("PerformanceMonitor", "Failed to open file for export: %s" % file_path)
+		return
+	
+	# Collect current metrics
+	var data: Dictionary = {
+		"timestamp": timestamp,
+		"fps": Engine.get_frames_per_second(),
+		"process_ms": Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0,
+		"physics_ms": Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0,
+		"memory_bytes": Performance.get_monitor(Performance.MEMORY_STATIC),
+		"objects": Performance.get_monitor(Performance.OBJECT_COUNT),
+		"nodes": Performance.get_monitor(Performance.OBJECT_NODE_COUNT),
+	}
+	
+	# Add RenderingServer metrics if available
+	if _frame_count >= 3:
+		data["draw_calls"] = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)
+		data["primitives"] = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME)
+		data["objects_drawn"] = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME)
+		data["vram_bytes"] = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_VIDEO_MEM_USED)
+		data["texture_mem_bytes"] = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TEXTURE_MEM_USED)
+	else:
+		data["draw_calls"] = 0
+		data["primitives"] = 0
+		data["objects_drawn"] = 0
+		data["vram_bytes"] = 0
+		data["texture_mem_bytes"] = 0
+	
+	# Write CSV header
+	var keys: PackedStringArray = PackedStringArray(data.keys())
+	file.store_csv_line(keys)
+	
+	# Write CSV values
+	var values: PackedStringArray = PackedStringArray()
+	for key in keys:
+		values.append(str(data[key]))
+	file.store_csv_line(values)
+	
+	file.close()
+	MythosLogger.info("PerformanceMonitor", "Snapshot exported to: %s" % file_path)

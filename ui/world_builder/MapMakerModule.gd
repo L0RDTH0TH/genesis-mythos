@@ -425,7 +425,8 @@ func generate_map() -> void:
 		print("DEBUG: ERROR - map_generator is null!")
 		return
 	
-	map_generator.generate_map(world_map_data, false)  # Synchronous for now
+	# Use preview mode if specified (skips expensive post-processing)
+	map_generator.generate_map(world_map_data, false, false)  # Synchronous, no preview mode for full generation
 	print("DEBUG: Generation complete, checking heightmap...")
 	if world_map_data.heightmap_image != null:
 		var sample_pos: Vector2i = Vector2i(100, 100)
@@ -588,7 +589,8 @@ func regenerate_map(params: Dictionary, use_low_res_preview: bool = false) -> bo
 		"image_size": Vector2i(map_size_x, map_size_y)
 	})
 	
-	map_generator.generate_map(world_map_data, false)  # Synchronous
+	# Use preview mode for faster generation when requested
+	map_generator.generate_map(world_map_data, false, use_low_res_preview)  # Synchronous, preview mode if requested
 	
 	# Restore post-processing setting
 	if use_low_res_preview:

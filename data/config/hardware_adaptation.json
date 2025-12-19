@@ -1,0 +1,46 @@
+{
+  "quality_levels": {
+    "low": {
+      "max_preview_resolution": 512,
+      "max_octaves": 3,
+      "erosion_iterations": 2,
+      "erosion_enabled_default": false,
+      "use_threading_threshold": 256,
+      "preview_skip_post_processing": true,
+      "max_map_size_preview": 1024,
+      "viewport_update_mode": "update_when_visible",
+      "disable_shadows": true,
+      "disable_post_processing": true
+    },
+    "medium": {
+      "max_preview_resolution": 1024,
+      "max_octaves": 4,
+      "erosion_iterations": 3,
+      "erosion_enabled_default": true,
+      "use_threading_threshold": 512,
+      "preview_skip_post_processing": false,
+      "max_map_size_preview": 2048,
+      "viewport_update_mode": "update_always",
+      "disable_shadows": false,
+      "disable_post_processing": false
+    },
+    "high": {
+      "max_preview_resolution": 2048,
+      "max_octaves": 6,
+      "erosion_iterations": 5,
+      "erosion_enabled_default": true,
+      "use_threading_threshold": 1024,
+      "preview_skip_post_processing": false,
+      "max_map_size_preview": 4096,
+      "viewport_update_mode": "update_always",
+      "disable_shadows": false,
+      "disable_post_processing": false
+    }
+  },
+  "benchmark": {
+    "test_map_size": 256,
+    "timeout_ms": 5000,
+    "low_threshold_ms": 2000,
+    "medium_threshold_ms": 1000
+  }
+}

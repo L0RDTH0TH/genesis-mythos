@@ -20,6 +20,7 @@ var history_full: bool = false
 
 var min_label: Label
 var max_label: Label
+var stats_label: Label  # Min/Avg/Max stats display
 
 const GRID_LINES: int = 4
 
@@ -36,6 +37,13 @@ func _ready() -> void:
 	max_label.add_theme_font_size_override("font_size", 10)
 	add_child(max_label)
 	
+	# Create stats label (Min/Avg/Max)
+	stats_label = Label.new()
+	stats_label.name = "StatsLabel"
+	stats_label.add_theme_font_size_override("font_size", 9)
+	stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	add_child(stats_label)
+	
 	# Update positions after size is set
 	call_deferred("_update_label_positions")
 
@@ -44,11 +52,16 @@ func _update_label_positions() -> void:
 	if min_label and max_label:
 		min_label.position = Vector2(2, size.y - 12)
 		max_label.position = Vector2(2, 2)
+	if stats_label:
+		stats_label.position = Vector2(size.x / 2 - 50, size.y - 12)
+		stats_label.size = Vector2(100, 12)
 
 func _notification(what: int) -> void:
 	"""Handle notifications including resize."""
 	if what == NOTIFICATION_RESIZED:
 		_update_label_positions()
+		if stats_label:
+			stats_label.position = Vector2(size.x / 2 - 50, size.y - 12)
 
 func add_value(value: float) -> void:
 	"""Add a new value to the history with optional smoothing."""
@@ -107,6 +120,17 @@ func _draw() -> void:
 			var y: float = size.y * (1.0 - ((history[idx] - min_val) / max(max_val - min_val, 0.001)))
 			points.append(Vector2(x, y))
 	
+	# Draw filled area under curve (semi-transparent)
+	if points.size() > 1:
+		var filled_points: PackedVector2Array = points.duplicate()
+		# Add bottom corners to close the polygon
+		filled_points.append(Vector2(points[points.size() - 1].x, size.y))
+		filled_points.append(Vector2(points[0].x, size.y))
+		# Draw filled polygon with 25% opacity
+		var fill_color: Color = line_color
+		fill_color.a = 0.25
+		draw_colored_polygon(filled_points, fill_color)
+	
 	# Draw line graph
 	if points.size() > 1:
 		draw_polyline(points, line_color, 2.0)
@@ -123,6 +147,14 @@ func _draw() -> void:
 		# Update label positions (handle resize)
 		min_label.position = Vector2(2, size.y - 12)
 		max_label.position = Vector2(2, 2)
+	
+	# Update stats label (Min/Avg/Max)
+	if stats_label:
+		var min_stat: float = get_min()
+		var avg_stat: float = get_average()
+		var max_stat: float = get_max()
+		stats_label.text = "Min: %.1f | Avg: %.1f | Max: %.1f" % [min_stat, avg_stat, max_stat]
+		stats_label.position = Vector2(size.x / 2 - 50, size.y - 12)
 
 func _get_auto_max() -> float:
 	"""Calculate maximum value from history with 10% padding."""
@@ -147,3 +179,39 @@ func _get_auto_min() -> float:
 		if idx >= 0 and idx < history.size() and history[idx] < m:
 			m = history[idx]
 	return max(m * 0.9, 0.0)
+
+func get_min() -> float:
+	"""Get minimum value from current history."""
+	if history.is_empty():
+		return 0.0
+	var m: float = history[0]
+	var count: int = history.size() if not history_full else UIConstants.PERF_HISTORY_SIZE
+	for i in range(count):
+		var idx: int = (history_index + i) % count if history_full else i
+		if idx >= 0 and idx < history.size() and history[idx] < m:
+			m = history[idx]
+	return m
+
+func get_max() -> float:
+	"""Get maximum value from current history."""
+	if history.is_empty():
+		return 0.0
+	var m: float = history[0]
+	var count: int = history.size() if not history_full else UIConstants.PERF_HISTORY_SIZE
+	for i in range(count):
+		var idx: int = (history_index + i) % count if history_full else i
+		if idx >= 0 and idx < history.size() and history[idx] > m:
+			m = history[idx]
+	return m
+
+func get_average() -> float:
+	"""Get average value from current history."""
+	if history.is_empty():
+		return 0.0
+	var sum: float = 0.0
+	var count: int = history.size() if not history_full else UIConstants.PERF_HISTORY_SIZE
+	for i in range(count):
+		var idx: int = (history_index + i) % count if history_full else i
+		if idx >= 0 and idx < history.size():
+			sum += history[idx]
+	return sum / count
