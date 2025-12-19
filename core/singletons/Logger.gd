@@ -284,7 +284,7 @@ func _format_message(system: String, level: LogLevel, message: String, data: Var
 	return formatted
 
 func log_entry(system: String, level: LogLevel, message: String, data: Variant = null) -> void:
-	"""Main logging method - logs a message if the level allows."""
+	"""Main logging method - logs a message if the level allows. Thread-safe."""
 	log_mutex.lock()
 	
 	# Check if we should log this
@@ -294,16 +294,17 @@ func log_entry(system: String, level: LogLevel, message: String, data: Variant =
 	
 	var formatted: String = _format_message(system, level, message, data)
 	
-	# Console output
+	# Console output (thread-safe: push_error, push_warning, print work from threads)
 	if log_to_console:
 		_output_to_console(level, formatted)
 	
-	# File output
+	# File output (thread-safe: FileAccess operations work from threads)
 	if log_to_file:
 		_output_to_file(formatted)
 	
-	# Emit signal for UI integration
-	emit_signal("log_entry_created", level, system, message, data)
+	# Emit signal for UI integration (MUST be deferred if called from thread)
+	# Always use call_deferred for signal emission to ensure thread safety
+	call_deferred("_emit_log_signal", level, system, message, data)
 	
 	log_mutex.unlock()
 
@@ -316,6 +317,10 @@ func _output_to_console(level: LogLevel, message: String) -> void:
 			push_warning(message)
 		LogLevel.INFO, LogLevel.DEBUG, LogLevel.VERBOSE:
 			print(message)
+
+func _emit_log_signal(level: LogLevel, system: String, message: String, data: Variant) -> void:
+	"""Thread-safe signal emission wrapper (called via call_deferred)."""
+	emit_signal("log_entry_created", level, system, message, data)
 
 func _force_console_log(system: String, level: LogLevel, message: String) -> void:
 	"""Force log to console bypassing all checks - used for Logger internal messages."""

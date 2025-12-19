@@ -184,6 +184,7 @@ func _threaded_generate() -> void:
 		"postproc_time_ms": postproc_time
 	}
 	call_deferred("_emit_complete", result_data)
+	# Mark thread as complete (cleanup will happen in _emit_complete on main thread)
 
 
 func _record_metric(phase: String, time_ms: float) -> void:
@@ -218,6 +219,11 @@ func _emit_progress(phase: String, percent: float) -> void:
 func _emit_complete(data: Dictionary) -> void:
 	"""Emit completion signal (callable from thread via call_deferred)."""
 	generation_complete.emit(data)
+	# Clean up thread reference after completion (on main thread)
+	if generation_thread != null:
+		if generation_thread.is_alive():
+			generation_thread.wait_to_finish()
+		generation_thread = null
 
 
 func _on_map_generator_progress(progress: float) -> void:
@@ -233,3 +239,11 @@ func _exit_tree() -> void:
 		MythosLogger.warn("WorldGenerator", "Waiting for thread to finish on exit")
 		generation_thread.wait_to_finish()
 		generation_thread = null
+
+func _notification(what: int) -> void:
+	"""Handle notification for proper thread cleanup."""
+	if what == NOTIFICATION_PREDELETE:
+		# Ensure thread is properly cleaned up before node is destroyed
+		if generation_thread != null and generation_thread.is_alive():
+			generation_thread.wait_to_finish()
+			generation_thread = null
