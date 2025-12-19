@@ -20,11 +20,18 @@ enum Mode { OFF, SIMPLE, DETAILED }
 @onready var bottom_fps_graph: GraphControl = $BottomGraphBar/MarginContainer/BottomGraphsContainer/BottomFPSGraph
 @onready var bottom_process_graph: GraphControl = $BottomGraphBar/MarginContainer/BottomGraphsContainer/BottomProcessGraph
 @onready var bottom_refresh_graph: GraphControl = $BottomGraphBar/MarginContainer/BottomGraphsContainer/BottomRefreshGraph
+@onready var bottom_thread_graph: GraphControl = $BottomGraphBar/MarginContainer/BottomGraphsContainer/BottomThreadGraph
 
 var current_mode: Mode = Mode.OFF : set = set_mode
 
 # Custom timing for MapRenderer.refresh()
 var refresh_time_ms: float = 0.0
+
+# Thread compute time tracking
+var thread_compute_time_ms: float = 0.0
+
+# System status tracking
+var system_status: String = "Idle"
 
 # Frame counter for safe RenderingServer initialization (needs 2+ frames)
 var _frame_count: int = 0
@@ -38,6 +45,7 @@ const CATEGORIES: Array[String] = ["All", "Time", "Memory", "Rendering", "Object
 var process_label: Label
 var physics_label: Label
 var refresh_label: Label
+var system_status_label: Label
 # Memory category
 var memory_label: Label
 var vram_label: Label
@@ -99,6 +107,9 @@ func _ready() -> void:
 	if not bottom_refresh_graph:
 		MythosLogger.error("PerformanceMonitor", "bottom_refresh_graph not found!")
 		return
+	if not bottom_thread_graph:
+		MythosLogger.error("PerformanceMonitor", "bottom_thread_graph not found!")
+		return
 	
 	MythosLogger.debug("PerformanceMonitor", "All @onready nodes validated successfully")
 	
@@ -107,6 +118,7 @@ func _ready() -> void:
 	process_label = _create_metric_label("Process: -- ms")
 	physics_label = _create_metric_label("Physics: -- ms")
 	refresh_label = _create_metric_label("Refresh: -- ms")
+	system_status_label = _create_metric_label("Status: Idle")
 	# Memory category
 	memory_label = _create_metric_label("Memory: --")
 	vram_label = _create_metric_label("VRAM: --")
@@ -121,7 +133,7 @@ func _ready() -> void:
 	
 	# Add all labels to container
 	var all_labels: Array[Label] = [
-		process_label, physics_label, refresh_label,  # Time
+		process_label, physics_label, refresh_label, system_status_label,  # Time
 		memory_label, vram_label, texture_mem_label,  # Memory
 		draw_calls_label, primitives_label, objects_drawn_label,  # Rendering
 		object_label, node_label  # Objects
@@ -174,6 +186,9 @@ func _ready() -> void:
 	
 	bottom_refresh_graph.max_value = 33.33  # Headroom for refresh spikes
 	bottom_refresh_graph.line_color = Color(1.0, 0.3, 0.3)  # Red for refresh bottleneck
+	
+	bottom_thread_graph.max_value = 33.33  # Headroom for thread compute time
+	bottom_thread_graph.line_color = Color(0.3, 0.7, 1.0)  # Blue for thread compute time
 	
 	# Apply theme stylebox for overlay (moved from programmatic creation to theme)
 	var theme_stylebox: StyleBox = perf_panel.get_theme_stylebox("perf_overlay", "PanelContainer")
@@ -340,6 +355,8 @@ func _process(_delta: float) -> void:
 			bottom_process_graph.add_value(process_ms)
 		if bottom_refresh_graph:
 			bottom_refresh_graph.add_value(refresh_time_ms)
+		if bottom_thread_graph:
+			bottom_thread_graph.add_value(thread_compute_time_ms)
 		
 		# Update refresh label with color coding
 		if refresh_label:
@@ -348,6 +365,9 @@ func _process(_delta: float) -> void:
 				refresh_label.modulate = fps_bad_color  # Red if >10ms
 			else:
 				refresh_label.modulate = Color.WHITE  # Normal color if <=10ms
+		
+		# Update system status and thread metrics
+		_update_thread_metrics()
 
 func _update_detailed_metrics() -> void:
 	"""Update all detailed metric labels."""
@@ -436,8 +456,10 @@ func _update_bottom_graph_bar() -> void:
 		bottom_fps_graph.custom_minimum_size.y = UIConstants.GRAPH_INNER_HEIGHT
 	if bottom_process_graph:
 		bottom_process_graph.custom_minimum_size.y = UIConstants.GRAPH_INNER_HEIGHT
-	if bottom_refresh_graph:
-		bottom_refresh_graph.custom_minimum_size.y = UIConstants.GRAPH_INNER_HEIGHT
+		if bottom_refresh_graph:
+			bottom_refresh_graph.custom_minimum_size.y = UIConstants.GRAPH_INNER_HEIGHT
+		if bottom_thread_graph:
+			bottom_thread_graph.custom_minimum_size.y = UIConstants.GRAPH_INNER_HEIGHT
 	
 	# Set visibility based on mode
 	bottom_graph_bar.visible = (current_mode == Mode.DETAILED)
@@ -512,7 +534,7 @@ func _load_saved_mode() -> void:
 func _apply_category_filter(category: String) -> void:
 	"""Show/hide metrics based on selected category."""
 	# Time category
-	var time_labels: Array[Label] = [process_label, physics_label, refresh_label]
+	var time_labels: Array[Label] = [process_label, physics_label, refresh_label, system_status_label]
 	# Memory category
 	var memory_labels: Array[Label] = [memory_label, vram_label, texture_mem_label]
 	# Rendering category
@@ -611,5 +633,59 @@ func export_snapshot() -> void:
 func set_refresh_time(time_ms: float) -> void:
 	"""Set refresh time for MapRenderer timing (called via PerformanceMonitorSingleton)."""
 	refresh_time_ms = time_ms
+
+
+func _update_thread_metrics() -> void:
+	"""Update thread metrics from WorldGenerator if available."""
+	# Try to find WorldGenerator in scene tree (using method check to avoid type issues)
+	var world_gen = _find_world_generator()
+	if world_gen and world_gen.has_method("is_generating"):
+		# Check if generating
+		if world_gen.is_generating():
+			system_status = "World Gen Active"
+			# Get thread metrics
+			var metrics: Array[Dictionary] = world_gen.get_thread_metrics()
+			if metrics.size() > 0:
+				# Sum up recent compute time (last metric's time)
+				thread_compute_time_ms = 0.0
+				for metric: Dictionary in metrics:
+					thread_compute_time_ms += metric.get("time_ms", 0.0)
+				# Average over metrics count
+				if metrics.size() > 0:
+					thread_compute_time_ms /= metrics.size()
+		else:
+			system_status = "Idle"
+			thread_compute_time_ms = 0.0
+	else:
+		system_status = "Idle"
+		thread_compute_time_ms = 0.0
+	
+	# Update status label
+	if system_status_label:
+		system_status_label.text = "Status: %s" % system_status
+		if system_status == "World Gen Active":
+			system_status_label.modulate = Color(0.3, 0.7, 1.0)  # Blue tint when active
+		else:
+			system_status_label.modulate = Color.WHITE
+
+
+func _find_world_generator():
+	"""Find WorldGenerator instance in scene tree."""
+	# Search from root using method check (avoids type resolution issues)
+	var root: Node = get_tree().root
+	return _find_world_generator_recursive(root)
+
+
+func _find_world_generator_recursive(node: Node):
+	"""Recursively search for WorldGenerator node by checking for is_generating method."""
+	if node.has_method("is_generating") and node.has_method("get_thread_metrics"):
+		return node
+	
+	for child: Node in node.get_children():
+		var result = _find_world_generator_recursive(child)
+		if result:
+			return result
+	
+	return null
 
 

@@ -64,3 +64,8 @@ const PERF_REFRESH_THRESHOLD: float = 10.0  ## Threshold (ms) for color-coding r
 const BOTTOM_GRAPH_BAR_HEIGHT: int = 480  ## Height for bottom graph bar in DETAILED mode
 const BOTTOM_GRAPH_BAR_MARGIN: int = 20  ## Bottom margin for graph bar
 const GRAPH_INNER_HEIGHT: int = 140  ## Individual graph height with padding
+
+# Progress Bar Constants
+const PROGRESS_BAR_WIDTH: int = 400  ## Width for progress bars
+const PROGRESS_BAR_HEIGHT: int = 40  ## Height for progress bars
+const PROGRESS_BAR_MARGIN_TOP: int = 100  ## Top margin for progress bar positioning

@@ -105,13 +105,6 @@ size_flags_vertical = 3
 custom_minimum_size = Vector2(0, 140)
 script = ExtResource("2_graph_control")
 
-[node name="BottomFPSGraph" type="Control" parent="BottomGraphBar/MarginContainer/BottomGraphsContainer"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-custom_minimum_size = Vector2(0, 140)
-script = ExtResource("2_graph_control")
-
 [node name="BottomProcessGraph" type="Control" parent="BottomGraphBar/MarginContainer/BottomGraphsContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
@@ -120,6 +113,13 @@ custom_minimum_size = Vector2(0, 140)
 script = ExtResource("2_graph_control")
 
 [node name="BottomRefreshGraph" type="Control" parent="BottomGraphBar/MarginContainer/BottomGraphsContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 140)
+script = ExtResource("2_graph_control")
+
+[node name="BottomThreadGraph" type="Control" parent="BottomGraphBar/MarginContainer/BottomGraphsContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3

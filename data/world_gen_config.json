@@ -1,0 +1,16 @@
+{
+	"seed": 0,
+	"map_size": 1024,
+	"biome_count": 8,
+	"erosion_enabled": true,
+	"erosion_iterations": 5,
+	"rivers_enabled": true,
+	"river_count": 10,
+	"noise_type": 0,
+	"noise_frequency": 0.0005,
+	"noise_octaves": 4,
+	"noise_persistence": 0.5,
+	"noise_lacunarity": 2.0,
+	"sea_level": 0.4,
+	"landmass_type": "Continents"
+}
