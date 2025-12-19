@@ -284,29 +284,38 @@ func _format_message(system: String, level: LogLevel, message: String, data: Var
 	return formatted
 
 func log_entry(system: String, level: LogLevel, message: String, data: Variant = null) -> void:
-	"""Main logging method - logs a message if the level allows. Thread-safe."""
+	"""Main logging method - logs a message if the level allows. Thread-safe via DiagnosticDispatcher."""
 	log_mutex.lock()
 	
-	# Check if we should log this
+	# Check if we should log this (level filtering)
 	if not _should_log(system, level):
+		log_mutex.unlock()
+		return
+	
+	# Check rate limiting via DiagnosticDispatcher (PerformanceMonitor)
+	if not PerformanceMonitorSingleton.can_log():
 		log_mutex.unlock()
 		return
 	
 	var formatted: String = _format_message(system, level, message, data)
 	
-	# Console output (thread-safe: push_error, push_warning, print work from threads)
-	if log_to_console:
-		_output_to_console(level, formatted)
-	
-	# File output (thread-safe: FileAccess operations work from threads)
-	if log_to_file:
-		_output_to_file(formatted)
-	
-	# Emit signal for UI integration (MUST be deferred if called from thread)
-	# Always use call_deferred for signal emission to ensure thread safety
-	call_deferred("_emit_log_signal", level, system, message, data)
+	# Wrap actual log operations in a Callable for DiagnosticDispatcher queue
+	var log_callable: Callable = func():
+		# Console output (thread-safe: push_error, push_warning, print work from threads)
+		if log_to_console:
+			_output_to_console(level, formatted)
+		
+		# File output (thread-safe: FileAccess operations work from threads)
+		if log_to_file:
+			_output_to_file(formatted)
+		
+		# Emit signal for UI integration (on main thread via queue)
+		_emit_log_signal(level, system, message, data)
 	
 	log_mutex.unlock()
+	
+	# Queue diagnostic callable (handles main thread vs thread automatically)
+	PerformanceMonitorSingleton.queue_diagnostic(log_callable)
 
 func _output_to_console(level: LogLevel, message: String) -> void:
 	"""Output message to console with appropriate formatting."""

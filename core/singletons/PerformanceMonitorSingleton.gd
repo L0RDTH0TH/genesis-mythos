@@ -33,3 +33,22 @@ func set_refresh_time(time_ms: float) -> void:
 	"""Set refresh time for the performance monitor (called from MapRenderer)."""
 	if monitor_instance:
 		monitor_instance.set_refresh_time(time_ms)
+
+
+func queue_diagnostic(callable: Callable) -> void:
+	"""Queue a diagnostic callable for execution on main thread (DiagnosticDispatcher API)."""
+	if monitor_instance:
+		monitor_instance.queue_diagnostic(callable)
+
+
+func push_metric_from_thread(metric: Dictionary) -> void:
+	"""Push a metric from a thread into the ring buffer (DiagnosticDispatcher API)."""
+	if monitor_instance:
+		monitor_instance.push_metric_from_thread(metric)
+
+
+func can_log() -> bool:
+	"""Check if logging is allowed based on rate limiting (DiagnosticDispatcher API)."""
+	if monitor_instance:
+		return monitor_instance.can_log()
+	return true  # Default to allowing if monitor not ready

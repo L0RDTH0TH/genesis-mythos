@@ -188,7 +188,15 @@ func _threaded_generate() -> void:
 
 
 func _record_metric(phase: String, time_ms: float) -> void:
-	"""Record thread metric (thread-safe)."""
+	"""Record thread metric via DiagnosticDispatcher (thread-safe)."""
+	# Push metric to DiagnosticDispatcher ring buffer (thread-safe)
+	PerformanceMonitorSingleton.push_metric_from_thread({
+		"phase": phase,
+		"time_ms": time_ms,
+		"timestamp": Time.get_ticks_msec()
+	})
+	
+	# Also keep local queue for backward compatibility with get_thread_metrics()
 	metrics_mutex.lock()
 	thread_metrics_queue.append({"phase": phase, "time_ms": time_ms})
 	# Keep queue size reasonable (last 100 entries)

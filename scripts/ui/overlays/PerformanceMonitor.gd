@@ -68,6 +68,13 @@ var node_label: Label
 # Mode names for logging
 var mode_names: Array[String] = ["OFF", "SIMPLE", "DETAILED"]
 
+# DiagnosticDispatcher infrastructure (thread-safe, high-priority diagnostics)
+var _diagnostic_queue: Array[Callable] = []
+var _metric_ring_buffer: Array[Dictionary] = []  # For thread-pushed metrics {phase: String, time_ms: float, timestamp: int}
+var _buffer_mutex: Mutex = Mutex.new()
+var _log_timestamps: Array[int] = []
+const MAX_LOGS_PER_SECOND: int = 15
+
 func _ready() -> void:
 	"""Initialize performance monitor with labels, graphs, and settings."""
 	MythosLogger.debug("PerformanceMonitor", "Overlay ready in singleton mode - available globally")
@@ -234,6 +241,9 @@ func _ready() -> void:
 	
 	# Load saved mode or default to OFF
 	_load_saved_mode()
+	
+	# Set process priority to -1000 for high-priority diagnostic processing
+	set_process_priority(-1000)
 
 func _verify_panel_visibility() -> void:
 	"""Verify panel visibility state after deferred call."""
@@ -324,9 +334,32 @@ func set_mode(new_mode: Mode) -> void:
 	_save_mode()
 
 func _process(_delta: float) -> void:
-	"""Update performance metrics each frame."""
+	"""Update performance metrics each frame. DiagnosticDispatcher: drains queue first, then metrics, then existing logic."""
 	_frame_count += 1
 	
+	# FIRST: Drain diagnostic queue completely (thread-safe log/UI updates)
+	for i in range(_diagnostic_queue.size()):
+		var callable: Callable = _diagnostic_queue[i]
+		callable.call()
+	_diagnostic_queue.clear()
+	
+	# SECOND: Drain metric ring buffer (thread-safe metric collection)
+	_buffer_mutex.lock()
+	var metrics_to_process: Array[Dictionary] = _metric_ring_buffer.duplicate()
+	_metric_ring_buffer.clear()
+	_buffer_mutex.unlock()
+	
+	# Feed drained metrics into graphs (live updates)
+	for metric: Dictionary in metrics_to_process:
+		var phase: String = metric.get("phase", "")
+		var time_ms: float = metric.get("time_ms", 0.0)
+		var timestamp: int = metric.get("timestamp", 0)
+		
+		# Update thread graph with metric time (perfectly live)
+		if bottom_thread_graph:
+			bottom_thread_graph.add_value(time_ms)
+	
+	# Rest of existing _process logic (FPS, graphs, etc.)
 	var fps: float = Engine.get_frames_per_second()
 	fps_label.text = "FPS: %.1f" % fps
 	
@@ -687,5 +720,46 @@ func _find_world_generator_recursive(node: Node):
 			return result
 	
 	return null
+
+
+## DiagnosticDispatcher public API
+
+func queue_diagnostic(callable: Callable) -> void:
+	"""Queue a diagnostic callable for execution on main thread. Thread-safe."""
+	if Thread.is_main_thread():
+		callable.call()
+	else:
+		_diagnostic_queue.append(callable)
+
+
+func push_metric_from_thread(metric: Dictionary) -> void:
+	"""Push a metric from a thread into the ring buffer. Thread-safe."""
+	_buffer_mutex.lock()
+	_metric_ring_buffer.append(metric)
+	# Keep ring buffer size reasonable (last 1000 entries)
+	if _metric_ring_buffer.size() > 1000:
+		_metric_ring_buffer.pop_front()
+	_buffer_mutex.unlock()
+
+
+func can_log() -> bool:
+	"""Check if logging is allowed based on rate limiting (MAX_LOGS_PER_SECOND). Public API for Logger."""
+	var now: int = Time.get_ticks_msec()
+	
+	# Remove timestamps older than 1 second
+	var one_second_ago: int = now - 1000
+	var i: int = 0
+	while i < _log_timestamps.size():
+		if _log_timestamps[i] < one_second_ago:
+			_log_timestamps.remove_at(i)
+		else:
+			i += 1
+	
+	# Check if we're under the limit
+	if _log_timestamps.size() < MAX_LOGS_PER_SECOND:
+		_log_timestamps.append(now)
+		return true
+	
+	return false
 
 
