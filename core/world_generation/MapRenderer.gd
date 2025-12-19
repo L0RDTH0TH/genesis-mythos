@@ -102,51 +102,50 @@ func _update_textures() -> void:
 	var image_size: Vector2i = world_map_data.heightmap_image.get_size()
 	MythosLogger.debug("World/Rendering", "Updating textures", {"heightmap_size": image_size})
 	
-	# Update heightmap texture - skip set_image() if same image reference (fast path)
+	# Update heightmap texture - use update() if same image reference (optimization)
 	if heightmap_texture == null:
 		heightmap_texture = ImageTexture.new()
 		heightmap_texture.set_image(world_map_data.heightmap_image)
 		MythosLogger.debug("World/Rendering", "Heightmap texture created", {"size": heightmap_texture.get_size()})
 	else:
 		var current_image: Image = heightmap_texture.get_image()
-		if current_image != world_map_data.heightmap_image:
+		if current_image == world_map_data.heightmap_image:
+			# Same image reference, just update (much faster - no GPU re-upload)
+			heightmap_texture.update()
+		else:
 			# Different image, need full update
 			heightmap_texture.set_image(world_map_data.heightmap_image)
-		# If same image reference, skip update (no GPU re-upload needed)
+			MythosLogger.debug("World/Rendering", "Heightmap texture updated", {"size": heightmap_texture.get_size()})
 	
-	# Update biome texture - skip set_image() if same image reference (fast path)
+	# Update biome texture - use update() if same image reference (optimization)
+	var biome_image: Image = null
 	if world_map_data.biome_preview_image != null:
-		if biome_texture == null:
-			biome_texture = ImageTexture.new()
-			biome_texture.set_image(world_map_data.biome_preview_image)
-			MythosLogger.debug("World/Rendering", "Biome texture updated from preview image")
-		else:
-			var current_image: Image = biome_texture.get_image()
-			if current_image != world_map_data.biome_preview_image:
-				# Different image, need full update
-				biome_texture.set_image(world_map_data.biome_preview_image)
-			# If same image reference, skip update (no GPU re-upload needed)
+		biome_image = world_map_data.biome_preview_image
 	else:
 		# Generate biome preview if not exists
 		MythosLogger.verbose("World/Rendering", "Generating biome preview image")
 		# Remove type hint to avoid parse-time dependency on MapGenerator
 		var generator = MapGenerator.new()
-		var biome_img: Image = generator.generate_biome_preview(world_map_data)
-		if biome_img != null:
-			if biome_texture == null:
-				biome_texture = ImageTexture.new()
-				biome_texture.set_image(biome_img)
-			else:
-				var current_image: Image = biome_texture.get_image()
-				if current_image != biome_img:
-					# Different image, need full update
-					biome_texture.set_image(biome_img)
-				# If same image reference, skip update (no GPU re-upload needed)
-			MythosLogger.debug("World/Rendering", "Biome texture generated", {"size": biome_img.get_size()})
-		else:
+		biome_image = generator.generate_biome_preview(world_map_data)
+		if biome_image == null:
 			MythosLogger.warn("World/Rendering", "Failed to generate biome preview image")
 	
-	# Create empty rivers texture (for now) - only create once
+	if biome_image != null:
+		if biome_texture == null:
+			biome_texture = ImageTexture.new()
+			biome_texture.set_image(biome_image)
+			MythosLogger.debug("World/Rendering", "Biome texture created", {"size": biome_image.get_size()})
+		else:
+			var current_image: Image = biome_texture.get_image()
+			if current_image == biome_image:
+				# Same image reference, just update (much faster - no GPU re-upload)
+				biome_texture.update()
+			else:
+				# Different image, need full update
+				biome_texture.set_image(biome_image)
+				MythosLogger.debug("World/Rendering", "Biome texture updated", {"size": biome_image.get_size()})
+	
+	# Create empty rivers texture (for now) - only create once, reuse
 	if rivers_texture == null:
 		rivers_texture = ImageTexture.new()
 		var rivers_img: Image = Image.create(
@@ -158,7 +157,7 @@ func _update_textures() -> void:
 		rivers_img.fill(Color.BLACK)
 		rivers_texture.set_image(rivers_img)
 		MythosLogger.debug("World/Rendering", "Rivers texture created", {"size": rivers_img.get_size()})
-	# Rivers texture is static (black), no update needed
+	# Note: Rivers texture is static (all black), so no update needed
 	
 	# Apply textures to shader
 	if shader_material != null:
@@ -230,7 +229,7 @@ func refresh() -> void:
 	"""Refresh rendering (call after map data changes)."""
 	var now: int = Time.get_ticks_msec()
 	
-	# Throttle refreshes - skip if called too frequently (max 10 per second)
+	# Throttle refreshes - skip if called too frequently (prevents 12ms+ blocking)
 	if now - last_refresh_time < MIN_REFRESH_INTERVAL_MS:
 		pending_refresh = true
 		# Schedule deferred refresh if not already scheduled
@@ -252,11 +251,13 @@ func refresh() -> void:
 func _do_pending_refresh() -> void:
 	"""Handle pending refresh after throttle interval."""
 	if pending_refresh:
-		refresh()
+		pending_refresh = false
+		last_refresh_time = Time.get_ticks_msec()
+		_do_actual_refresh()
 
 
 func _do_actual_refresh() -> void:
-	"""Actually perform the refresh (called after throttling check)."""
+	"""Actually perform the refresh operation."""
 	# PROFILING: Time refresh operation
 	var refresh_start: int = Time.get_ticks_usec()
 	profiling_refresh_calls += 1
