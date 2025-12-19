@@ -41,6 +41,9 @@ var current_view_mode: MapRenderer.ViewMode = MapRenderer.ViewMode.BIOMES
 ## Is map initialized
 var is_initialized: bool = false
 
+## Is module active (processing enabled)
+var is_active: bool = false
+
 ## Map root node
 var map_root: Node2D
 
@@ -63,6 +66,10 @@ const REFRESH_THROTTLE_MS: float = 0.1  # Max 10 refreshes per second (100ms)
 func _ready() -> void:
 	"""Initialize MapMakerModule."""
 	print("DEBUG: MapMakerModule._ready() called")
+	# Disable processing by default - will be enabled when module becomes active
+	set_process(false)
+	set_physics_process(false)
+	
 	_setup_ui()
 	_setup_viewport()
 	_setup_generator()
@@ -86,7 +93,8 @@ func _setup_viewport() -> void:
 	map_viewport.size = Vector2i(1920, 1080)
 	map_viewport.transparent_bg = false
 	map_viewport.handle_input_locally = true  # Handle input in viewport
-	map_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	# Use UPDATE_WHEN_VISIBLE for better performance (only render when viewport is visible)
+	map_viewport.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE
 	
 	map_viewport_container = SubViewportContainer.new()
 	map_viewport_container.name = "MapViewportContainer"
@@ -902,6 +910,22 @@ func _on_refresh_timer_timeout() -> void:
 		if refresh_time > 0.016:  # Log if > 16ms (60 FPS threshold)
 			MythosLogger.warn("UI/MapMaker", "Throttled renderer refresh took %f ms" % (refresh_time * 1000.0))
 		pending_refresh = false
+
+
+func activate() -> void:
+	"""Activate module - enable processing."""
+	is_active = true
+	set_process(true)
+	set_physics_process(true)
+	MythosLogger.debug("UI/MapMaker", "MapMakerModule activated")
+
+
+func deactivate() -> void:
+	"""Deactivate module - disable processing to save CPU."""
+	is_active = false
+	set_process(false)
+	set_physics_process(false)
+	MythosLogger.debug("UI/MapMaker", "MapMakerModule deactivated")
 
 
 func _setup_keyboard_shortcuts() -> void:

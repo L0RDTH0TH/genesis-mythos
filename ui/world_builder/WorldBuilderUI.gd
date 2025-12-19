@@ -140,8 +140,9 @@ func _ready() -> void:
 	# Hide ProceduralWorldMap by default - MapMakerModule is the primary renderer
 	if procedural_world_map != null:
 		procedural_world_map.visible = false
-		# Disable _process() when hidden to save CPU cycles
+		# Disable _process() and _physics_process() when hidden to save CPU cycles
 		procedural_world_map.set_process(false)
+		procedural_world_map.set_physics_process(false)
 		MythosLogger.debug("UI/WorldBuilder", "ProceduralWorldMap hidden and processing disabled (fallback only)")
 	
 	_update_step_display()
@@ -801,6 +802,9 @@ func update_camera_for_step(step: int) -> void:
 			if map_maker_module != null:
 				print("DEBUG: MapMakerModule exists, showing custom renderer")
 				map_maker_module.visible = true
+				# Activate module processing when it becomes active
+				if map_maker_module.has_method("activate"):
+					map_maker_module.activate()
 				# Hide placeholder and fallback systems
 				if map_2d_texture != null:
 					map_2d_texture.visible = false
@@ -824,6 +828,11 @@ func update_camera_for_step(step: int) -> void:
 				preview_camera.current = false
 			
 		2, 3, 4, 5, 6, 7, 8:  # Steps 3+: Show 3D viewport, hide 2D map
+			# Deactivate MapMakerModule when leaving Step 1
+			if map_maker_module != null:
+				if map_maker_module.has_method("deactivate"):
+					map_maker_module.deactivate()
+				map_maker_module.visible = false
 			# Hide 2D map texture
 			if map_2d_texture != null:
 				map_2d_texture.visible = false
@@ -2521,6 +2530,7 @@ func _on_generate_map_pressed() -> void:
 		# Make ProceduralWorldMap visible temporarily for fallback
 		procedural_world_map.visible = true
 		procedural_world_map.set_process(true)
+		procedural_world_map.set_physics_process(true)
 		
 		# Hide MapMakerModule if it exists (fallback mode)
 		if map_maker_module != null:
@@ -2579,6 +2589,7 @@ func _on_map_generation_complete_fallback() -> void:
 	if procedural_world_map != null:
 		procedural_world_map.visible = true
 		procedural_world_map.set_process(true)
+		procedural_world_map.set_physics_process(true)
 		MythosLogger.debug("UI/WorldBuilder", "ProceduralWorldMap fallback display confirmed", {
 			"visible": procedural_world_map.visible,
 			"has_material": procedural_world_map.material != null,
