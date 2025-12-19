@@ -31,6 +31,11 @@ var camera: Camera2D
 ## Light direction for hillshading
 var light_direction: Vector2 = Vector2(0.5, 0.5)
 
+## Refresh throttling to prevent excessive refresh calls
+var last_refresh_time: int = 0
+const MIN_REFRESH_INTERVAL_MS: int = 100  # Max 10 refreshes per second
+var pending_refresh: bool = false
+
 ## PROFILING: Data accumulation
 var profiling_refresh_calls: int = 0
 var profiling_refresh_over_1ms: int = 0
@@ -97,19 +102,30 @@ func _update_textures() -> void:
 	var image_size: Vector2i = world_map_data.heightmap_image.get_size()
 	MythosLogger.debug("World/Rendering", "Updating textures", {"heightmap_size": image_size})
 	
-	# Update heightmap texture
+	# Update heightmap texture - skip set_image() if same image reference (fast path)
 	if heightmap_texture == null:
 		heightmap_texture = ImageTexture.new()
+		heightmap_texture.set_image(world_map_data.heightmap_image)
+		MythosLogger.debug("World/Rendering", "Heightmap texture created", {"size": heightmap_texture.get_size()})
+	else:
+		var current_image: Image = heightmap_texture.get_image()
+		if current_image != world_map_data.heightmap_image:
+			# Different image, need full update
+			heightmap_texture.set_image(world_map_data.heightmap_image)
+		# If same image reference, skip update (no GPU re-upload needed)
 	
-	heightmap_texture.set_image(world_map_data.heightmap_image)
-	MythosLogger.debug("World/Rendering", "Heightmap texture created", {"size": heightmap_texture.get_size()})
-	
-	# Update biome texture
+	# Update biome texture - skip set_image() if same image reference (fast path)
 	if world_map_data.biome_preview_image != null:
 		if biome_texture == null:
 			biome_texture = ImageTexture.new()
-		biome_texture.set_image(world_map_data.biome_preview_image)
-		MythosLogger.debug("World/Rendering", "Biome texture updated from preview image")
+			biome_texture.set_image(world_map_data.biome_preview_image)
+			MythosLogger.debug("World/Rendering", "Biome texture updated from preview image")
+		else:
+			var current_image: Image = biome_texture.get_image()
+			if current_image != world_map_data.biome_preview_image:
+				# Different image, need full update
+				biome_texture.set_image(world_map_data.biome_preview_image)
+			# If same image reference, skip update (no GPU re-upload needed)
 	else:
 		# Generate biome preview if not exists
 		MythosLogger.verbose("World/Rendering", "Generating biome preview image")
@@ -119,12 +135,18 @@ func _update_textures() -> void:
 		if biome_img != null:
 			if biome_texture == null:
 				biome_texture = ImageTexture.new()
-			biome_texture.set_image(biome_img)
+				biome_texture.set_image(biome_img)
+			else:
+				var current_image: Image = biome_texture.get_image()
+				if current_image != biome_img:
+					# Different image, need full update
+					biome_texture.set_image(biome_img)
+				# If same image reference, skip update (no GPU re-upload needed)
 			MythosLogger.debug("World/Rendering", "Biome texture generated", {"size": biome_img.get_size()})
 		else:
 			MythosLogger.warn("World/Rendering", "Failed to generate biome preview image")
 	
-	# Create empty rivers texture (for now)
+	# Create empty rivers texture (for now) - only create once
 	if rivers_texture == null:
 		rivers_texture = ImageTexture.new()
 		var rivers_img: Image = Image.create(
@@ -136,6 +158,7 @@ func _update_textures() -> void:
 		rivers_img.fill(Color.BLACK)
 		rivers_texture.set_image(rivers_img)
 		MythosLogger.debug("World/Rendering", "Rivers texture created", {"size": rivers_img.get_size()})
+	# Rivers texture is static (black), no update needed
 	
 	# Apply textures to shader
 	if shader_material != null:
@@ -205,6 +228,35 @@ func set_light_direction(direction: Vector2) -> void:
 
 func refresh() -> void:
 	"""Refresh rendering (call after map data changes)."""
+	var now: int = Time.get_ticks_msec()
+	
+	# Throttle refreshes - skip if called too frequently (max 10 per second)
+	if now - last_refresh_time < MIN_REFRESH_INTERVAL_MS:
+		pending_refresh = true
+		# Schedule deferred refresh if not already scheduled
+		if not has_node("RefreshThrottleTimer"):
+			var timer: Timer = Timer.new()
+			timer.name = "RefreshThrottleTimer"
+			timer.wait_time = (MIN_REFRESH_INTERVAL_MS - (now - last_refresh_time)) / 1000.0
+			timer.one_shot = true
+			timer.timeout.connect(_do_pending_refresh)
+			add_child(timer)
+			timer.start()
+		return
+	
+	last_refresh_time = now
+	pending_refresh = false
+	_do_actual_refresh()
+
+
+func _do_pending_refresh() -> void:
+	"""Handle pending refresh after throttle interval."""
+	if pending_refresh:
+		refresh()
+
+
+func _do_actual_refresh() -> void:
+	"""Actually perform the refresh (called after throttling check)."""
 	# PROFILING: Time refresh operation
 	var refresh_start: int = Time.get_ticks_usec()
 	profiling_refresh_calls += 1
@@ -252,7 +304,7 @@ func refresh() -> void:
 	
 	if refresh_time > 1000:  # >1ms
 		profiling_refresh_over_1ms += 1
-		print("PROFILING: MapRenderer.refresh() took: ", refresh_time_ms, " ms")
+		print("PROFILING: MapRenderer._do_actual_refresh() took: ", refresh_time_ms, " ms")
 	if refresh_time > 10000:  # >10ms
 		profiling_refresh_over_10ms += 1
 
