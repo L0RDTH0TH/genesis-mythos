@@ -37,6 +37,7 @@ var mode_names: Array[String] = ["OFF", "SIMPLE", "DETAILED"]
 
 func _ready() -> void:
 	"""Initialize performance monitor with labels, graphs, and settings."""
+	MythosLogger.debug("PerformanceMonitor", "Overlay ready in singleton mode - available globally")
 	MythosLogger.debug("PerformanceMonitor", "_ready() starting initialization")
 	
 	# Validate all @onready nodes exist
@@ -109,15 +110,8 @@ func _ready() -> void:
 	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
 	MythosLogger.debug("PerformanceMonitor", "Viewport size: %s" % viewport_size)
 	
-	# DEBUG: Force DETAILED mode for testing visibility
-	MythosLogger.debug("PerformanceMonitor", "_ready() called - forcing DETAILED mode for debugging")
-	set_mode(Mode.DETAILED)
-	
-	# Force panel to be visible and check its state
-	call_deferred("_verify_panel_visibility")
-	
-	# Load saved mode (commented out for debugging)
-	# _load_saved_mode()
+	# Load saved mode or default to OFF
+	_load_saved_mode()
 
 func _verify_panel_visibility() -> void:
 	"""Verify panel visibility state after deferred call."""
@@ -136,10 +130,8 @@ func _create_metric_label(text: String) -> Label:
 
 func _input(event: InputEvent) -> void:
 	"""Handle input for toggling performance monitor."""
-	# Only log key events to reduce spam
 	if event is InputEventKey:
 		if event.is_action_pressed("toggle_perf_monitor"):
-			print("[PerformanceMonitor] F3 PRESSED - Toggling performance monitor")
 			MythosLogger.debug("PerformanceMonitor", "F3 pressed via action - cycling mode")
 			cycle_mode()
 			get_viewport().set_input_as_handled()
@@ -148,7 +140,6 @@ func _unhandled_input(event: InputEvent) -> void:
 	"""Handle unhandled input as fallback for key detection."""
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.physical_keycode == KEY_F3:
-			print("[PerformanceMonitor] F3 PRESSED (via _unhandled_input) - Toggling performance monitor")
 			MythosLogger.debug("PerformanceMonitor", "F3 detected via _unhandled_input - cycling mode")
 			cycle_mode()
 			get_viewport().set_input_as_handled()
@@ -157,15 +148,12 @@ func cycle_mode() -> void:
 	"""Toggles performance monitor mode."""
 	var old_mode: int = current_mode
 	var new_mode: Mode = (current_mode + 1) % Mode.size()
-	print("[PerformanceMonitor] Mode cycling: %s -> %s" % [mode_names[old_mode], mode_names[new_mode]])
 	MythosLogger.debug("PerformanceMonitor", "Mode cycled: %s -> %s" % [mode_names[old_mode], mode_names[new_mode]])
 	set_mode(new_mode)
 
 func set_mode(new_mode: Mode) -> void:
 	"""Set the performance monitor mode with logging."""
 	current_mode = new_mode
-	
-	print("[PerformanceMonitor] Setting mode to: %s" % mode_names[current_mode])
 	MythosLogger.debug("PerformanceMonitor", "set_mode() called: %s" % mode_names[current_mode])
 	
 	match current_mode:

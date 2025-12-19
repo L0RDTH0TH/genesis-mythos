@@ -23,6 +23,7 @@ MythosLogger="*res://core/singletons/Logger.gd"
 WorldStreamer="*res://core/streaming/world_streamer.gd"
 EntitySim="*res://core/sim/entity_sim.gd"
 FactionEconomy="*res://core/sim/faction_economy.gd"
+PerformanceMonitorSingleton="*res://core/singletons/PerformanceMonitorSingleton.gd"
 
 [debug]
 

@@ -85,7 +85,6 @@ func _ready() -> void:
 	# Terrain3DManager now creates and configures the terrain itself in its own _ready()
 	# Nothing else needed here unless you want to trigger procedural generation later
 	_setup_world_builder_ui()
-	MythosLogger.debug("WorldRoot", "PerformanceMonitor integrated")
 	MythosLogger.info("World", "Setup complete - splash removed, terrain visible, UI added")
 
 

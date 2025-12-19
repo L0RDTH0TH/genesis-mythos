@@ -1,11 +1,10 @@
-[gd_scene load_steps=9 format=3 uid="uid://world_root"]
+[gd_scene load_steps=8 format=3 uid="uid://world_root"]
 
 [ext_resource type="Environment" path="res://assets/environments/eryndor_base.tres" id="1_eryndor_env"]
 [ext_resource type="Script" path="res://core/utils/creative_fly_camera.gd" id="5_camera_script"]
 [ext_resource type="Script" path="res://core/scenes/world_root.gd" id="6_world_root"]
 [ext_resource type="Script" path="res://core/world_generation/Terrain3DManager.gd" id="7_terrain_manager"]
 [ext_resource type="PackedScene" uid="uid://debug_overlay" path="res://scenes/ui/DebugOverlay.tscn" id="8_debug_overlay"]
-[ext_resource type="PackedScene" uid="uid://perf_monitor" path="res://scenes/ui/overlays/PerformanceMonitor.tscn" id="9_perf_monitor"]
 
 [node name="WorldRoot" type="Node3D"]
 script = ExtResource("6_world_root")
@@ -37,5 +36,3 @@ environment = ExtResource("1_eryndor_env")
 script = ExtResource("7_terrain_manager")
 
 [node name="DebugOverlay" parent="." instance=ExtResource("8_debug_overlay")]
-
-[node name="PerformanceMonitor" parent="." instance=ExtResource("9_perf_monitor")]
