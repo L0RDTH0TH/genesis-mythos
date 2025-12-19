@@ -351,9 +351,7 @@ func _process(_delta: float) -> void:
 	
 	# Feed drained metrics into graphs (live updates)
 	for metric: Dictionary in metrics_to_process:
-		var phase: String = metric.get("phase", "")
 		var time_ms: float = metric.get("time_ms", 0.0)
-		var timestamp: int = metric.get("timestamp", 0)
 		
 		# Update thread graph with metric time (perfectly live)
 		if bottom_thread_graph:
@@ -726,7 +724,18 @@ func _find_world_generator_recursive(node: Node):
 
 func queue_diagnostic(callable: Callable) -> void:
 	"""Queue a diagnostic callable for execution on main thread. Thread-safe."""
-	if Thread.is_main_thread():
+	# Check if we're on main thread by trying to access Engine (main thread only)
+	# If we can access Engine safely, execute immediately; otherwise queue
+	var is_main: bool = false
+	if is_inside_tree():
+		# We have scene tree access, so we're on main thread
+		is_main = true
+	else:
+		# Try to access Engine (safe on main thread)
+		var main_loop = Engine.get_main_loop()
+		is_main = (main_loop != null)
+	
+	if is_main:
 		callable.call()
 	else:
 		_diagnostic_queue.append(callable)
