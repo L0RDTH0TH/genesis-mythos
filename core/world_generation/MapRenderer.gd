@@ -31,6 +31,12 @@ var camera: Camera2D
 ## Light direction for hillshading
 var light_direction: Vector2 = Vector2(0.5, 0.5)
 
+## PROFILING: Data accumulation
+var profiling_refresh_calls: int = 0
+var profiling_refresh_over_1ms: int = 0
+var profiling_refresh_over_10ms: int = 0
+var profiling_refresh_times: Array[float] = []
+
 
 func _init() -> void:
 	"""Initialize MapRenderer."""
@@ -201,6 +207,7 @@ func refresh() -> void:
 	"""Refresh rendering (call after map data changes)."""
 	# PROFILING: Time refresh operation
 	var refresh_start: int = Time.get_ticks_usec()
+	profiling_refresh_calls += 1
 	
 	MythosLogger.verbose("World/Rendering", "refresh() called")
 	_update_textures()
@@ -238,5 +245,35 @@ func refresh() -> void:
 	
 	# PROFILING: Report refresh time if >1ms
 	var refresh_time: int = Time.get_ticks_usec() - refresh_start
+	var refresh_time_ms: float = refresh_time / 1000.0
+	profiling_refresh_times.append(refresh_time_ms)
+	if profiling_refresh_times.size() > 1000:  # Keep last 1000 samples
+		profiling_refresh_times.pop_front()
+	
 	if refresh_time > 1000:  # >1ms
-		print("PROFILING: MapRenderer.refresh() took: ", refresh_time / 1000.0, " ms")
+		profiling_refresh_over_1ms += 1
+		print("PROFILING: MapRenderer.refresh() took: ", refresh_time_ms, " ms")
+	if refresh_time > 10000:  # >10ms
+		profiling_refresh_over_10ms += 1
+
+
+func get_profiling_summary() -> Dictionary:
+	"""Get profiling data summary."""
+	var avg_time: float = 0.0
+	var max_time: float = 0.0
+	if profiling_refresh_times.size() > 0:
+		var sum: float = 0.0
+		for time in profiling_refresh_times:
+			sum += time
+			if time > max_time:
+				max_time = time
+		avg_time = sum / profiling_refresh_times.size()
+	
+	return {
+		"refresh_calls": profiling_refresh_calls,
+		"refresh_over_1ms": profiling_refresh_over_1ms,
+		"refresh_over_10ms": profiling_refresh_over_10ms,
+		"avg_time_ms": avg_time,
+		"max_time_ms": max_time,
+		"time_samples_count": profiling_refresh_times.size()
+	}

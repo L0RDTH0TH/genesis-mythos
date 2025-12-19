@@ -43,6 +43,14 @@ var tint:Color : set = set_tint, get = get_tint
 # This timer is used to start the incremental rendering process after an idle period. It is not used to schedule the multiple rendering passes.
 @onready var incremental_timer:Timer=Timer.new()
 
+# PROFILING: Data accumulation
+var profiling_process_calls: int = 0
+var profiling_process_over_1ms: int = 0
+var profiling_process_over_10ms: int = 0
+var profiling_running_while_hidden: int = 0
+var profiling_last_fps: float = 0.0
+var profiling_fps_samples: Array[float] = []
+
 # ---- EXPORTS -------------------------
 
 # If true, the map will be rendered with incremental quality, meaning it will start with a low quality version and gradually improve until it reaches the desired quality level.
@@ -186,9 +194,11 @@ func _ready():
 func _process(delta):
 	# PROFILING: Time the entire _process function
 	var frame_start: int = Time.get_ticks_usec()
+	profiling_process_calls += 1
 	
 	# PROFILING: Log if processing while hidden
 	if not visible:
+		profiling_running_while_hidden += 1
 		# Only log once per second to avoid spam
 		if Engine.get_process_frames() % 60 == 0:
 			print("PROFILING: ProceduralWorldMap._process() running while hidden! visible=", visible, " is_processing=", is_processing())
@@ -200,12 +210,43 @@ func _process(delta):
 	
 	# PROFILING: Report frame time if >1ms
 	var frame_time: int = Time.get_ticks_usec() - frame_start
+	var frame_time_ms: float = frame_time / 1000.0
 	if frame_time > 1000:  # >1ms
-		print("PROFILING: ProceduralWorldMap._process() took: ", frame_time / 1000.0, " ms")
+		profiling_process_over_1ms += 1
+		print("PROFILING: ProceduralWorldMap._process() took: ", frame_time_ms, " ms")
+	if frame_time > 10000:  # >10ms
+		profiling_process_over_10ms += 1
 	
 	# PROFILING: Periodic FPS report every 1 second
 	if Engine.get_process_frames() % 60 == 0:
-		print("PROFILING: ProceduralWorldMap - Current FPS: ", Engine.get_frames_per_second())
+		var fps: float = Engine.get_frames_per_second()
+		profiling_last_fps = fps
+		profiling_fps_samples.append(fps)
+		if profiling_fps_samples.size() > 120:  # Keep last 120 samples (2 minutes)
+			profiling_fps_samples.pop_front()
+		print("PROFILING: ProceduralWorldMap - Current FPS: ", fps)
+
+
+func get_profiling_summary() -> Dictionary:
+	"""Get profiling data summary."""
+	var avg_fps: float = 0.0
+	if profiling_fps_samples.size() > 0:
+		var sum: float = 0.0
+		for fps in profiling_fps_samples:
+			sum += fps
+		avg_fps = sum / profiling_fps_samples.size()
+	
+	return {
+		"process_calls": profiling_process_calls,
+		"process_over_1ms": profiling_process_over_1ms,
+		"process_over_10ms": profiling_process_over_10ms,
+		"running_while_hidden": profiling_running_while_hidden,
+		"last_fps": profiling_last_fps,
+		"avg_fps": avg_fps,
+		"fps_samples_count": profiling_fps_samples.size(),
+		"visible": visible,
+		"is_processing": is_processing()
+	}
 
 # Internal entry point to refresh the map
 func _start_map_update(is_recursive:bool):

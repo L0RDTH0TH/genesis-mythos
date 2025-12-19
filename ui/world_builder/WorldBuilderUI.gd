@@ -102,6 +102,14 @@ var map_preview_texture: ImageTexture = ImageTexture.new()
 const HardwareProfilerScript = preload("res://core/utils/HardwareProfiler.gd")
 var hardware_profiler
 
+## PROFILING: Data accumulation
+var profiling_process_calls: int = 0
+var profiling_process_over_1ms: int = 0
+var profiling_process_over_10ms: int = 0
+var profiling_last_fps: float = 0.0
+var profiling_fps_samples: Array[float] = []
+var profiling_summary_timer: Timer = null
+
 
 func _ready() -> void:
 	"""
@@ -150,6 +158,9 @@ func _ready() -> void:
 	await get_tree().process_frame
 	_update_viewport_size()
 	MythosLogger.info("UI/WorldBuilder", "Wizard-style UI ready")
+	
+	# PROFILING: Setup 120-second summary timer
+	_setup_profiling_summary_timer()
 
 
 func _notification(what: int) -> void:
@@ -161,17 +172,107 @@ func _notification(what: int) -> void:
 func _process(delta: float) -> void:
 	"""PROFILING: Per-frame processing - timing instrumentation."""
 	var frame_start: int = Time.get_ticks_usec()
+	profiling_process_calls += 1
 	
 	# Existing per-frame logic would go here (currently none)
 	
 	# PROFILING: Report frame time if >1ms
 	var frame_time: int = Time.get_ticks_usec() - frame_start
+	var frame_time_ms: float = frame_time / 1000.0
 	if frame_time > 1000:  # >1ms
-		print("PROFILING: WorldBuilderUI._process() took: ", frame_time / 1000.0, " ms")
+		profiling_process_over_1ms += 1
+		print("PROFILING: WorldBuilderUI._process() took: ", frame_time_ms, " ms")
+	if frame_time > 10000:  # >10ms
+		profiling_process_over_10ms += 1
 	
 	# PROFILING: Periodic FPS report every 1 second
 	if Engine.get_process_frames() % 60 == 0:
-		print("PROFILING: WorldBuilderUI - Current FPS: ", Engine.get_frames_per_second(), " current_step=", current_step)
+		var fps: float = Engine.get_frames_per_second()
+		profiling_last_fps = fps
+		profiling_fps_samples.append(fps)
+		if profiling_fps_samples.size() > 120:  # Keep last 120 samples (2 minutes)
+			profiling_fps_samples.pop_front()
+		print("PROFILING: WorldBuilderUI - Current FPS: ", fps, " current_step=", current_step)
+
+
+func _setup_profiling_summary_timer() -> void:
+	"""Setup timer to print profiling summary after 120 seconds."""
+	profiling_summary_timer = Timer.new()
+	profiling_summary_timer.name = "ProfilingSummaryTimer"
+	profiling_summary_timer.wait_time = 120.0
+	profiling_summary_timer.one_shot = true
+	profiling_summary_timer.timeout.connect(_print_profiling_summary)
+	add_child(profiling_summary_timer)
+	profiling_summary_timer.start()
+	print("PROFILING: Summary timer started - will print after 120 seconds")
+
+
+func _print_profiling_summary() -> void:
+	"""Print comprehensive profiling summary after 120-second idle test."""
+	print("\n" + "=".repeat(80))
+	print("=== PROFILING SUMMARY AFTER 120s IDLE TEST ===")
+	print("=".repeat(80))
+	
+	# WorldBuilderUI summary
+	var avg_fps: float = 0.0
+	if profiling_fps_samples.size() > 0:
+		var sum: float = 0.0
+		for fps in profiling_fps_samples:
+			sum += fps
+		avg_fps = sum / profiling_fps_samples.size()
+	
+	print("\n--- WorldBuilderUI ---")
+	print("  _process() calls: ", profiling_process_calls)
+	print("  _process() >1ms: ", profiling_process_over_1ms)
+	print("  _process() >10ms: ", profiling_process_over_10ms)
+	print("  Last FPS: ", profiling_last_fps)
+	print("  Avg FPS: ", avg_fps)
+	print("  FPS samples: ", profiling_fps_samples.size())
+	print("  Current step: ", current_step)
+	
+	# MapMakerModule summary
+	if map_maker_module != null and map_maker_module.has_method("get_profiling_summary"):
+		var mm_summary: Dictionary = map_maker_module.get_profiling_summary()
+		print("\n--- MapMakerModule ---")
+		print("  _process() calls: ", mm_summary.get("process_calls", 0))
+		print("  _process() >1ms: ", mm_summary.get("process_over_1ms", 0))
+		print("  _process() >10ms: ", mm_summary.get("process_over_10ms", 0))
+		print("  Input calls: ", mm_summary.get("input_calls", 0))
+		print("  Input >1ms: ", mm_summary.get("input_over_1ms", 0))
+		print("  Last FPS: ", mm_summary.get("last_fps", 0.0))
+		print("  Avg FPS: ", mm_summary.get("avg_fps", 0.0))
+		print("  Is active: ", mm_summary.get("is_active", false))
+		print("  Is processing: ", mm_summary.get("is_processing", false))
+	
+	# MapRenderer summary (via MapMakerModule)
+	if map_maker_module != null and map_maker_module.map_renderer != null:
+		var renderer: MapRenderer = map_maker_module.map_renderer
+		if renderer.has_method("get_profiling_summary"):
+			var renderer_summary: Dictionary = renderer.get_profiling_summary()
+			print("\n--- MapRenderer ---")
+			print("  refresh() calls: ", renderer_summary.get("refresh_calls", 0))
+			print("  refresh() >1ms: ", renderer_summary.get("refresh_over_1ms", 0))
+			print("  refresh() >10ms: ", renderer_summary.get("refresh_over_10ms", 0))
+			print("  Avg refresh time: ", renderer_summary.get("avg_time_ms", 0.0), " ms")
+			print("  Max refresh time: ", renderer_summary.get("max_time_ms", 0.0), " ms")
+			print("  Time samples: ", renderer_summary.get("time_samples_count", 0))
+	
+	# ProceduralWorldMap summary
+	if procedural_world_map != null and procedural_world_map.has_method("get_profiling_summary"):
+		var pwm_summary: Dictionary = procedural_world_map.get_profiling_summary()
+		print("\n--- ProceduralWorldMap ---")
+		print("  _process() calls: ", pwm_summary.get("process_calls", 0))
+		print("  _process() >1ms: ", pwm_summary.get("process_over_1ms", 0))
+		print("  _process() >10ms: ", pwm_summary.get("process_over_10ms", 0))
+		print("  Running while hidden: ", pwm_summary.get("running_while_hidden", 0))
+		print("  Last FPS: ", pwm_summary.get("last_fps", 0.0))
+		print("  Avg FPS: ", pwm_summary.get("avg_fps", 0.0))
+		print("  Visible: ", pwm_summary.get("visible", false))
+		print("  Is processing: ", pwm_summary.get("is_processing", false))
+	
+	print("\n" + "=".repeat(80))
+	print("=== END PROFILING SUMMARY ===")
+	print("=".repeat(80) + "\n")
 
 
 func _apply_hardware_viewport_optimizations() -> void:

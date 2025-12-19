@@ -62,6 +62,15 @@ var refresh_timer: Timer = null
 var pending_refresh: bool = false
 const REFRESH_THROTTLE_MS: float = 0.1  # Max 10 refreshes per second (100ms)
 
+## PROFILING: Data accumulation
+var profiling_process_calls: int = 0
+var profiling_process_over_1ms: int = 0
+var profiling_process_over_10ms: int = 0
+var profiling_input_calls: int = 0
+var profiling_input_over_1ms: int = 0
+var profiling_last_fps: float = 0.0
+var profiling_fps_samples: Array[float] = []
+
 
 func _ready() -> void:
 	"""Initialize MapMakerModule."""
@@ -814,6 +823,7 @@ func _on_viewport_container_input(event: InputEvent) -> void:
 	"""Handle input events from viewport container."""
 	# PROFILING: Time input handling
 	var input_start: int = Time.get_ticks_usec()
+	profiling_input_calls += 1
 	
 	if map_viewport_container == null or not map_viewport_container.is_visible_in_tree():
 		return
@@ -867,8 +877,10 @@ func _on_viewport_container_input(event: InputEvent) -> void:
 	
 	# PROFILING: Report input handling time if >1ms
 	var input_time: int = Time.get_ticks_usec() - input_start
+	var input_time_ms: float = input_time / 1000.0
 	if input_time > 1000:  # >1ms
-		print("PROFILING: MapMakerModule._on_viewport_container_input() took: ", input_time / 1000.0, " ms")
+		profiling_input_over_1ms += 1
+		print("PROFILING: MapMakerModule._on_viewport_container_input() took: ", input_time_ms, " ms")
 
 
 func _screen_to_world_position(screen_pos: Vector2) -> Vector2:
@@ -939,17 +951,27 @@ func deactivate() -> void:
 func _process(delta: float) -> void:
 	"""PROFILING: Per-frame processing - timing instrumentation."""
 	var frame_start: int = Time.get_ticks_usec()
+	profiling_process_calls += 1
 	
 	# Existing per-frame logic would go here (currently none)
 	
 	# PROFILING: Report frame time if >1ms
 	var frame_time: int = Time.get_ticks_usec() - frame_start
+	var frame_time_ms: float = frame_time / 1000.0
 	if frame_time > 1000:  # >1ms
-		print("PROFILING: MapMakerModule._process() took: ", frame_time / 1000.0, " ms")
+		profiling_process_over_1ms += 1
+		print("PROFILING: MapMakerModule._process() took: ", frame_time_ms, " ms")
+	if frame_time > 10000:  # >10ms
+		profiling_process_over_10ms += 1
 	
 	# PROFILING: Periodic FPS report every 1 second
 	if Engine.get_process_frames() % 60 == 0:
-		print("PROFILING: MapMakerModule - Current FPS: ", Engine.get_frames_per_second(), " is_active=", is_active, " is_processing=", is_processing())
+		var fps: float = Engine.get_frames_per_second()
+		profiling_last_fps = fps
+		profiling_fps_samples.append(fps)
+		if profiling_fps_samples.size() > 120:  # Keep last 120 samples (2 minutes)
+			profiling_fps_samples.pop_front()
+		print("PROFILING: MapMakerModule - Current FPS: ", fps, " is_active=", is_active, " is_processing=", is_processing())
 
 
 func _setup_keyboard_shortcuts() -> void:
@@ -966,6 +988,29 @@ func _next_power_of_2(value: int) -> int:
 	while power < value:
 		power *= 2
 	return power
+
+
+func get_profiling_summary() -> Dictionary:
+	"""Get profiling data summary."""
+	var avg_fps: float = 0.0
+	if profiling_fps_samples.size() > 0:
+		var sum: float = 0.0
+		for fps in profiling_fps_samples:
+			sum += fps
+		avg_fps = sum / profiling_fps_samples.size()
+	
+	return {
+		"process_calls": profiling_process_calls,
+		"process_over_1ms": profiling_process_over_1ms,
+		"process_over_10ms": profiling_process_over_10ms,
+		"input_calls": profiling_input_calls,
+		"input_over_1ms": profiling_input_over_1ms,
+		"last_fps": profiling_last_fps,
+		"avg_fps": avg_fps,
+		"fps_samples_count": profiling_fps_samples.size(),
+		"is_active": is_active,
+		"is_processing": is_processing()
+	}
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
