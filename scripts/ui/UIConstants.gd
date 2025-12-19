@@ -51,3 +51,10 @@ const BUTTON_SIZE_TYPE: Vector2 = Vector2(100, 40)  ## Type selection button siz
 # Overlay Sizes
 const OVERLAY_MIN_WIDTH: int = 450  ## Minimum width for performance monitor overlay
 const OVERLAY_MARGIN_LARGE: int = 50  ## Larger margin to prevent clipping
+
+# Performance Monitor Constants
+const PERF_OVERLAY_PADDING: int = 10  ## Padding for performance monitor overlay
+const PERF_GRAPH_WIDTH_RATIO: float = 0.2  ## 20% of viewport width for graphs
+const PERF_GRAPH_HEIGHT: int = 100  ## Fixed height for performance graphs
+const PERF_LABEL_FONT_SIZE: int = 14  ## Smaller font size for performance text
+const PERF_HISTORY_SIZE: int = 120  ## ~2 seconds at 60 FPS for smoother graphs
