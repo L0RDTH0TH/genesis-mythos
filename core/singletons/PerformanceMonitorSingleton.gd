@@ -27,3 +27,9 @@ func _ready() -> void:
 	add_child(monitor_instance, true)
 	MythosLogger.debug("PerformanceMonitorSingleton", "Global Performance Monitor overlay instantiated and added to scene tree")
 	MythosLogger.info("PerformanceMonitorSingleton", "Performance Monitor available globally in all scenes")
+
+
+func set_refresh_time(time_ms: float) -> void:
+	"""Set refresh time for the performance monitor (called from MapRenderer)."""
+	if monitor_instance:
+		monitor_instance.refresh_time_ms = time_ms

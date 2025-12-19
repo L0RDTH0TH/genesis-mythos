@@ -58,3 +58,6 @@ const PERF_GRAPH_WIDTH_RATIO: float = 0.2  ## 20% of viewport width for graphs
 const PERF_GRAPH_HEIGHT: int = 100  ## Fixed height for performance graphs
 const PERF_LABEL_FONT_SIZE: int = 18  ## Smaller font size for performance text
 const PERF_HISTORY_SIZE: int = 120  ## ~2 seconds at 60 FPS for smoother graphs
+const PERF_BOTTOM_BAR_HEIGHT: int = 180  ## Height for DETAILED mode bottom bar overlay
+const PERF_BOTTOM_MARGIN: int = 20  ## Bottom margin for DETAILED mode overlay
+const PERF_REFRESH_THRESHOLD: float = 10.0  ## Threshold (ms) for color-coding refresh time (red if >10ms)

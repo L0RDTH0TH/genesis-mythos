@@ -299,6 +299,10 @@ func _do_actual_refresh() -> void:
 	if profiling_refresh_times.size() > 1000:  # Keep last 1000 samples
 		profiling_refresh_times.pop_front()
 	
+	# Send timing to Performance Monitor overlay
+	if PerformanceMonitorSingleton.monitor_instance:
+		PerformanceMonitorSingleton.set_refresh_time(refresh_time_ms)
+	
 	if refresh_time > 1000:  # >1ms
 		profiling_refresh_over_1ms += 1
 		print("PROFILING: MapRenderer._do_actual_refresh() took: ", refresh_time_ms, " ms")

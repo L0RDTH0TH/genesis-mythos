@@ -15,8 +15,12 @@ enum Mode { OFF, SIMPLE, DETAILED }
 @onready var graphs_container: HBoxContainer = $PerfPanel/Content/GraphsContainer
 @onready var fps_graph: GraphControl = $PerfPanel/Content/GraphsContainer/FPSGraph
 @onready var process_graph: GraphControl = $PerfPanel/Content/GraphsContainer/ProcessGraph
+@onready var refresh_graph: GraphControl = $PerfPanel/Content/GraphsContainer/RefreshGraph
 
 var current_mode: Mode = Mode.OFF : set = set_mode
+
+# Custom timing for MapRenderer.refresh()
+var refresh_time_ms: float = 0.0
 
 # Frame counter for safe RenderingServer initialization (needs 2+ frames)
 var _frame_count: int = 0
@@ -29,6 +33,7 @@ const CATEGORIES: Array[String] = ["All", "Time", "Memory", "Rendering", "Object
 # Time category
 var process_label: Label
 var physics_label: Label
+var refresh_label: Label
 # Memory category
 var memory_label: Label
 var vram_label: Label
@@ -75,6 +80,9 @@ func _ready() -> void:
 	if not process_graph:
 		MythosLogger.error("PerformanceMonitor", "process_graph not found!")
 		return
+	if not refresh_graph:
+		MythosLogger.error("PerformanceMonitor", "refresh_graph not found!")
+		return
 	
 	MythosLogger.debug("PerformanceMonitor", "All @onready nodes validated successfully")
 	
@@ -82,6 +90,7 @@ func _ready() -> void:
 	# Time category
 	process_label = _create_metric_label("Process: -- ms")
 	physics_label = _create_metric_label("Physics: -- ms")
+	refresh_label = _create_metric_label("Refresh: -- ms")
 	# Memory category
 	memory_label = _create_metric_label("Memory: --")
 	vram_label = _create_metric_label("VRAM: --")
@@ -96,7 +105,7 @@ func _ready() -> void:
 	
 	# Add all labels to container
 	var all_labels: Array[Label] = [
-		process_label, physics_label,  # Time
+		process_label, physics_label, refresh_label,  # Time
 		memory_label, vram_label, texture_mem_label,  # Memory
 		draw_calls_label, primitives_label, objects_drawn_label,  # Rendering
 		object_label, node_label  # Objects
@@ -137,6 +146,9 @@ func _ready() -> void:
 	process_graph.max_value = 16.67  # 60 FPS budget
 	process_graph.line_color = Color(1.0, 0.8, 0.2)
 	
+	refresh_graph.max_value = 16.67  # 60 FPS budget (same as process)
+	refresh_graph.line_color = Color(1.0, 0.3, 0.3)  # Red for refresh bottleneck
+	
 	# Apply theme stylebox for overlay (moved from programmatic creation to theme)
 	var theme_stylebox: StyleBox = perf_panel.get_theme_stylebox("perf_overlay", "PanelContainer")
 	if theme_stylebox:
@@ -158,12 +170,11 @@ func _ready() -> void:
 		stylebox.corner_radius_bottom_left = 6
 		perf_panel.add_theme_stylebox_override("panel", stylebox)
 	
-	# Apply panel positioning (remove magic numbers from scene)
-	_apply_panel_positioning()
-	
 	# Resize handling
 	get_viewport().connect("size_changed", _on_viewport_resized)
-	_on_viewport_resized()
+	
+	# Apply initial layout based on mode
+	_update_layout_for_mode()
 	
 	# Ensure CanvasLayer is visible and in tree
 	visible = true
@@ -243,6 +254,7 @@ func set_mode(new_mode: Mode) -> void:
 			if graphs_container:
 				graphs_container.visible = false
 			set_process(true)
+			_update_layout_for_mode()
 		Mode.DETAILED:
 			MythosLogger.debug("PerformanceMonitor", "Setting DETAILED mode - showing all metrics and graphs")
 			if perf_panel:
@@ -255,6 +267,7 @@ func set_mode(new_mode: Mode) -> void:
 				graphs_container.visible = true
 				MythosLogger.debug("PerformanceMonitor", "graphs_container.visible = %s" % graphs_container.visible)
 			set_process(true)
+			_update_layout_for_mode()
 	
 	MythosLogger.debug("PerformanceMonitor", "Mode set complete - perf_panel exists: %s, visible: %s" % [perf_panel != null, perf_panel.visible if perf_panel else "N/A"])
 	_save_mode()
@@ -281,6 +294,15 @@ func _process(_delta: float) -> void:
 		fps_graph.add_value(fps)
 		var process_ms: float = Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
 		process_graph.add_value(process_ms)
+		refresh_graph.add_value(refresh_time_ms)
+		
+		# Update refresh label with color coding
+		if refresh_label:
+			refresh_label.text = "Refresh: %.2f ms" % refresh_time_ms
+			if refresh_time_ms > UIConstants.PERF_REFRESH_THRESHOLD:
+				refresh_label.modulate = fps_bad_color  # Red if >10ms
+			else:
+				refresh_label.modulate = Color.WHITE  # Normal color if <=10ms
 
 func _update_detailed_metrics() -> void:
 	"""Update all detailed metric labels."""
@@ -325,47 +347,70 @@ func _format_memory(bytes: int) -> String:
 	else:
 		return "%.2f GB" % (b / 1073741824.0)
 
-func _apply_panel_positioning() -> void:
-	"""Apply panel positioning using UIConstants instead of magic numbers."""
+func _update_layout_for_mode() -> void:
+	"""Update panel layout based on current mode (SIMPLE = top-right, DETAILED = bottom full-width)."""
 	if not perf_panel:
 		return
 	
-	var margin: int = UIConstants.SPACING_SMALL
-	var min_width: int = UIConstants.OVERLAY_MIN_WIDTH
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var margin: int = UIConstants.SPACING_MEDIUM
 	
-	# Set offsets using UIConstants (top-right positioning)
-	perf_panel.offset_left = -min_width - margin
-	perf_panel.offset_top = margin
-	perf_panel.offset_right = -margin
-	perf_panel.offset_bottom = margin
-	
-	# Set minimum size
-	perf_panel.custom_minimum_size = Vector2(min_width, 0)
-	
-	MythosLogger.debug("PerformanceMonitor", "Panel positioning applied (offset_left: %d, min_width: %d)" % [perf_panel.offset_left, min_width])
+	match current_mode:
+		Mode.SIMPLE:
+			# Top-right positioning
+			perf_panel.anchors_preset = Control.PRESET_TOP_RIGHT
+			perf_panel.anchor_left = 1.0
+			perf_panel.anchor_top = 0.0
+			perf_panel.anchor_right = 1.0
+			perf_panel.anchor_bottom = 0.0
+			perf_panel.offset_left = -UIConstants.OVERLAY_MIN_WIDTH - margin
+			perf_panel.offset_top = UIConstants.SPACING_SMALL
+			perf_panel.offset_right = -UIConstants.SPACING_SMALL
+			perf_panel.offset_bottom = UIConstants.SPACING_SMALL
+			perf_panel.custom_minimum_size = Vector2(UIConstants.OVERLAY_MIN_WIDTH, 0)
+			MythosLogger.debug("PerformanceMonitor", "Layout updated for SIMPLE mode (top-right)")
+			# Update graph sizes for SIMPLE mode
+			var graph_width: float = viewport_size.x * UIConstants.PERF_GRAPH_WIDTH_RATIO
+			if fps_graph:
+				fps_graph.custom_minimum_size.x = graph_width
+				fps_graph.custom_minimum_size.y = UIConstants.PERF_GRAPH_HEIGHT
+			if process_graph:
+				process_graph.custom_minimum_size.x = graph_width
+				process_graph.custom_minimum_size.y = UIConstants.PERF_GRAPH_HEIGHT
+			if refresh_graph:
+				refresh_graph.custom_minimum_size.x = graph_width
+				refresh_graph.custom_minimum_size.y = UIConstants.PERF_GRAPH_HEIGHT
+		Mode.DETAILED:
+			# Bottom full-width positioning
+			perf_panel.anchors_preset = Control.PRESET_FULL_RECT
+			perf_panel.anchor_left = 0.0
+			perf_panel.anchor_top = 1.0
+			perf_panel.anchor_right = 1.0
+			perf_panel.anchor_bottom = 1.0
+			perf_panel.offset_left = margin
+			perf_panel.offset_top = -UIConstants.PERF_BOTTOM_BAR_HEIGHT - UIConstants.PERF_BOTTOM_MARGIN
+			perf_panel.offset_right = -margin
+			perf_panel.offset_bottom = -UIConstants.PERF_BOTTOM_MARGIN
+			perf_panel.custom_minimum_size = Vector2(0, UIConstants.PERF_BOTTOM_BAR_HEIGHT)
+			MythosLogger.debug("PerformanceMonitor", "Layout updated for DETAILED mode (bottom full-width)")
+			# In DETAILED mode, graphs fill horizontal space equally via size flags, just set height
+			if fps_graph:
+				fps_graph.custom_minimum_size.y = UIConstants.PERF_GRAPH_HEIGHT
+			if process_graph:
+				process_graph.custom_minimum_size.y = UIConstants.PERF_GRAPH_HEIGHT
+			if refresh_graph:
+				refresh_graph.custom_minimum_size.y = UIConstants.PERF_GRAPH_HEIGHT
+		_:
+			# OFF mode - layout doesn't matter
+			pass
 
 func _on_viewport_resized() -> void:
-	"""Handle viewport resize to update graph sizes and panel positioning."""
+	"""Handle viewport resize to update panel layout and graph sizes."""
 	var vp_size: Vector2 = get_viewport().get_visible_rect().size
 	MythosLogger.debug("PerformanceMonitor", "Viewport resized to: %s" % vp_size)
 	
-	# Update graph sizes
-	var graph_width: float = vp_size.x * UIConstants.PERF_GRAPH_WIDTH_RATIO
-	if fps_graph:
-		fps_graph.custom_minimum_size.x = graph_width
-		fps_graph.custom_minimum_size.y = UIConstants.PERF_GRAPH_HEIGHT
-	if process_graph:
-		process_graph.custom_minimum_size.x = graph_width
-		process_graph.custom_minimum_size.y = UIConstants.PERF_GRAPH_HEIGHT
-	
-	# Reapply panel positioning (responsive to viewport size)
-	_apply_panel_positioning()
-	
-	# Ensure panel has minimum width to be visible (responsive calculation)
-	if perf_panel:
-		var min_width: float = max(float(UIConstants.OVERLAY_MIN_WIDTH), vp_size.x * 0.15)
-		perf_panel.custom_minimum_size.x = min_width
-		MythosLogger.debug("PerformanceMonitor", "Panel min width set to: %s" % min_width)
+	# Reapply layout based on current mode (this will also update graph sizes)
+	_update_layout_for_mode()
 
 func _save_mode() -> void:
 	"""Save current mode to user settings with error handling."""
@@ -412,7 +457,7 @@ func _load_saved_mode() -> void:
 func _apply_category_filter(category: String) -> void:
 	"""Show/hide metrics based on selected category."""
 	# Time category
-	var time_labels: Array[Label] = [process_label, physics_label]
+	var time_labels: Array[Label] = [process_label, physics_label, refresh_label]
 	# Memory category
 	var memory_labels: Array[Label] = [memory_label, vram_label, texture_mem_label]
 	# Rendering category
@@ -506,3 +551,5 @@ func export_snapshot() -> void:
 	
 	file.close()
 	MythosLogger.info("PerformanceMonitor", "Snapshot exported to: %s" % file_path)
+
+
