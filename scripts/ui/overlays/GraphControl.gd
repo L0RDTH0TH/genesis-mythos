@@ -118,11 +118,15 @@ func _draw() -> void:
 		if idx >= 0 and idx < history.size():
 			var x: float = (float(i) / max(count - 1, 1)) * size.x
 			var y: float = size.y * (1.0 - ((history[idx] - min_val) / max(max_val - min_val, 0.001)))
+			y = clamp(y, 0.0, size.y)  # Clamp to graph bounds
 			points.append(Vector2(x, y))
 	
 	# Draw filled area under curve (semi-transparent)
 	if points.size() > 1:
 		var filled_points: PackedVector2Array = points.duplicate()
+		# Clamp all y-coordinates to graph bounds before adding bottom corners
+		for i in range(filled_points.size()):
+			filled_points[i].y = clamp(filled_points[i].y, 0.0, size.y)
 		# Add bottom corners to close the polygon
 		filled_points.append(Vector2(points[points.size() - 1].x, size.y))
 		filled_points.append(Vector2(points[0].x, size.y))
@@ -135,9 +139,11 @@ func _draw() -> void:
 	if points.size() > 1:
 		draw_polyline(points, line_color, 2.0)
 	
-	# Current value dot
+	# Current value dot (clamp position to graph bounds)
 	if points.size() > 0:
-		draw_circle(points[points.size() - 1], 4.0, line_color)
+		var dot_pos: Vector2 = points[points.size() - 1]
+		dot_pos.y = clamp(dot_pos.y, 0.0, size.y)
+		draw_circle(dot_pos, 4.0, line_color)
 	
 	# Update min/max labels
 	if min_label and max_label:

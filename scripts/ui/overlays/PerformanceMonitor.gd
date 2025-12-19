@@ -165,14 +165,14 @@ func _ready() -> void:
 	refresh_graph.max_value = 16.67  # 60 FPS budget (same as process)
 	refresh_graph.line_color = Color(1.0, 0.3, 0.3)  # Red for refresh bottleneck
 	
-	# Configure bottom graphs
-	bottom_fps_graph.max_value = 60.0
+	# Configure bottom graphs with headroom for spikes
+	bottom_fps_graph.max_value = 120.0  # Give headroom above 60 FPS
 	bottom_fps_graph.line_color = Color(0.2, 1.0, 0.2)
 	
-	bottom_process_graph.max_value = 16.67  # 60 FPS budget
+	bottom_process_graph.max_value = 33.33  # Headroom for 30 FPS budget
 	bottom_process_graph.line_color = Color(1.0, 1.0, 0.2)
 	
-	bottom_refresh_graph.max_value = 16.67  # 60 FPS budget
+	bottom_refresh_graph.max_value = 33.33  # Headroom for refresh spikes
 	bottom_refresh_graph.line_color = Color(1.0, 0.3, 0.3)  # Red for refresh bottleneck
 	
 	# Apply theme stylebox for overlay (moved from programmatic creation to theme)
@@ -431,10 +431,18 @@ func _update_bottom_graph_bar() -> void:
 	bottom_graph_bar.offset_bottom = -UIConstants.BOTTOM_GRAPH_BAR_MARGIN
 	bottom_graph_bar.custom_minimum_size = Vector2(0, UIConstants.BOTTOM_GRAPH_BAR_HEIGHT)
 	
+	# Update graph heights to use new constant
+	if bottom_fps_graph:
+		bottom_fps_graph.custom_minimum_size.y = UIConstants.GRAPH_INNER_HEIGHT
+	if bottom_process_graph:
+		bottom_process_graph.custom_minimum_size.y = UIConstants.GRAPH_INNER_HEIGHT
+	if bottom_refresh_graph:
+		bottom_refresh_graph.custom_minimum_size.y = UIConstants.GRAPH_INNER_HEIGHT
+	
 	# Set visibility based on mode
 	bottom_graph_bar.visible = (current_mode == Mode.DETAILED)
 	
-	MythosLogger.debug("PerformanceMonitor", "Bottom graph bar updated (visible: %s)" % bottom_graph_bar.visible)
+	MythosLogger.debug("PerformanceMonitor", "Bottom graph bar updated (visible: %s, height: %d)" % [bottom_graph_bar.visible, UIConstants.BOTTOM_GRAPH_BAR_HEIGHT])
 
 func _on_viewport_resized() -> void:
 	"""Handle viewport resize to update panel layout and graph sizes."""

@@ -61,5 +61,6 @@ const PERF_HISTORY_SIZE: int = 120  ## ~2 seconds at 60 FPS for smoother graphs
 const PERF_BOTTOM_BAR_HEIGHT: int = 180  ## Height for DETAILED mode bottom bar overlay
 const PERF_BOTTOM_MARGIN: int = 20  ## Bottom margin for DETAILED mode overlay
 const PERF_REFRESH_THRESHOLD: float = 10.0  ## Threshold (ms) for color-coding refresh time (red if >10ms)
-const BOTTOM_GRAPH_BAR_HEIGHT: int = 160  ## Height for bottom graph bar in DETAILED mode
+const BOTTOM_GRAPH_BAR_HEIGHT: int = 480  ## Height for bottom graph bar in DETAILED mode
 const BOTTOM_GRAPH_BAR_MARGIN: int = 20  ## Bottom margin for graph bar
+const GRAPH_INNER_HEIGHT: int = 140  ## Individual graph height with padding

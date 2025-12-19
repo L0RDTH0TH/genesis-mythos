@@ -96,25 +96,32 @@ theme_override_constants/margin_bottom = 10
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-theme_override_constants/separation = 20
+theme_override_constants/separation = 40
 
 [node name="BottomFPSGraph" type="Control" parent="BottomGraphBar/MarginContainer/BottomGraphsContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-custom_minimum_size = Vector2(0, 100)
+custom_minimum_size = Vector2(0, 140)
+script = ExtResource("2_graph_control")
+
+[node name="BottomFPSGraph" type="Control" parent="BottomGraphBar/MarginContainer/BottomGraphsContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 140)
 script = ExtResource("2_graph_control")
 
 [node name="BottomProcessGraph" type="Control" parent="BottomGraphBar/MarginContainer/BottomGraphsContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-custom_minimum_size = Vector2(0, 100)
+custom_minimum_size = Vector2(0, 140)
 script = ExtResource("2_graph_control")
 
 [node name="BottomRefreshGraph" type="Control" parent="BottomGraphBar/MarginContainer/BottomGraphsContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-custom_minimum_size = Vector2(0, 100)
+custom_minimum_size = Vector2(0, 140)
 script = ExtResource("2_graph_control")
