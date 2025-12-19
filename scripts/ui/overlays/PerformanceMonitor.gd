@@ -37,6 +37,30 @@ var mode_names: Array[String] = ["OFF", "SIMPLE", "DETAILED"]
 
 func _ready() -> void:
 	"""Initialize performance monitor with labels, graphs, and settings."""
+	MythosLogger.debug("PerformanceMonitor", "_ready() starting initialization")
+	
+	# Validate all @onready nodes exist
+	if not perf_panel:
+		MythosLogger.error("PerformanceMonitor", "perf_panel not found!")
+		return
+	if not fps_label:
+		MythosLogger.error("PerformanceMonitor", "fps_label not found!")
+		return
+	if not metrics_container:
+		MythosLogger.error("PerformanceMonitor", "metrics_container not found!")
+		return
+	if not graphs_container:
+		MythosLogger.error("PerformanceMonitor", "graphs_container not found!")
+		return
+	if not fps_graph:
+		MythosLogger.error("PerformanceMonitor", "fps_graph not found!")
+		return
+	if not process_graph:
+		MythosLogger.error("PerformanceMonitor", "process_graph not found!")
+		return
+	
+	MythosLogger.debug("PerformanceMonitor", "All @onready nodes validated successfully")
+	
 	# Create metric labels
 	process_label = _create_metric_label("Process: -- ms")
 	physics_label = _create_metric_label("Physics: -- ms")
@@ -77,8 +101,31 @@ func _ready() -> void:
 	get_viewport().connect("size_changed", _on_viewport_resized)
 	_on_viewport_resized()
 	
-	# Load saved mode
-	_load_saved_mode()
+	# Ensure CanvasLayer is visible and in tree
+	visible = true
+	MythosLogger.debug("PerformanceMonitor", "CanvasLayer visible: %s, in tree: %s" % [visible, is_inside_tree()])
+	
+	# Ensure panel has minimum size
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	MythosLogger.debug("PerformanceMonitor", "Viewport size: %s" % viewport_size)
+	
+	# DEBUG: Force DETAILED mode for testing visibility
+	MythosLogger.debug("PerformanceMonitor", "_ready() called - forcing DETAILED mode for debugging")
+	set_mode(Mode.DETAILED)
+	
+	# Force panel to be visible and check its state
+	call_deferred("_verify_panel_visibility")
+	
+	# Load saved mode (commented out for debugging)
+	# _load_saved_mode()
+
+func _verify_panel_visibility() -> void:
+	"""Verify panel visibility state after deferred call."""
+	if perf_panel:
+		MythosLogger.debug("PerformanceMonitor", "Panel state - visible: %s, size: %s, position: %s" % [perf_panel.visible, perf_panel.size, perf_panel.position])
+		MythosLogger.debug("PerformanceMonitor", "Panel global_position: %s, rect: %s" % [perf_panel.global_position, perf_panel.get_rect()])
+	else:
+		MythosLogger.error("PerformanceMonitor", "perf_panel is null in _verify_panel_visibility!")
 
 func _create_metric_label(text: String) -> Label:
 	"""Create a metric label with right alignment."""
@@ -89,35 +136,63 @@ func _create_metric_label(text: String) -> Label:
 
 func _input(event: InputEvent) -> void:
 	"""Handle input for toggling performance monitor."""
-	if event.is_action_pressed("toggle_perf_monitor"):
-		cycle_mode()
-		get_viewport().set_input_as_handled()
+	# Only log key events to reduce spam
+	if event is InputEventKey:
+		if event.is_action_pressed("toggle_perf_monitor"):
+			MythosLogger.debug("PerformanceMonitor", "F3 pressed via action - cycling mode")
+			cycle_mode()
+			get_viewport().set_input_as_handled()
+
+func _unhandled_input(event: InputEvent) -> void:
+	"""Handle unhandled input as fallback for key detection."""
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.physical_keycode == KEY_F3:
+			MythosLogger.debug("PerformanceMonitor", "F3 detected via _unhandled_input - cycling mode")
+			cycle_mode()
+			get_viewport().set_input_as_handled()
 
 func cycle_mode() -> void:
 	"""Toggles performance monitor mode."""
-	current_mode = (current_mode + 1) % Mode.size()
+	var old_mode: int = current_mode
+	var new_mode: Mode = (current_mode + 1) % Mode.size()
+	MythosLogger.debug("PerformanceMonitor", "Mode cycled: %s -> %s" % [mode_names[old_mode], mode_names[new_mode]])
+	set_mode(new_mode)
 
 func set_mode(new_mode: Mode) -> void:
 	"""Set the performance monitor mode with logging."""
 	current_mode = new_mode
 	
-	MythosLogger.debug("PerformanceMonitor", "Mode changed to: %s" % mode_names[current_mode])
+	MythosLogger.debug("PerformanceMonitor", "set_mode() called: %s" % mode_names[current_mode])
 	
 	match current_mode:
 		Mode.OFF:
-			perf_panel.visible = false
+			MythosLogger.debug("PerformanceMonitor", "Setting OFF mode - hiding panel")
+			if perf_panel:
+				perf_panel.visible = false
 			set_process(false)
 		Mode.SIMPLE:
-			perf_panel.visible = true
-			metrics_container.visible = false
-			graphs_container.visible = false
+			MythosLogger.debug("PerformanceMonitor", "Setting SIMPLE mode - showing FPS only")
+			if perf_panel:
+				perf_panel.visible = true
+			if metrics_container:
+				metrics_container.visible = false
+			if graphs_container:
+				graphs_container.visible = false
 			set_process(true)
 		Mode.DETAILED:
-			perf_panel.visible = true
-			metrics_container.visible = true
-			graphs_container.visible = true
+			MythosLogger.debug("PerformanceMonitor", "Setting DETAILED mode - showing all metrics and graphs")
+			if perf_panel:
+				perf_panel.visible = true
+				MythosLogger.debug("PerformanceMonitor", "perf_panel.visible = %s" % perf_panel.visible)
+			if metrics_container:
+				metrics_container.visible = true
+				MythosLogger.debug("PerformanceMonitor", "metrics_container.visible = %s" % metrics_container.visible)
+			if graphs_container:
+				graphs_container.visible = true
+				MythosLogger.debug("PerformanceMonitor", "graphs_container.visible = %s" % graphs_container.visible)
 			set_process(true)
 	
+	MythosLogger.debug("PerformanceMonitor", "Mode set complete - perf_panel exists: %s, visible: %s" % [perf_panel != null, perf_panel.visible if perf_panel else "N/A"])
 	_save_mode()
 
 func _process(_delta: float) -> void:
@@ -168,11 +243,22 @@ func _format_memory(bytes: int) -> String:
 func _on_viewport_resized() -> void:
 	"""Handle viewport resize to update graph sizes."""
 	var vp_size: Vector2 = get_viewport().get_visible_rect().size
+	MythosLogger.debug("PerformanceMonitor", "Viewport resized to: %s" % vp_size)
+	
 	var graph_width: float = vp_size.x * UIConstants.PERF_GRAPH_WIDTH_RATIO
-	fps_graph.custom_minimum_size.x = graph_width
-	process_graph.custom_minimum_size.x = graph_width
-	fps_graph.custom_minimum_size.y = UIConstants.PERF_GRAPH_HEIGHT
-	process_graph.custom_minimum_size.y = UIConstants.PERF_GRAPH_HEIGHT
+	if fps_graph:
+		fps_graph.custom_minimum_size.x = graph_width
+		fps_graph.custom_minimum_size.y = UIConstants.PERF_GRAPH_HEIGHT
+	if process_graph:
+		process_graph.custom_minimum_size.x = graph_width
+		process_graph.custom_minimum_size.y = UIConstants.PERF_GRAPH_HEIGHT
+	
+	# Ensure panel has minimum width to be visible
+	if perf_panel:
+		# PanelContainer will size to content, but ensure it's not too narrow
+		var min_width: float = max(300.0, vp_size.x * 0.15)  # At least 300px or 15% of viewport
+		perf_panel.custom_minimum_size.x = min_width
+		MythosLogger.debug("PerformanceMonitor", "Panel min width set to: %s" % min_width)
 
 func _save_mode() -> void:
 	"""Save current mode to user settings with error handling."""

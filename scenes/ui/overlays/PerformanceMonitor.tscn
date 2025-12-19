@@ -15,12 +15,13 @@ anchor_left = 1.0
 anchor_top = 0.0
 anchor_right = 1.0
 anchor_bottom = 0.0
-offset_left = -450
+offset_left = -400
 offset_top = 10
 offset_right = -10
 offset_bottom = 10
 grow_horizontal = 0
 grow_vertical = 2
+custom_minimum_size = Vector2(300, 0)
 theme = ExtResource("3_theme")
 mouse_filter = 2
 
