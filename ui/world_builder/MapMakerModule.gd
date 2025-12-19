@@ -54,6 +54,11 @@ var mini_3d_world: Node3D = null
 var mini_3d_camera: Camera3D = null
 var mini_3d_terrain: Node = null
 
+## Refresh throttling for brush tools (prevents excessive refresh calls)
+var refresh_timer: Timer = null
+var pending_refresh: bool = false
+const REFRESH_THROTTLE_MS: float = 0.1  # Max 10 refreshes per second (100ms)
+
 
 func _ready() -> void:
 	"""Initialize MapMakerModule."""
@@ -66,6 +71,7 @@ func _ready() -> void:
 	_setup_marker_manager()
 	# _setup_mini_3d_preview()  # TODO: Implement in future phase
 	_setup_keyboard_shortcuts()
+	_setup_refresh_throttling()
 	print("DEBUG: MapMakerModule._ready() complete")
 
 
@@ -823,7 +829,9 @@ func _on_viewport_container_input(event: InputEvent) -> void:
 			if mouse_event.button_index == MOUSE_BUTTON_LEFT:
 				if map_editor != null:
 					map_editor.end_paint()
+				# Final refresh on mouse release (immediate, not throttled)
 				if map_renderer != null:
+					pending_refresh = false  # Cancel pending, do immediate refresh
 					map_renderer.refresh()
 	
 	elif event is InputEventMouseMotion:
@@ -836,9 +844,15 @@ func _on_viewport_container_input(event: InputEvent) -> void:
 				map_camera.position -= mouse_event.relative / map_camera.zoom
 		elif map_editor != null:
 			# Handle painting
+			var paint_start_time: int = Time.get_ticks_msec()
 			map_editor.continue_paint(world_pos)
+			var paint_time: float = (Time.get_ticks_msec() - paint_start_time) / 1000.0
+			if paint_time > 0.016:  # Log if > 16ms (60 FPS threshold)
+				MythosLogger.warn("UI/MapMaker", "Paint operation took %f ms" % (paint_time * 1000.0))
+			
+			# Throttled refresh: mark as pending instead of immediate refresh
 			if map_editor.is_painting and map_renderer != null:
-				map_renderer.refresh()
+				pending_refresh = true
 
 
 func _screen_to_world_position(screen_pos: Vector2) -> Vector2:
@@ -865,6 +879,29 @@ func _screen_to_world_position(screen_pos: Vector2) -> Vector2:
 	var world_pos: Vector2 = camera_pos + world_offset
 	
 	return world_pos
+
+
+func _setup_refresh_throttling() -> void:
+	"""Setup refresh throttling timer to prevent excessive refresh calls during brush painting."""
+	refresh_timer = Timer.new()
+	refresh_timer.name = "RefreshThrottleTimer"
+	refresh_timer.wait_time = REFRESH_THROTTLE_MS
+	refresh_timer.one_shot = false
+	refresh_timer.timeout.connect(_on_refresh_timer_timeout)
+	add_child(refresh_timer)
+	refresh_timer.start()
+	MythosLogger.debug("UI/MapMaker", "Refresh throttling enabled", {"throttle_ms": REFRESH_THROTTLE_MS * 1000.0})
+
+
+func _on_refresh_timer_timeout() -> void:
+	"""Handle refresh timer timeout - perform pending refresh if needed."""
+	if pending_refresh and map_renderer != null:
+		var refresh_start_time: int = Time.get_ticks_msec()
+		map_renderer.refresh()
+		var refresh_time: float = (Time.get_ticks_msec() - refresh_start_time) / 1000.0
+		if refresh_time > 0.016:  # Log if > 16ms (60 FPS threshold)
+			MythosLogger.warn("UI/MapMaker", "Throttled renderer refresh took %f ms" % (refresh_time * 1000.0))
+		pending_refresh = false
 
 
 func _setup_keyboard_shortcuts() -> void:

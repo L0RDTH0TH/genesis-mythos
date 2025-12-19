@@ -184,6 +184,12 @@ func _ready():
 	_start_map_update(false)
 
 func _process(delta):
+	# PROFILING: Log if processing while hidden
+	if not visible and incremental_quality:
+		# Only log once per second to avoid spam
+		if Engine.get_process_frames() % 60 == 0:
+			print("PROFILING: ProceduralWorldMap._process() running while hidden!")
+	
 	# start the idling timeout when the map has been fast rendered
 	if incremental_quality and image_changed and incremental_timer.is_stopped():
 		image_changed=false

@@ -140,7 +140,9 @@ func _ready() -> void:
 	# Hide ProceduralWorldMap by default - MapMakerModule is the primary renderer
 	if procedural_world_map != null:
 		procedural_world_map.visible = false
-		MythosLogger.debug("UI/WorldBuilder", "ProceduralWorldMap hidden by default (fallback only)")
+		# Disable _process() when hidden to save CPU cycles
+		procedural_world_map.set_process(false)
+		MythosLogger.debug("UI/WorldBuilder", "ProceduralWorldMap hidden and processing disabled (fallback only)")
 	
 	_update_step_display()
 	# Update viewport size after layout is ready
@@ -2052,6 +2054,10 @@ func _update_terrain_live() -> void:
 	if current_step != 2:
 		return
 	
+	# PROFILING: Log terrain update
+	var update_start_time: int = Time.get_ticks_msec()
+	MythosLogger.debug("UI/WorldBuilder", "PROFILING: _update_terrain_live() called")
+	
 	var terrain_params: Dictionary = step_data.get("Terrain", {})
 	if terrain_params.is_empty():
 		return
@@ -2066,12 +2072,16 @@ func _update_terrain_live() -> void:
 	# Generate terrain
 	if terrain_manager.has_method("generate_from_noise"):
 		terrain_manager.generate_from_noise(seed_value, frequency, min_height, max_height)
+		var update_time: float = (Time.get_ticks_msec() - update_start_time) / 1000.0
+		MythosLogger.warn("UI/WorldBuilder", "PROFILING: Terrain3D update took %f ms" % (update_time * 1000.0))
 		# Update preview
 		call_deferred("_update_preview_terrain")
 	else:
 		# Fallback: use generate_initial_terrain if available
 		if terrain_manager.has_method("generate_initial_terrain"):
 			terrain_manager.generate_initial_terrain()
+			var update_time: float = (Time.get_ticks_msec() - update_start_time) / 1000.0
+			MythosLogger.warn("UI/WorldBuilder", "PROFILING: Terrain3D update took %f ms" % (update_time * 1000.0))
 			call_deferred("_update_preview_terrain")
 
 
@@ -2510,6 +2520,7 @@ func _on_generate_map_pressed() -> void:
 		
 		# Make ProceduralWorldMap visible temporarily for fallback
 		procedural_world_map.visible = true
+		procedural_world_map.set_process(true)
 		
 		# Hide MapMakerModule if it exists (fallback mode)
 		if map_maker_module != null:
@@ -2567,6 +2578,7 @@ func _on_map_generation_complete_fallback() -> void:
 	# Ensure it's visible - the map should already be rendering from the refresh() call
 	if procedural_world_map != null:
 		procedural_world_map.visible = true
+		procedural_world_map.set_process(true)
 		MythosLogger.debug("UI/WorldBuilder", "ProceduralWorldMap fallback display confirmed", {
 			"visible": procedural_world_map.visible,
 			"has_material": procedural_world_map.material != null,
