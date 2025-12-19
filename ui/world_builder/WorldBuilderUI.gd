@@ -158,6 +158,22 @@ func _notification(what: int) -> void:
 		_update_viewport_size()
 
 
+func _process(delta: float) -> void:
+	"""PROFILING: Per-frame processing - timing instrumentation."""
+	var frame_start: int = Time.get_ticks_usec()
+	
+	# Existing per-frame logic would go here (currently none)
+	
+	# PROFILING: Report frame time if >1ms
+	var frame_time: int = Time.get_ticks_usec() - frame_start
+	if frame_time > 1000:  # >1ms
+		print("PROFILING: WorldBuilderUI._process() took: ", frame_time / 1000.0, " ms")
+	
+	# PROFILING: Periodic FPS report every 1 second
+	if Engine.get_process_frames() % 60 == 0:
+		print("PROFILING: WorldBuilderUI - Current FPS: ", Engine.get_frames_per_second(), " current_step=", current_step)
+
+
 func _apply_hardware_viewport_optimizations() -> void:
 	"""Apply hardware-based optimizations to viewports."""
 	if hardware_profiler == null:

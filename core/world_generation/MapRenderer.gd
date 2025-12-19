@@ -198,7 +198,8 @@ func set_light_direction(direction: Vector2) -> void:
 
 
 func refresh() -> void:
-	"""Refresh rendering (call after map data changes) - PROFILING ENABLED."""
+	"""Refresh rendering (call after map data changes)."""
+	# PROFILING: Time refresh operation
 	var refresh_start: int = Time.get_ticks_usec()
 	
 	MythosLogger.verbose("World/Rendering", "refresh() called")
@@ -235,6 +236,7 @@ func refresh() -> void:
 	else:
 		MythosLogger.error("World/Rendering", "render_target is null!")
 	
+	# PROFILING: Report refresh time if >1ms
 	var refresh_time: int = Time.get_ticks_usec() - refresh_start
 	if refresh_time > 1000:  # >1ms
 		print("PROFILING: MapRenderer.refresh() took: ", refresh_time / 1000.0, " ms")

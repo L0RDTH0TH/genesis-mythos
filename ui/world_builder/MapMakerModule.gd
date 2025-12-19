@@ -811,11 +811,12 @@ func _update_viewport_size() -> void:
 
 
 func _on_viewport_container_input(event: InputEvent) -> void:
-	"""Handle input events from viewport container - PROFILING ENABLED."""
+	"""Handle input events from viewport container."""
+	# PROFILING: Time input handling
+	var input_start: int = Time.get_ticks_usec()
+	
 	if map_viewport_container == null or not map_viewport_container.is_visible_in_tree():
 		return
-	
-	var input_start: int = Time.get_ticks_usec()
 	
 	# Handle mouse input for editing
 	if event is InputEventMouseButton:
@@ -864,9 +865,10 @@ func _on_viewport_container_input(event: InputEvent) -> void:
 			if map_editor.is_painting and map_renderer != null:
 				pending_refresh = true
 	
+	# PROFILING: Report input handling time if >1ms
 	var input_time: int = Time.get_ticks_usec() - input_start
 	if input_time > 1000:  # >1ms
-		print("PROFILING: MapMakerModule._on_viewport_container_input took: ", input_time / 1000.0, " ms")
+		print("PROFILING: MapMakerModule._on_viewport_container_input() took: ", input_time / 1000.0, " ms")
 
 
 func _screen_to_world_position(screen_pos: Vector2) -> Vector2:
@@ -918,25 +920,6 @@ func _on_refresh_timer_timeout() -> void:
 		pending_refresh = false
 
 
-func _process(delta: float) -> void:
-	"""Process per-frame updates - PROFILING ENABLED."""
-	if not is_active:
-		return
-	
-	var frame_start: int = Time.get_ticks_usec()
-	
-	# Existing per-frame logic would go here (currently none)
-	
-	var frame_time: int = Time.get_ticks_usec() - frame_start
-	if frame_time > 1000:  # >1ms
-		print("PROFILING: MapMakerModule._process took: ", frame_time / 1000.0, " ms")
-	
-	# Periodic FPS reporting (every 1 second)
-	if Engine.get_process_frames() % 60 == 0:
-		var current_fps: float = Engine.get_frames_per_second()
-		print("PROFILING: MapMakerModule - Current FPS: ", current_fps, " | is_active: ", is_active, " | visible: ", visible)
-
-
 func activate() -> void:
 	"""Activate module - enable processing."""
 	is_active = true
@@ -951,6 +934,22 @@ func deactivate() -> void:
 	set_process(false)
 	set_physics_process(false)
 	MythosLogger.debug("UI/MapMaker", "MapMakerModule deactivated")
+
+
+func _process(delta: float) -> void:
+	"""PROFILING: Per-frame processing - timing instrumentation."""
+	var frame_start: int = Time.get_ticks_usec()
+	
+	# Existing per-frame logic would go here (currently none)
+	
+	# PROFILING: Report frame time if >1ms
+	var frame_time: int = Time.get_ticks_usec() - frame_start
+	if frame_time > 1000:  # >1ms
+		print("PROFILING: MapMakerModule._process() took: ", frame_time / 1000.0, " ms")
+	
+	# PROFILING: Periodic FPS report every 1 second
+	if Engine.get_process_frames() % 60 == 0:
+		print("PROFILING: MapMakerModule - Current FPS: ", Engine.get_frames_per_second(), " is_active=", is_active, " is_processing=", is_processing())
 
 
 func _setup_keyboard_shortcuts() -> void:

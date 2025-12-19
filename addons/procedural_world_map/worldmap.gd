@@ -184,28 +184,28 @@ func _ready():
 	_start_map_update(false)
 
 func _process(delta):
-	# PROFILING: Enhanced timing
+	# PROFILING: Time the entire _process function
 	var frame_start: int = Time.get_ticks_usec()
 	
 	# PROFILING: Log if processing while hidden
 	if not visible:
 		# Only log once per second to avoid spam
 		if Engine.get_process_frames() % 60 == 0:
-			print("PROFILING: ProceduralWorldMap._process() running while hidden! visible=", visible, " incremental_quality=", incremental_quality)
+			print("PROFILING: ProceduralWorldMap._process() running while hidden! visible=", visible, " is_processing=", is_processing())
 	
 	# start the idling timeout when the map has been fast rendered
 	if incremental_quality and image_changed and incremental_timer.is_stopped():
 		image_changed=false
 		incremental_timer.start()
 	
+	# PROFILING: Report frame time if >1ms
 	var frame_time: int = Time.get_ticks_usec() - frame_start
 	if frame_time > 1000:  # >1ms
-		print("PROFILING: ProceduralWorldMap._process took: ", frame_time / 1000.0, " ms | visible=", visible, " incremental_quality=", incremental_quality)
+		print("PROFILING: ProceduralWorldMap._process() took: ", frame_time / 1000.0, " ms")
 	
-	# Periodic FPS reporting (every 1 second)
+	# PROFILING: Periodic FPS report every 1 second
 	if Engine.get_process_frames() % 60 == 0:
-		var current_fps: float = Engine.get_frames_per_second()
-		print("PROFILING: ProceduralWorldMap - Current FPS: ", current_fps, " | visible: ", visible, " | incremental_quality: ", incremental_quality)
+		print("PROFILING: ProceduralWorldMap - Current FPS: ", Engine.get_frames_per_second())
 
 # Internal entry point to refresh the map
 func _start_map_update(is_recursive:bool):

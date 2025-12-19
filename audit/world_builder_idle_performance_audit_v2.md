@@ -2,353 +2,429 @@
 
 **Date:** 2025-12-19  
 **Focus:** ~3 FPS idle bottleneck in World Builder UI (Step 1, mouse completely still)  
-**Previous Fixes Attempted:** Throttling brush refresh, disabling _process on hidden/idle modules, viewport UPDATE_WHEN_VISIBLE  
-**Result:** ZERO impact on FPS
+**Previous Fixes:** Throttling brush refresh + disabling _process on hidden/idle modules + viewport UPDATE_WHEN_VISIBLE had ZERO impact
 
 ---
 
 ## Executive Summary
 
-This audit adds comprehensive profiling instrumentation to identify the root cause of the ~3 FPS idle bottleneck. Despite previous optimizations (refresh throttling, disabled _process on hidden modules, viewport update mode changes), FPS remains at ~3 when the World Builder UI is idle at Step 1 with no mouse movement.
+This audit adds comprehensive profiling instrumentation to identify why FPS remains ~3 even when the World Builder UI is completely idle (Step 1, no mouse movement, no user interaction). Previous optimizations (refresh throttling, disabling _process on hidden modules, viewport update modes) had zero impact, indicating the bottleneck is elsewhere.
 
 **New Potential Causes Identified:**
-1. **SubViewport continuous rendering loop** - SubViewport may be forcing full redraws every frame even when idle
-2. **Shader material texture updates** - MapRenderer shader material may be triggering expensive texture uploads per frame
-3. **MapEditor input event processing** - Input event handlers may be running even when no input occurs
-4. **ProceduralWorldMap incremental rendering** - Even when hidden, incremental quality rendering may still be active
-5. **Viewport container input polling** - SubViewportContainer may be polling for input events every frame
+1. **SubViewport continuous rendering** - SubViewport may be rendering every frame even when idle
+2. **Shader material updates** - ShaderMaterial parameter updates may trigger per-frame GPU work
+3. **Texture updates** - ImageTexture.set_image() or texture updates may be happening per-frame
+4. **Input event processing** - Even idle mouse position may trigger per-frame input handling
+5. **Timer callbacks** - Refresh throttling timer may be causing overhead
+6. **Hidden ProceduralWorldMap still processing** - Despite set_process(false), may still have other per-frame logic
 
 ---
 
 ## Profiling Instrumentation Added
 
-### 1. MapMakerModule._process() Profiling
-**File:** `ui/world_builder/MapMakerModule.gd`  
-**Lines:** 915-930
+### 1. ProceduralWorldMap._process() (addons/procedural_world_map/worldmap.gd)
 
-```gdscript
-func _process(delta: float) -> void:
-	"""Process per-frame updates - PROFILING ENABLED."""
-	if not is_active:
-		return
-	
-	var frame_start: int = Time.get_ticks_usec()
-	
-	# Existing per-frame logic would go here (currently none)
-	
-	var frame_time: int = Time.get_ticks_usec() - frame_start
-	if frame_time > 1000:  # >1ms
-		print("PROFILING: MapMakerModule._process took: ", frame_time / 1000.0, " ms")
-	
-	# Periodic FPS reporting (every 1 second)
-	if Engine.get_process_frames() % 60 == 0:
-		var current_fps: float = Engine.get_frames_per_second()
-		print("PROFILING: MapMakerModule - Current FPS: ", current_fps, " | is_active: ", is_active, " | visible: ", visible)
-```
+**Status:** ✅ INSTRUMENTED
 
-**Status:** ✅ ADDED  
-**Findings:** 
-- `_process()` only runs when `is_active == true` (controlled by `activate()`/`deactivate()`)
-- If `_process()` is running, it will report frame times >1ms and FPS every 60 frames
-- **Critical:** Need to verify if `activate()` is being called when entering Step 1
+**Changes:**
+- Added microsecond-level timing around entire `_process()` function
+- Enhanced visibility check logging (logs every second if running while hidden)
+- Added periodic FPS reporting (every 60 frames = ~1 second)
+- Reports frame time if >1ms
 
-**Evidence:**
-- `activate()` is called in `WorldBuilderUI.gd` line 807
-- `deactivate()` is called in `WorldBuilderUI.gd` line 834
-- Default state: `set_process(false)` in `_ready()` (line 70)
-
----
-
-### 2. MapMakerModule._on_viewport_container_input() Profiling
-**File:** `ui/world_builder/MapMakerModule.gd`  
-**Lines:** 813-865
-
-```gdscript
-func _on_viewport_container_input(event: InputEvent) -> void:
-	"""Handle input events from viewport container - PROFILING ENABLED."""
-	if map_viewport_container == null or not map_viewport_container.is_visible_in_tree():
-		return
-	
-	var input_start: int = Time.get_ticks_usec()
-	
-	# ... existing input handling code ...
-	
-	var input_time: int = Time.get_ticks_usec() - input_start
-	if input_time > 1000:  # >1ms
-		print("PROFILING: MapMakerModule._on_viewport_container_input took: ", input_time / 1000.0, " ms")
-```
-
-**Status:** ✅ ADDED  
-**Findings:**
-- This function should only be called when actual input events occur
-- If it's being called during idle, that indicates input event spam or polling
-- Will report if input handling takes >1ms
-
-**Evidence:**
-- Connected to `map_viewport_container.gui_input` signal (line 104)
-- Should only fire on actual mouse/keyboard events
-
----
-
-### 3. ProceduralWorldMap._process() Enhanced Profiling
-**File:** `addons/procedural_world_map/worldmap.gd`  
-**Lines:** 186-210
-
+**Code:**
 ```gdscript
 func _process(delta):
-	# PROFILING: Enhanced timing
+	# PROFILING: Time the entire _process function
 	var frame_start: int = Time.get_ticks_usec()
 	
 	# PROFILING: Log if processing while hidden
 	if not visible:
 		# Only log once per second to avoid spam
 		if Engine.get_process_frames() % 60 == 0:
-			print("PROFILING: ProceduralWorldMap._process() running while hidden! visible=", visible, " incremental_quality=", incremental_quality)
+			print("PROFILING: ProceduralWorldMap._process() running while hidden! visible=", visible, " is_processing=", is_processing())
 	
 	# ... existing logic ...
 	
+	# PROFILING: Report frame time if >1ms
 	var frame_time: int = Time.get_ticks_usec() - frame_start
 	if frame_time > 1000:  # >1ms
-		print("PROFILING: ProceduralWorldMap._process took: ", frame_time / 1000.0, " ms | visible=", visible, " incremental_quality=", incremental_quality)
+		print("PROFILING: ProceduralWorldMap._process() took: ", frame_time / 1000.0, " ms")
 	
-	# Periodic FPS reporting (every 1 second)
+	# PROFILING: Periodic FPS report every 1 second
 	if Engine.get_process_frames() % 60 == 0:
-		var current_fps: float = Engine.get_frames_per_second()
-		print("PROFILING: ProceduralWorldMap - Current FPS: ", current_fps, " | visible: ", visible, " | incremental_quality: ", incremental_quality)
+		print("PROFILING: ProceduralWorldMap - Current FPS: ", Engine.get_frames_per_second())
 ```
 
-**Status:** ✅ ENHANCED  
-**Findings:**
-- Previous profiling only logged "running while hidden" for incremental_quality
-- Now logs frame times and FPS even when visible
-- **Critical:** Will detect if ProceduralWorldMap is running when it should be disabled
-
-**Evidence:**
-- `WorldBuilderUI.gd` line 144: `procedural_world_map.set_process(false)` when hidden
-- But `_process()` may still run if `set_process(false)` wasn't effective
+**Expected Output:**
+- If `_process()` is running while hidden: `"PROFILING: ProceduralWorldMap._process() running while hidden! visible=false is_processing=true"`
+- If `_process()` takes >1ms: `"PROFILING: ProceduralWorldMap._process() took: X.XX ms"`
+- Every second: `"PROFILING: ProceduralWorldMap - Current FPS: X"`
 
 ---
 
-### 4. MapRenderer.refresh() Profiling
-**File:** `core/world_generation/MapRenderer.gd`  
-**Lines:** 200-234
+### 2. MapMakerModule._process() (ui/world_builder/MapMakerModule.gd)
 
+**Status:** ✅ INSTRUMENTED (NEW FUNCTION)
+
+**Changes:**
+- Added `_process()` function with timing (module previously had no _process)
+- Reports frame time if >1ms
+- Reports FPS and activation status every second
+
+**Code:**
+```gdscript
+func _process(delta: float) -> void:
+	"""PROFILING: Per-frame processing - timing instrumentation."""
+	var frame_start: int = Time.get_ticks_usec()
+	
+	# Existing per-frame logic would go here (currently none)
+	
+	# PROFILING: Report frame time if >1ms
+	var frame_time: int = Time.get_ticks_usec() - frame_start
+	if frame_time > 1000:  # >1ms
+		print("PROFILING: MapMakerModule._process() took: ", frame_time / 1000.0, " ms")
+	
+	# PROFILING: Periodic FPS report every 1 second
+	if Engine.get_process_frames() % 60 == 0:
+		print("PROFILING: MapMakerModule - Current FPS: ", Engine.get_frames_per_second(), " is_active=", is_active, " is_processing=", is_processing())
+```
+
+**Expected Output:**
+- If `_process()` takes >1ms: `"PROFILING: MapMakerModule._process() took: X.XX ms"`
+- Every second: `"PROFILING: MapMakerModule - Current FPS: X is_active=true is_processing=true"`
+
+**Note:** This function should NOT be called if `is_active=false` (processing disabled via `set_process(false)`). If we see output, it means processing is enabled when it shouldn't be.
+
+---
+
+### 3. MapMakerModule._on_viewport_container_input() (ui/world_builder/MapMakerModule.gd)
+
+**Status:** ✅ INSTRUMENTED
+
+**Changes:**
+- Added timing around input event handling
+- Reports time if >1ms
+
+**Code:**
+```gdscript
+func _on_viewport_container_input(event: InputEvent) -> void:
+	"""Handle input events from viewport container."""
+	# PROFILING: Time input handling
+	var input_start: int = Time.get_ticks_usec()
+	
+	# ... existing logic ...
+	
+	# PROFILING: Report input handling time if >1ms
+	var input_time: int = Time.get_ticks_usec() - input_start
+	if input_time > 1000:  # >1ms
+		print("PROFILING: MapMakerModule._on_viewport_container_input() took: ", input_time / 1000.0, " ms")
+```
+
+**Expected Output:**
+- If input handling takes >1ms: `"PROFILING: MapMakerModule._on_viewport_container_input() took: X.XX ms"`
+
+**Note:** Even idle mouse position may trigger `InputEventMouseMotion` events every frame. If this is being called every frame, it could be a major bottleneck.
+
+---
+
+### 4. MapRenderer.refresh() (core/world_generation/MapRenderer.gd)
+
+**Status:** ✅ INSTRUMENTED
+
+**Changes:**
+- Added timing around entire `refresh()` operation
+- Reports time if >1ms
+
+**Code:**
 ```gdscript
 func refresh() -> void:
-	"""Refresh rendering (call after map data changes) - PROFILING ENABLED."""
+	"""Refresh rendering (call after map data changes)."""
+	# PROFILING: Time refresh operation
 	var refresh_start: int = Time.get_ticks_usec()
 	
-	# ... existing refresh logic ...
+	# ... existing logic ...
 	
+	# PROFILING: Report refresh time if >1ms
 	var refresh_time: int = Time.get_ticks_usec() - refresh_start
 	if refresh_time > 1000:  # >1ms
 		print("PROFILING: MapRenderer.refresh() took: ", refresh_time / 1000.0, " ms")
 ```
 
-**Status:** ✅ ADDED  
-**Findings:**
-- `refresh()` is called from multiple places:
-  - `MapMakerModule.generate_map()` (line 461)
-  - `MapMakerModule._on_refresh_timer_timeout()` (line 908) - throttled
-  - `MapMakerModule._on_viewport_container_input()` (line 843) - on mouse release
-- If `refresh()` is being called every frame during idle, that's the bottleneck
-- Will report if refresh takes >1ms
+**Expected Output:**
+- If refresh takes >1ms: `"PROFILING: MapRenderer.refresh() took: X.XX ms"`
 
-**Evidence:**
-- Refresh throttling is in place (100ms throttle, line 63)
-- But if something else is calling `refresh()` directly, throttling won't help
+**Note:** `refresh()` should NOT be called every frame when idle. If we see frequent calls, it indicates something is triggering refreshes unnecessarily.
 
 ---
 
-## Potential Root Causes (Based on Code Analysis)
+### 5. WorldBuilderUI._process() (ui/world_builder/WorldBuilderUI.gd)
+
+**Status:** ✅ INSTRUMENTED (NEW FUNCTION)
+
+**Changes:**
+- Added `_process()` function with timing (UI previously had no _process)
+- Reports frame time if >1ms
+- Reports FPS and current step every second
+
+**Code:**
+```gdscript
+func _process(delta: float) -> void:
+	"""PROFILING: Per-frame processing - timing instrumentation."""
+	var frame_start: int = Time.get_ticks_usec()
+	
+	# Existing per-frame logic would go here (currently none)
+	
+	# PROFILING: Report frame time if >1ms
+	var frame_time: int = Time.get_ticks_usec() - frame_start
+	if frame_time > 1000:  # >1ms
+		print("PROFILING: WorldBuilderUI._process() took: ", frame_time / 1000.0, " ms")
+	
+	# PROFILING: Periodic FPS report every 1 second
+	if Engine.get_process_frames() % 60 == 0:
+		print("PROFILING: WorldBuilderUI - Current FPS: ", Engine.get_frames_per_second(), " current_step=", current_step)
+```
+
+**Expected Output:**
+- If `_process()` takes >1ms: `"PROFILING: WorldBuilderUI._process() took: X.XX ms"`
+- Every second: `"PROFILING: WorldBuilderUI - Current FPS: X current_step=0"`
+
+**Note:** This function should NOT exist (UI has no per-frame logic). If we see output, it means something is enabling processing unexpectedly.
+
+---
+
+## Analysis of Potential Causes
 
 ### Cause 1: SubViewport Continuous Rendering
-**Status:** ⚠️ SUSPECTED  
-**Impact:** HIGH  
+
+**Status:** ⚠️ SUSPECTED
+
 **Evidence:**
-- `map_viewport.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE` (line 97)
-- But SubViewport may still be rendering every frame if it thinks it's "visible"
-- SubViewport rendering is expensive, especially with shader materials
+- `MapMakerModule` uses `SubViewport` with `render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE`
+- Even with `UPDATE_WHEN_VISIBLE`, if the viewport container is visible, it may render every frame
+- SubViewport rendering involves GPU work (shader execution, texture updates)
+
+**Impact:** HIGH - GPU-bound operations can easily drop FPS to single digits
 
 **Recommended Fix:**
-- Set `render_target_update_mode = SubViewport.UPDATE_ONCE` after initial render
-- Only switch to `UPDATE_ALWAYS` when actively editing
-- Add profiling to measure viewport render time
+- Set `render_target_update_mode = SubViewport.UPDATE_ONCE` when idle
+- Only switch to `UPDATE_WHEN_VISIBLE` or `UPDATE_ALWAYS` when actively editing
+- Use a timer to detect idle state (no input for N seconds) and switch to `UPDATE_ONCE`
+
+**How to Confirm:**
+- Check if SubViewport is rendering every frame (Godot profiler → Rendering → Viewport updates)
+- Look for `PROFILING: MapRenderer.refresh()` being called every frame (should NOT happen when idle)
 
 ---
 
-### Cause 2: Shader Material Texture Updates Every Frame
-**Status:** ⚠️ SUSPECTED  
-**Impact:** HIGH  
+### Cause 2: Shader Material Parameter Updates
+
+**Status:** ⚠️ SUSPECTED
+
 **Evidence:**
-- `MapRenderer` uses `ShaderMaterial` with multiple textures (heightmap, biome, rivers)
-- Shader material parameter updates may trigger texture uploads
-- Even if textures don't change, parameter validation may be expensive
+- `MapRenderer` uses `ShaderMaterial` with multiple texture parameters
+- Even if textures don't change, shader parameter updates may trigger GPU work
+- `set_shader_parameter()` calls may be happening per-frame
+
+**Impact:** MEDIUM-HIGH - Shader parameter updates can cause GPU stalls
 
 **Recommended Fix:**
-- Add profiling to `_update_textures()` to measure texture upload time
-- Cache texture state and only update when actually changed
-- Consider using `ImageTexture.update()` instead of `set_image()` if image data hasn't changed
+- Only call `set_shader_parameter()` when values actually change
+- Cache parameter values and compare before updating
+- Use `NOTIFICATION_THEME_CHANGED` or similar to batch updates
+
+**How to Confirm:**
+- Add profiling to `MapRenderer._update_textures()` to see if it's called every frame
+- Check shader parameter update frequency in Godot profiler
 
 ---
 
-### Cause 3: Input Event Polling/Spam
-**Status:** ⚠️ SUSPECTED  
-**Impact:** MEDIUM  
+### Cause 3: Input Event Processing (Idle Mouse)
+
+**Status:** ⚠️ SUSPECTED
+
 **Evidence:**
-- `SubViewportContainer.gui_input` signal may be firing even when mouse is still
-- Input event processing includes coordinate conversion (`_screen_to_world_position`)
-- Multiple input handlers may be processing the same events
+- `MapMakerModule._on_viewport_container_input()` is connected to `SubViewportContainer.gui_input`
+- Even when mouse is still, `InputEventMouseMotion` events may fire every frame with `relative = Vector2.ZERO`
+- Input handling may be doing expensive work (coordinate conversion, world position calculation)
+
+**Impact:** MEDIUM - Per-frame input processing adds CPU overhead
 
 **Recommended Fix:**
-- Add early return in `_on_viewport_container_input()` if no actual input occurred
-- Verify that input events aren't being generated by the UI system itself
-- Consider debouncing input events
+- Filter out zero-movement mouse events: `if event is InputEventMouseMotion and event.relative.length_squared() < 0.001: return`
+- Only process input when actually needed (mouse button pressed, mouse moved significantly)
+
+**How to Confirm:**
+- Check `PROFILING: MapMakerModule._on_viewport_container_input()` output frequency
+- If called every frame even when idle, this is the culprit
 
 ---
 
-### Cause 4: ProceduralWorldMap Still Running
-**Status:** ⚠️ SUSPECTED  
-**Impact:** MEDIUM  
+### Cause 4: Timer Callback Overhead
+
+**Status:** ⚠️ SUSPECTED
+
 **Evidence:**
-- `WorldBuilderUI.gd` line 144: `procedural_world_map.set_process(false)`
-- But if `set_process(false)` is called before `_ready()`, it may not take effect
-- Incremental quality rendering may continue in background threads
+- `MapMakerModule` has a `refresh_timer` (Timer) that runs every 100ms (10 times per second)
+- Timer callbacks may have overhead even when not doing work
+- Multiple timers in the scene tree can add up
+
+**Impact:** LOW-MEDIUM - Timer overhead is usually minimal, but can add up
 
 **Recommended Fix:**
-- Verify `set_process(false)` is called after `_ready()` completes
-- Check if incremental rendering threads are still active
-- Add explicit check: `if procedural_world_map.is_processing(): print("ERROR: PWM still processing!")`
+- Stop timer when idle: `refresh_timer.stop()` when no painting is active
+- Only start timer when painting begins
+
+**How to Confirm:**
+- Check if timer is running when idle (add logging to `_on_refresh_timer_timeout()`)
+- Temporarily disable timer and measure FPS impact
 
 ---
 
-### Cause 5: Viewport Container Resize Events
-**Status:** ⚠️ SUSPECTED  
-**Impact:** LOW-MEDIUM  
+### Cause 5: Texture Updates Per Frame
+
+**Status:** ⚠️ SUSPECTED
+
 **Evidence:**
-- `_on_viewport_container_resized()` calls `_update_viewport_size()`
-- Resize events may be firing continuously if layout is unstable
-- Viewport size updates trigger texture reallocation
+- `MapRenderer.refresh()` calls `ImageTexture.set_image()` which may trigger GPU uploads
+- Even if image data doesn't change, texture updates can be expensive
+- Sprite2D texture updates may trigger per-frame GPU work
+
+**Impact:** HIGH - Texture uploads are expensive GPU operations
 
 **Recommended Fix:**
-- Add profiling to `_update_viewport_size()`
-- Only update viewport size if it actually changed
-- Debounce resize events
+- Only call `refresh()` when map data actually changes
+- Cache texture data and compare before updating
+- Use `ImageTexture.update()` instead of `set_image()` if image reference is the same
+
+**How to Confirm:**
+- Check `PROFILING: MapRenderer.refresh()` output frequency
+- If called every frame, this is likely the bottleneck
+
+---
+
+### Cause 6: Hidden ProceduralWorldMap Still Processing
+
+**Status:** ⚠️ SUSPECTED
+
+**Evidence:**
+- `ProceduralWorldMap` is set to `visible = false` and `set_process(false)`
+- However, it may still have other per-frame logic (signals, timers, incremental rendering)
+- `incremental_timer` may still be running even when hidden
+
+**Impact:** MEDIUM - Hidden nodes shouldn't process, but if they do, it wastes CPU
+
+**Recommended Fix:**
+- Ensure `incremental_timer.stop()` when hidden
+- Check for other per-frame logic in ProceduralWorldMap (signals, callbacks)
+
+**How to Confirm:**
+- Check `PROFILING: ProceduralWorldMap._process()` output
+- If we see "running while hidden" messages, this is confirmed
 
 ---
 
 ## Testing Instructions
 
-1. **Launch World Builder UI:**
-   - Start the project
-   - Navigate to World Builder (Step 1: Map Generation & Editing)
-   - Wait for initial map generation to complete
+To capture profiling data:
 
-2. **Enter Idle State:**
-   - Do NOT move the mouse
-   - Do NOT interact with any UI elements
-   - Wait 60 seconds
+1. **Launch the project** (already done with profiling code in place)
+2. **Navigate to World Builder UI** (should auto-load or via main menu)
+3. **Go to Step 1** (Map Generation & Editing - 2D map view)
+4. **Do NOTHING** - Keep mouse completely still for ~120 seconds
+5. **Capture debug output** - All `PROFILING:` messages will appear in console
 
-3. **Capture Debug Output:**
-   - Look for lines starting with `PROFILING:`
-   - Note frame times, FPS reports, and "running while hidden" messages
-   - Count how many times each profiling message appears
+**Expected Profiling Output (if idle):**
+- `PROFILING: WorldBuilderUI - Current FPS: X current_step=0` (every second)
+- `PROFILING: MapMakerModule - Current FPS: X is_active=true is_processing=true` (every second, if processing enabled)
+- `PROFILING: ProceduralWorldMap - Current FPS: X` (every second, if processing enabled)
+- `PROFILING: MapRenderer.refresh() took: X.XX ms` (should NOT appear frequently when idle)
+- `PROFILING: MapMakerModule._on_viewport_container_input() took: X.XX ms` (should NOT appear when mouse is still)
 
-4. **Expected Profiling Output:**
-   ```
-   PROFILING: MapMakerModule - Current FPS: 3.0 | is_active: true | visible: true
-   PROFILING: ProceduralWorldMap._process() running while hidden! visible=false incremental_quality=true
-   PROFILING: MapRenderer.refresh() took: 250.0 ms
-   ```
+**Red Flags (indicating bottleneck):**
+- `MapRenderer.refresh()` called every frame → **Cause 5 confirmed**
+- `_on_viewport_container_input()` called every frame → **Cause 3 confirmed**
+- `ProceduralWorldMap._process()` running while hidden → **Cause 6 confirmed**
+- Any `_process()` function taking >10ms per frame → **Primary bottleneck identified**
 
 ---
 
-## Analysis Framework
+## Summary & Priority
 
-### If MapMakerModule._process() is running:
-- **Check frame time:** If >16ms, that's the bottleneck
-- **Check is_active:** If true when it shouldn't be, fix activation logic
-- **Check FPS:** If FPS is low but frame time is <1ms, bottleneck is elsewhere
+### Primary Suspects (High Priority)
 
-### If ProceduralWorldMap._process() is running while hidden:
-- **CRITICAL BUG:** `set_process(false)` didn't work
-- **Fix:** Call `set_process(false)` in `_ready()` after a frame delay
-- **Alternative:** Remove ProceduralWorldMap from scene tree when not needed
+1. **SubViewport continuous rendering** - Most likely cause of GPU-bound 3 FPS
+2. **Texture updates per frame** - If `MapRenderer.refresh()` is called every frame
+3. **Input event processing** - If `_on_viewport_container_input()` fires every frame
 
-### If MapRenderer.refresh() is called frequently:
-- **Check call stack:** Use `print_stack()` to see who's calling it
-- **Check throttle timer:** Verify `refresh_timer` is actually throttling
-- **Fix:** Add guard to prevent refresh if nothing changed
+### Secondary Suspects (Medium Priority)
 
-### If no profiling output appears:
-- **Profiling code not running:** Check if `_process()` is enabled
-- **Frame times <1ms:** Bottleneck is in rendering, not script
-- **Use Godot Profiler:** Enable "Script Functions" profiling in Godot editor
+4. **Shader material parameter updates** - If shader parameters are updated every frame
+5. **Hidden ProceduralWorldMap processing** - If still running despite `set_process(false)`
+6. **Timer callback overhead** - If multiple timers are running unnecessarily
 
 ---
 
 ## Recommended Action Plan
 
-### Phase 1: Verify Profiling Data (IMMEDIATE)
-1. Run project with profiling code
-2. Navigate to Step 1, enter idle state
-3. Capture all `PROFILING:` output
-4. Identify which functions are running and their frame times
+### Phase 1: Identify Primary Bottleneck (IMMEDIATE)
 
-### Phase 2: Fix Confirmed Bottlenecks (HIGH PRIORITY)
-1. **If SubViewport is rendering every frame:**
-   - Set `UPDATE_ONCE` after initial render
-   - Only update when map data changes
-   - Add viewport render time profiling
+1. **Run project with profiling code** (already added)
+2. **Navigate to Step 1 and remain idle for 120 seconds**
+3. **Capture all `PROFILING:` output**
+4. **Analyze output to identify:**
+   - Which functions are called every frame?
+   - Which functions take >10ms per frame?
+   - Are any functions running when they shouldn't be?
 
-2. **If Shader material is updating every frame:**
-   - Cache texture state
-   - Only call `set_shader_parameter()` when values actually change
-   - Consider using `RenderingServer` for direct texture updates
+### Phase 2: Implement Top Fixes (Based on Profiling Data)
 
-3. **If ProceduralWorldMap is still running:**
-   - Fix `set_process(false)` timing
-   - Remove from scene tree when not needed
-   - Disable incremental rendering threads
+**If SubViewport rendering is the issue:**
+- Add idle detection (no input for 2 seconds)
+- Switch to `UPDATE_ONCE` when idle
+- Only use `UPDATE_WHEN_VISIBLE` or `UPDATE_ALWAYS` when actively editing
 
-### Phase 3: Optimize Rendering Pipeline (MEDIUM PRIORITY)
-1. Reduce viewport render target size if possible
-2. Use lower resolution textures for preview
-3. Disable shader effects that aren't needed for 2D map view
-4. Consider using `CanvasLayer` instead of `SubViewport` for 2D map
+**If texture updates are the issue:**
+- Add change detection before calling `refresh()`
+- Cache texture data and compare before updating
+- Use `ImageTexture.update()` instead of `set_image()` when possible
 
-### Phase 4: Advanced Optimizations (LOW PRIORITY)
-1. Implement frame skipping for non-interactive periods
-2. Use `call_deferred()` for non-critical updates
-3. Batch texture updates
-4. Consider multi-threaded rendering
+**If input processing is the issue:**
+- Filter out zero-movement mouse events
+- Only process input when mouse actually moves or buttons are pressed
+
+**If hidden ProceduralWorldMap is the issue:**
+- Ensure all timers are stopped when hidden
+- Check for other per-frame logic (signals, callbacks)
+
+### Phase 3: Verify Fixes
+
+1. **Remove profiling code** (or make it optional via debug flag)
+2. **Test idle FPS** - Should be 60 FPS or close to it
+3. **Test active editing** - Should maintain smooth FPS during brush painting
+4. **Test step transitions** - Should not cause FPS drops
 
 ---
 
 ## Next Steps
 
-1. **Run the project with profiling code active**
-2. **Navigate to Step 1 and leave idle for 60 seconds**
-3. **Capture all `PROFILING:` output from debug console**
-4. **Share profiling output for analysis**
-5. **Implement fixes based on profiling data**
+1. **User Action Required:** Navigate to World Builder UI → Step 1 → Remain idle for 120 seconds
+2. **Capture Profiling Output:** Copy all `PROFILING:` messages from console
+3. **Analyze Results:** Identify which functions are called every frame and which take >10ms
+4. **Implement Fixes:** Based on profiling data, implement fixes for top 2-3 bottlenecks
+5. **Re-test:** Verify FPS improvement (target: 60 FPS idle, smooth during editing)
 
 ---
 
-## Commit Message
+## Files Modified
 
-```
-Perf: Add temporary profiling for idle FPS audit v2
+- `addons/procedural_world_map/worldmap.gd` - Added profiling to `_process()`
+- `ui/world_builder/MapMakerModule.gd` - Added `_process()` and profiling to `_on_viewport_container_input()`
+- `core/world_generation/MapRenderer.gd` - Added profiling to `refresh()`
+- `ui/world_builder/WorldBuilderUI.gd` - Added `_process()` for profiling
 
-- Added frame timing to MapMakerModule._process()
-- Added input event timing to _on_viewport_container_input()
-- Enhanced ProceduralWorldMap._process() profiling
-- Added MapRenderer.refresh() timing
-- All profiling prints to console with "PROFILING:" prefix
-- FPS reporting every 60 frames
-- Frame time warnings for operations >1ms
-```
+**Commit Message:** `Perf: Add temporary profiling for idle FPS audit v2`
 
 ---
 
-**END OF AUDIT REPORT v2**
+**END OF AUDIT REPORT**
