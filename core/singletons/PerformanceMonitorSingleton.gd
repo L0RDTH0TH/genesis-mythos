@@ -32,4 +32,4 @@ func _ready() -> void:
 func set_refresh_time(time_ms: float) -> void:
 	"""Set refresh time for the performance monitor (called from MapRenderer)."""
 	if monitor_instance:
-		monitor_instance.refresh_time_ms = time_ms
+		monitor_instance.set_refresh_time(time_ms)
