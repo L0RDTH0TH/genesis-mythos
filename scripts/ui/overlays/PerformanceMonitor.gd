@@ -21,7 +21,7 @@ enum Mode { OFF, SIMPLE, DETAILED }
 @onready var bottom_process_graph: GraphControl = $BottomGraphBar/MarginContainer/BottomGraphsContainer/BottomProcessGraph
 @onready var bottom_refresh_graph: GraphControl = $BottomGraphBar/MarginContainer/BottomGraphsContainer/BottomRefreshGraph
 @onready var bottom_thread_graph: GraphControl = $BottomGraphBar/MarginContainer/BottomGraphsContainer/BottomThreadGraph
-@onready var waterfall_control: WaterfallControl = $BottomGraphBar/MarginContainer/BottomGraphsContainer/WaterfallControl
+@onready var waterfall_control: Control = $BottomGraphBar/MarginContainer/BottomGraphsContainer/WaterfallControl
 
 var current_mode: Mode = Mode.OFF : set = set_mode
 
@@ -416,7 +416,9 @@ func _process(_delta: float) -> void:
 			}
 			
 			var sub_breakdowns: Array[Dictionary] = _sub_breakdowns_for_frame(frame_id)
-			waterfall_control.add_frame_metrics(primary, sub_breakdowns)
+			# Cast to WaterfallControl to access add_frame_metrics method
+			if waterfall_control.has_method("add_frame_metrics"):
+				waterfall_control.add_frame_metrics(primary, sub_breakdowns)
 		
 		# Update refresh label with color coding
 		if refresh_label:
