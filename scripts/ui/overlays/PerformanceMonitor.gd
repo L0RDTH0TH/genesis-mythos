@@ -17,10 +17,11 @@ enum Mode { OFF, SIMPLE, DETAILED }
 @onready var process_graph: GraphControl = $PerfPanel/Content/GraphsContainer/ProcessGraph
 @onready var refresh_graph: GraphControl = $PerfPanel/Content/GraphsContainer/RefreshGraph
 @onready var bottom_graph_bar: PanelContainer = $BottomGraphBar
-@onready var bottom_fps_graph: GraphControl = $BottomGraphBar/MarginContainer/BottomGraphsContainer/BottomFPSGraph
-@onready var bottom_process_graph: GraphControl = $BottomGraphBar/MarginContainer/BottomGraphsContainer/BottomProcessGraph
-@onready var bottom_refresh_graph: GraphControl = $BottomGraphBar/MarginContainer/BottomGraphsContainer/BottomRefreshGraph
-@onready var bottom_thread_graph: GraphControl = $BottomGraphBar/MarginContainer/BottomGraphsContainer/BottomThreadGraph
+# Old bottom graphs removed - replaced by waterfall_control
+@onready var bottom_fps_graph: GraphControl = get_node_or_null("BottomGraphBar/MarginContainer/BottomGraphsContainer/BottomFPSGraph")
+@onready var bottom_process_graph: GraphControl = get_node_or_null("BottomGraphBar/MarginContainer/BottomGraphsContainer/BottomProcessGraph")
+@onready var bottom_refresh_graph: GraphControl = get_node_or_null("BottomGraphBar/MarginContainer/BottomGraphsContainer/BottomRefreshGraph")
+@onready var bottom_thread_graph: GraphControl = get_node_or_null("BottomGraphBar/MarginContainer/BottomGraphsContainer/BottomThreadGraph")
 @onready var waterfall_control: Control = $BottomGraphBar/MarginContainer/BottomGraphsContainer/WaterfallControl
 
 var current_mode: Mode = Mode.OFF : set = set_mode
@@ -116,8 +117,8 @@ func _ready() -> void:
 		MythosLogger.error("PerformanceMonitor", "bottom_refresh_graph not found!")
 		return
 	# Old bottom graphs are optional (replaced by waterfall view)
-	if not bottom_thread_graph:
-		MythosLogger.warn("PerformanceMonitor", "bottom_thread_graph not found (optional, using waterfall)")
+	# Old bottom graphs are optional (replaced by waterfall view)
+	# No need to log warnings - they're intentionally removed
 	
 	if not waterfall_control:
 		MythosLogger.error("PerformanceMonitor", "waterfall_control not found!")
@@ -436,12 +437,15 @@ func _update_detailed_metrics() -> void:
 	# Time category metrics
 	var process_ms: float = Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
 	var physics_ms: float = Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
-	process_label.text = "Process: %.2f ms" % process_ms
-	physics_label.text = "Physics: %.2f ms" % physics_ms
+	if process_label:
+		process_label.text = "Process: %.2f ms" % process_ms
+	if physics_label:
+		physics_label.text = "Physics: %.2f ms" % physics_ms
 	
 	# Memory category metrics
 	var mem_bytes: int = Performance.get_monitor(Performance.MEMORY_STATIC)
-	memory_label.text = "Memory: %s" % _format_memory(mem_bytes)
+	if memory_label:
+		memory_label.text = "Memory: %s" % _format_memory(mem_bytes)
 	
 	# RenderingServer metrics (requires 2+ frames, checked in _process)
 	var draw_calls: int = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)
@@ -450,17 +454,24 @@ func _update_detailed_metrics() -> void:
 	var vram_bytes: int = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_VIDEO_MEM_USED)
 	var texture_bytes: int = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TEXTURE_MEM_USED)
 	
-	draw_calls_label.text = "Draw Calls: %d" % draw_calls
-	primitives_label.text = "Primitives: %d" % primitives
-	objects_drawn_label.text = "Objects Drawn: %d" % objects_drawn
-	vram_label.text = "VRAM: %s" % _format_memory(vram_bytes)
-	texture_mem_label.text = "Texture Mem: %s" % _format_memory(texture_bytes)
+	if draw_calls_label:
+		draw_calls_label.text = "Draw Calls: %d" % draw_calls
+	if primitives_label:
+		primitives_label.text = "Primitives: %d" % primitives
+	if objects_drawn_label:
+		objects_drawn_label.text = "Objects Drawn: %d" % objects_drawn
+	if vram_label:
+		vram_label.text = "VRAM: %s" % _format_memory(vram_bytes)
+	if texture_mem_label:
+		texture_mem_label.text = "Texture Mem: %s" % _format_memory(texture_bytes)
 	
 	# Objects category metrics
 	var obj_count: int = Performance.get_monitor(Performance.OBJECT_COUNT)
 	var node_count: int = Performance.get_monitor(Performance.OBJECT_NODE_COUNT)
-	object_label.text = "Objects: %d" % obj_count
-	node_label.text = "Nodes: %d" % node_count
+	if object_label:
+		object_label.text = "Objects: %d" % obj_count
+	if node_label:
+		node_label.text = "Nodes: %d" % node_count
 
 func _format_memory(bytes: int) -> String:
 	"""Format memory bytes into human-readable string (B/KB/MB/GB)."""
