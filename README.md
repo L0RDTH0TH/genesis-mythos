@@ -1,10 +1,10 @@
 # ╔═══════════════════════════════════════════════════════════
 # ║ Genesis Mythos
-# ║ Godot 4.3 Project
+# ║ Godot 4.5.1 Project
 # ║ Author: Lordthoth
 # ╚═══════════════════════════════════════════════════════════
 
-Genesis Mythos is a Godot 4.3 project built with a focus on clean architecture, data-driven design, and extensibility.
+Genesis Mythos is a Godot 4.5.1 project built with a focus on clean architecture, data-driven design, and extensibility.
 
 ## Project Information
 
@@ -18,7 +18,7 @@ Genesis Mythos is a Godot 4.3 project built with a focus on clean architecture, 
 These rules are **LOCKED** and must be followed 100% with zero exceptions:
 
 ### 1. Godot Version
-- **4.3 stable only** (currently 4.3.0 or any 4.3.x patch)
+- **4.5.1 stable only**
 - GDScript only (no C#, no VisualScript)
 - Typed code everywhere
 
@@ -79,7 +79,7 @@ Every script MUST start with:
    ```
 
 2. **Open in Godot**
-   - Launch Godot 4.3.x
+   - Launch Godot 4.5.1
    - Click "Import" and select the `project.godot` file
    - Click "Import & Edit"
 
