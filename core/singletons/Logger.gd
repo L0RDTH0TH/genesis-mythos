@@ -328,14 +328,14 @@ func _output_to_console(level: LogLevel, message: String) -> void:
 			print(message)
 
 func _emit_log_signal(level: LogLevel, system: String, message: String, data: Variant) -> void:
-	"""Thread-safe signal emission wrapper (uses call_deferred if not on main thread)."""
-	# Check if we're on the main thread by checking if we can access the scene tree
-	if is_inside_tree():
-		# We're on the main thread, emit directly
-		emit_signal("log_entry_created", level, system, message, data)
-	else:
-		# We're on a worker thread, defer signal emission to main thread
-		call_deferred("emit_signal", "log_entry_created", level, system, message, data)
+	"""Thread-safe signal emission wrapper (always uses call_deferred for safety)."""
+	# Always use call_deferred to ensure signal emission happens on main thread
+	# This is safe even if called from main thread (slight overhead, but ensures correctness)
+	call_deferred("_do_emit_log_signal", level, system, message, data)
+
+func _do_emit_log_signal(level: LogLevel, system: String, message: String, data: Variant) -> void:
+	"""Actually emit the signal (called via call_deferred on main thread)."""
+	emit_signal("log_entry_created", level, system, message, data)
 
 func _force_console_log(system: String, level: LogLevel, message: String) -> void:
 	"""Force log to console bypassing all checks - used for Logger internal messages."""
