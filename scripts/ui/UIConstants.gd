@@ -69,3 +69,11 @@ const GRAPH_INNER_HEIGHT: int = 140  ## Individual graph height with padding
 const PROGRESS_BAR_WIDTH: int = 400  ## Width for progress bars
 const PROGRESS_BAR_HEIGHT: int = 40  ## Height for progress bars
 const PROGRESS_BAR_MARGIN_TOP: int = 100  ## Top margin for progress bar positioning
+
+# Waterfall View Constants (v4 Specification)
+const WATERFALL_LANE_HEIGHT: int = 60  ## Height per lane in waterfall view
+const WATERFALL_FRAME_WIDTH_MIN: int = 32  ## Minimum frame width for hover accuracy
+const WATERFALL_TARGET_FRAME_MS: float = 16.67  ## Target frame time (60 FPS)
+const WATERFALL_DRAW_CALLS_MAX: int = 2000  ## Maximum draw calls for scaling
+const WATERFALL_BUFFER_MAX: int = 10  ## Maximum size for metric buffers
+const WATERFALL_TOOLTIP_DELAY_MS: int = 200  ## Tooltip display delay in milliseconds

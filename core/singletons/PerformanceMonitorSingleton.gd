@@ -52,3 +52,113 @@ func can_log() -> bool:
 	if monitor_instance:
 		return monitor_instance.can_log()
 	return true  # Default to allowing if monitor not ready
+
+
+## Waterfall View Instrumentation Hooks (Frame-Tagged for Sync)
+
+var _refresh_breakdown_buffer: Array[Dictionary] = []
+var _thread_breakdown_buffer: Array[Dictionary] = []
+var _other_process_buffer: Array[Dictionary] = []
+var _buffer_mutex: Mutex = Mutex.new()
+
+func push_refresh_breakdown(breakdown: Dictionary, frame_id: int = -1) -> void:
+	"""Push refresh breakdown with frame_id for waterfall view sync."""
+	if frame_id == -1:
+		frame_id = Engine.get_process_frames()
+	_buffer_mutex.lock()
+	_refresh_breakdown_buffer.append({
+		"frame_id": frame_id,
+		"breakdown": breakdown,
+		"timestamp_usec": Time.get_ticks_usec()
+	})
+	if _refresh_breakdown_buffer.size() > UIConstants.WATERFALL_BUFFER_MAX:
+		_refresh_breakdown_buffer.pop_front()
+	_buffer_mutex.unlock()
+
+func push_thread_breakdown(breakdown: Dictionary, frame_id: int = -1) -> void:
+	"""Push thread breakdown with frame_id for waterfall view sync."""
+	if frame_id == -1:
+		frame_id = Engine.get_process_frames()
+	_buffer_mutex.lock()
+	_thread_breakdown_buffer.append({
+		"frame_id": frame_id,
+		"breakdown": breakdown,
+		"timestamp_usec": Time.get_ticks_usec()
+	})
+	if _thread_breakdown_buffer.size() > UIConstants.WATERFALL_BUFFER_MAX:
+		_thread_breakdown_buffer.pop_front()
+	_buffer_mutex.unlock()
+
+func push_other_process_timing(timing_ms: float, frame_id: int = -1) -> void:
+	"""Push explicit other process timing with frame_id."""
+	if frame_id == -1:
+		frame_id = Engine.get_process_frames()
+	_buffer_mutex.lock()
+	_other_process_buffer.append({
+		"frame_id": frame_id,
+		"time_ms": timing_ms,
+		"timestamp_usec": Time.get_ticks_usec()
+	})
+	if _other_process_buffer.size() > UIConstants.WATERFALL_BUFFER_MAX:
+		_other_process_buffer.pop_front()
+	_buffer_mutex.unlock()
+
+func get_refresh_breakdown_buffer() -> Array[Dictionary]:
+	"""Get refresh breakdown buffer (for PerformanceMonitor matching)."""
+	_buffer_mutex.lock()
+	var buffer: Array[Dictionary] = _refresh_breakdown_buffer.duplicate()
+	_buffer_mutex.unlock()
+	return buffer
+
+func get_thread_breakdown_buffer() -> Array[Dictionary]:
+	"""Get thread breakdown buffer (for PerformanceMonitor matching)."""
+	_buffer_mutex.lock()
+	var buffer: Array[Dictionary] = _thread_breakdown_buffer.duplicate()
+	_buffer_mutex.unlock()
+	return buffer
+
+func get_other_process_buffer() -> Array[Dictionary]:
+	"""Get other process buffer (for PerformanceMonitor matching)."""
+	_buffer_mutex.lock()
+	var buffer: Array[Dictionary] = _other_process_buffer.duplicate()
+	_buffer_mutex.unlock()
+	return buffer
+
+func consume_refresh_for_frame(frame_id: int) -> Dictionary:
+	"""Consume and return refresh breakdown for a specific frame."""
+	_buffer_mutex.lock()
+	for i in range(_refresh_breakdown_buffer.size() - 1, -1, -1):
+		var metric: Dictionary = _refresh_breakdown_buffer[i]
+		if metric.get("frame_id", -1) == frame_id or metric.get("frame_id", -1) == frame_id - 1:
+			var result: Dictionary = metric.duplicate()
+			_refresh_breakdown_buffer.remove_at(i)
+			_buffer_mutex.unlock()
+			return result
+	_buffer_mutex.unlock()
+	return {}
+
+func consume_thread_for_frame(frame_id: int) -> Dictionary:
+	"""Consume and return thread breakdown for a specific frame."""
+	_buffer_mutex.lock()
+	for i in range(_thread_breakdown_buffer.size() - 1, -1, -1):
+		var metric: Dictionary = _thread_breakdown_buffer[i]
+		if metric.get("frame_id", -1) == frame_id or metric.get("frame_id", -1) == frame_id - 1:
+			var result: Dictionary = metric.duplicate()
+			_thread_breakdown_buffer.remove_at(i)
+			_buffer_mutex.unlock()
+			return result
+	_buffer_mutex.unlock()
+	return {}
+
+func consume_other_process_for_frame(frame_id: int) -> Dictionary:
+	"""Consume and return other process timing for a specific frame."""
+	_buffer_mutex.lock()
+	for i in range(_other_process_buffer.size() - 1, -1, -1):
+		var metric: Dictionary = _other_process_buffer[i]
+		if metric.get("frame_id", -1) == frame_id or metric.get("frame_id", -1) == frame_id - 1:
+			var result: Dictionary = metric.duplicate()
+			_other_process_buffer.remove_at(i)
+			_buffer_mutex.unlock()
+			return result
+	_buffer_mutex.unlock()
+	return {}

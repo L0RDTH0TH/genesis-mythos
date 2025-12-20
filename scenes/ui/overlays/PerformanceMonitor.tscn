@@ -1,8 +1,9 @@
-[gd_scene load_steps=3 format=3 uid="uid://perf_monitor"]
+[gd_scene load_steps=4 format=3 uid="uid://perf_monitor"]
 
 [ext_resource type="Script" path="res://scripts/ui/overlays/PerformanceMonitor.gd" id="1_perf_monitor"]
 [ext_resource type="Script" path="res://scripts/ui/overlays/GraphControl.gd" id="2_graph_control"]
-[ext_resource type="Theme" uid="uid://dpiqolc47bhf4" path="res://themes/bg3_theme.tres" id="3_theme"]
+[ext_resource type="Script" path="res://scripts/ui/overlays/WaterfallControl.gd" id="3_waterfall_control"]
+[ext_resource type="Theme" uid="uid://dpiqolc47bhf4" path="res://themes/bg3_theme.tres" id="4_theme"]
 
 [node name="PerformanceMonitor" type="CanvasLayer"]
 layer = 20
@@ -21,7 +22,7 @@ offset_right = 0.0
 offset_bottom = 0.0
 grow_horizontal = 2
 grow_vertical = 2
-theme = ExtResource("3_theme")
+theme = ExtResource("4_theme")
 mouse_filter = 2
 
 [node name="Content" type="VBoxContainer" parent="PerfPanel"]
@@ -82,7 +83,7 @@ offset_bottom = 0.0
 grow_horizontal = 2
 grow_vertical = 0
 visible = false
-theme = ExtResource("3_theme")
+theme = ExtResource("4_theme")
 mouse_filter = 2
 
 [node name="MarginContainer" type="MarginContainer" parent="BottomGraphBar"]
@@ -96,32 +97,45 @@ theme_override_constants/margin_bottom = 10
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-theme_override_constants/separation = 40
+theme_override_constants/separation = 0
 
-[node name="BottomFPSGraph" type="Control" parent="BottomGraphBar/MarginContainer/BottomGraphsContainer"]
+[node name="WaterfallControl" type="Control" parent="BottomGraphBar/MarginContainer/BottomGraphsContainer"]
 layout_mode = 2
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-custom_minimum_size = Vector2(0, 140)
-script = ExtResource("2_graph_control")
+custom_minimum_size = Vector2(0, 480)
+script = ExtResource("3_waterfall_control")
 
-[node name="BottomProcessGraph" type="Control" parent="BottomGraphBar/MarginContainer/BottomGraphsContainer"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-custom_minimum_size = Vector2(0, 140)
-script = ExtResource("2_graph_control")
+[node name="TooltipPanel" type="Panel" parent="BottomGraphBar/MarginContainer/BottomGraphsContainer/WaterfallControl"]
+layout_mode = 1
+anchors_preset = 0
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -100.0
+offset_top = -75.0
+offset_right = 100.0
+offset_bottom = 75.0
+grow_horizontal = 2
+grow_vertical = 2
+visible = false
+mouse_filter = 2
 
-[node name="BottomRefreshGraph" type="Control" parent="BottomGraphBar/MarginContainer/BottomGraphsContainer"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-custom_minimum_size = Vector2(0, 140)
-script = ExtResource("2_graph_control")
-
-[node name="BottomThreadGraph" type="Control" parent="BottomGraphBar/MarginContainer/BottomGraphsContainer"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-custom_minimum_size = Vector2(0, 140)
-script = ExtResource("2_graph_control")
+[node name="TooltipLabel" type="Label" parent="BottomGraphBar/MarginContainer/BottomGraphsContainer/WaterfallControl/TooltipPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+text = "Tooltip"

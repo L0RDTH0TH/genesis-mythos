@@ -21,6 +21,7 @@ enum Mode { OFF, SIMPLE, DETAILED }
 @onready var bottom_process_graph: GraphControl = $BottomGraphBar/MarginContainer/BottomGraphsContainer/BottomProcessGraph
 @onready var bottom_refresh_graph: GraphControl = $BottomGraphBar/MarginContainer/BottomGraphsContainer/BottomRefreshGraph
 @onready var bottom_thread_graph: GraphControl = $BottomGraphBar/MarginContainer/BottomGraphsContainer/BottomThreadGraph
+@onready var waterfall_control: WaterfallControl = $BottomGraphBar/MarginContainer/BottomGraphsContainer/WaterfallControl
 
 var current_mode: Mode = Mode.OFF : set = set_mode
 
@@ -114,8 +115,12 @@ func _ready() -> void:
 	if not bottom_refresh_graph:
 		MythosLogger.error("PerformanceMonitor", "bottom_refresh_graph not found!")
 		return
+	# Old bottom graphs are optional (replaced by waterfall view)
 	if not bottom_thread_graph:
-		MythosLogger.error("PerformanceMonitor", "bottom_thread_graph not found!")
+		MythosLogger.warn("PerformanceMonitor", "bottom_thread_graph not found (optional, using waterfall)")
+	
+	if not waterfall_control:
+		MythosLogger.error("PerformanceMonitor", "waterfall_control not found!")
 		return
 	
 	MythosLogger.debug("PerformanceMonitor", "All @onready nodes validated successfully")
@@ -379,15 +384,39 @@ func _process(_delta: float) -> void:
 		process_graph.add_value(process_ms)
 		refresh_graph.add_value(refresh_time_ms)
 		
-		# Update large bottom graphs
-		if bottom_fps_graph:
-			bottom_fps_graph.add_value(fps)
-		if bottom_process_graph:
-			bottom_process_graph.add_value(process_ms)
-		if bottom_refresh_graph:
-			bottom_refresh_graph.add_value(refresh_time_ms)
-		if bottom_thread_graph:
-			bottom_thread_graph.add_value(thread_compute_time_ms)
+		# Update waterfall view (replaces bottom graphs)
+		if waterfall_control and _frame_count >= 3:
+			var frame_id: int = Engine.get_process_frames()
+			var frame_time_start: int = Time.get_ticks_usec()
+			var frame_delta_ms: float = _delta * 1000.0
+			
+			var physics_ms: float = Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
+			var refresh_ms: float = _match_refresh_to_frame(frame_id)
+			var thread_ms: float = _match_thread_to_frame(frame_id)
+			
+			var cpu_total_ms: float = process_ms + physics_ms + refresh_ms + thread_ms
+			var other_process_ms: float = max(0.0, process_ms - refresh_ms - thread_ms)
+			var idle_ms: float = max(0.0, frame_delta_ms - cpu_total_ms)
+			
+			var draw_calls: int = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)
+			var primitives: int = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME)
+			
+			var primary: Dictionary = {
+				"frame_id": frame_id,
+				"frame_delta_ms": frame_delta_ms,
+				"process_ms": process_ms,
+				"physics_ms": physics_ms,
+				"refresh_ms": refresh_ms,
+				"thread_ms": thread_ms,
+				"other_process_ms": other_process_ms,
+				"idle_ms": idle_ms,
+				"draw_calls": draw_calls,
+				"primitives": primitives,
+				"timestamp_usec": frame_time_start
+			}
+			
+			var sub_breakdowns: Array[Dictionary] = _sub_breakdowns_for_frame(frame_id)
+			waterfall_control.add_frame_metrics(primary, sub_breakdowns)
 		
 		# Update refresh label with color coding
 		if refresh_label:
@@ -482,15 +511,9 @@ func _update_bottom_graph_bar() -> void:
 	bottom_graph_bar.offset_bottom = -UIConstants.BOTTOM_GRAPH_BAR_MARGIN
 	bottom_graph_bar.custom_minimum_size = Vector2(0, UIConstants.BOTTOM_GRAPH_BAR_HEIGHT)
 	
-	# Update graph heights to use new constant
-	if bottom_fps_graph:
-		bottom_fps_graph.custom_minimum_size.y = UIConstants.GRAPH_INNER_HEIGHT
-	if bottom_process_graph:
-		bottom_process_graph.custom_minimum_size.y = UIConstants.GRAPH_INNER_HEIGHT
-		if bottom_refresh_graph:
-			bottom_refresh_graph.custom_minimum_size.y = UIConstants.GRAPH_INNER_HEIGHT
-		if bottom_thread_graph:
-			bottom_thread_graph.custom_minimum_size.y = UIConstants.GRAPH_INNER_HEIGHT
+	# Update waterfall control height
+	if waterfall_control:
+		waterfall_control.custom_minimum_size = Vector2(0, UIConstants.BOTTOM_GRAPH_BAR_HEIGHT)
 	
 	# Set visibility based on mode
 	bottom_graph_bar.visible = (current_mode == Mode.DETAILED)
@@ -718,6 +741,59 @@ func _find_world_generator_recursive(node: Node):
 			return result
 	
 	return null
+
+
+## Waterfall View Frame Matching Methods
+
+func _match_refresh_to_frame(frame_id: int) -> float:
+	"""Match refresh breakdown to frame_id from PerformanceMonitorSingleton buffer."""
+	var metric: Dictionary = PerformanceMonitorSingleton.consume_refresh_for_frame(frame_id)
+	if metric.is_empty():
+		return refresh_time_ms  # Fallback to current refresh_time_ms
+	
+	var breakdown: Dictionary = metric.get("breakdown", {})
+	return breakdown.get("total_ms", refresh_time_ms)
+
+func _match_thread_to_frame(frame_id: int) -> float:
+	"""Match thread breakdown to frame_id from PerformanceMonitorSingleton buffer."""
+	var metric: Dictionary = PerformanceMonitorSingleton.consume_thread_for_frame(frame_id)
+	if metric.is_empty():
+		return thread_compute_time_ms  # Fallback to current thread_compute_time_ms
+	
+	var breakdown: Dictionary = metric.get("breakdown", {})
+	return breakdown.get("total_ms", thread_compute_time_ms)
+
+func _sub_breakdowns_for_frame(frame_id: int) -> Array[Dictionary]:
+	"""Get sub-breakdowns for a frame (refresh and thread sub-metrics)."""
+	var sub_breakdowns: Array[Dictionary] = []
+	
+	# Get refresh sub-metrics
+	var refresh_metric: Dictionary = PerformanceMonitorSingleton.consume_refresh_for_frame(frame_id)
+	if not refresh_metric.is_empty():
+		var breakdown: Dictionary = refresh_metric.get("breakdown", {})
+		if breakdown.has("culling_ms") or breakdown.has("mesh_gen_ms") or breakdown.has("texture_update_ms"):
+			sub_breakdowns.append({
+				"category": "refresh",
+				"breakdown": breakdown
+			})
+	
+	# Get thread sub-metrics
+	var thread_metric: Dictionary = PerformanceMonitorSingleton.consume_thread_for_frame(frame_id)
+	if not thread_metric.is_empty():
+		var breakdown: Dictionary = thread_metric.get("breakdown", {})
+		# Check for per-thread metrics (e.g., thread_0, thread_1)
+		var has_thread_sub: bool = false
+		for key: String in breakdown.keys():
+			if key.begins_with("thread_"):
+				has_thread_sub = true
+				break
+		if has_thread_sub:
+			sub_breakdowns.append({
+				"category": "thread",
+				"breakdown": breakdown
+			})
+	
+	return sub_breakdowns
 
 
 ## DiagnosticDispatcher public API
