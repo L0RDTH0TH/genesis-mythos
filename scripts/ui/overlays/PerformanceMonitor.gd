@@ -107,18 +107,9 @@ func _ready() -> void:
 	if not bottom_graph_bar:
 		MythosLogger.error("PerformanceMonitor", "bottom_graph_bar not found!")
 		return
-	if not bottom_fps_graph:
-		MythosLogger.error("PerformanceMonitor", "bottom_fps_graph not found!")
-		return
-	if not bottom_process_graph:
-		MythosLogger.error("PerformanceMonitor", "bottom_process_graph not found!")
-		return
-	if not bottom_refresh_graph:
-		MythosLogger.error("PerformanceMonitor", "bottom_refresh_graph not found!")
-		return
+	
 	# Old bottom graphs are optional (replaced by waterfall view)
-	# Old bottom graphs are optional (replaced by waterfall view)
-	# No need to log warnings - they're intentionally removed
+	# No need to check or log - they're intentionally removed
 	
 	if not waterfall_control:
 		MythosLogger.error("PerformanceMonitor", "waterfall_control not found!")
@@ -190,18 +181,22 @@ func _ready() -> void:
 	refresh_graph.max_value = 16.67  # 60 FPS budget (same as process)
 	refresh_graph.line_color = Color(1.0, 0.3, 0.3)  # Red for refresh bottleneck
 	
-	# Configure bottom graphs with headroom for spikes
-	bottom_fps_graph.max_value = 120.0  # Give headroom above 60 FPS
-	bottom_fps_graph.line_color = Color(0.2, 1.0, 0.2)
+	# Configure bottom graphs with headroom for spikes (optional - replaced by waterfall)
+	if bottom_fps_graph:
+		bottom_fps_graph.max_value = 120.0  # Give headroom above 60 FPS
+		bottom_fps_graph.line_color = Color(0.2, 1.0, 0.2)
 	
-	bottom_process_graph.max_value = 33.33  # Headroom for 30 FPS budget
-	bottom_process_graph.line_color = Color(1.0, 1.0, 0.2)
+	if bottom_process_graph:
+		bottom_process_graph.max_value = 33.33  # Headroom for 30 FPS budget
+		bottom_process_graph.line_color = Color(1.0, 1.0, 0.2)
 	
-	bottom_refresh_graph.max_value = 33.33  # Headroom for refresh spikes
-	bottom_refresh_graph.line_color = Color(1.0, 0.3, 0.3)  # Red for refresh bottleneck
+	if bottom_refresh_graph:
+		bottom_refresh_graph.max_value = 33.33  # Headroom for refresh spikes
+		bottom_refresh_graph.line_color = Color(1.0, 0.3, 0.3)  # Red for refresh bottleneck
 	
-	bottom_thread_graph.max_value = 33.33  # Headroom for thread compute time
-	bottom_thread_graph.line_color = Color(0.3, 0.7, 1.0)  # Blue for thread compute time
+	if bottom_thread_graph:
+		bottom_thread_graph.max_value = 33.33  # Headroom for thread compute time
+		bottom_thread_graph.line_color = Color(0.3, 0.7, 1.0)  # Blue for thread compute time
 	
 	# Apply theme stylebox for overlay (moved from programmatic creation to theme)
 	var theme_stylebox: StyleBox = perf_panel.get_theme_stylebox("perf_overlay", "PanelContainer")
