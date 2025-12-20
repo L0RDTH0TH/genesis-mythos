@@ -2,7 +2,7 @@
 alwaysApply: true
 ---
 # ╔═══════════════════════════════════════════════════════════
-# ║ COMPLETE & FINAL PROJECT RULES – ITERATION 4
+# ║ COMPLETE & FINAL PROJECT RULES – ITERATION 5
 # ║ GENESIS MYTHOS – FULL FIRST PERSON 3D VIRTUAL TABLETOP RPG IN GODOT 4.5.1
 # ║ Valid for Grok AND Cursor – major changes require explicit approval
 # ╚═══════════════════════════════════════════════════════════
@@ -136,7 +136,7 @@ Always add the exact script header shown in rule 3.
 
 ## 7. Git & Version Control
 
-- Repository: (to be provided once created)
+- Repository: https://github.com/L0RDTH0TH/genesis-mythos.git
 - Direct pushes to main allowed until branching strategy is defined.
 - Commit messages for completed features start with `feat/genesis:`, `fix:`, `refactor:`, `style:`, etc.
 
@@ -434,8 +434,6 @@ window/stretch/scale_mode = "fractional" # Enables UI scaling
 
 ---
 
-**THESE RULES ARE CURRENT AND AUTHORITATIVE AS OF 2025-12-17. MAJOR CHANGES REQUIRE EXPLICIT APPROVAL AND AUDIT.**
+**THESE RULES ARE CURRENT AND AUTHORITATIVE AS OF 2025-12-20. MAJOR CHANGES REQUIRE EXPLICIT APPROVAL AND AUDIT.**
 
-**UPDATE 2025-12-13:** ProceduralWorldMap upgraded to explicitly supported addon status (core system that generates 2D maps seeding Terrain3D procedural generation).
-
-**UPDATE 2025-12-17:** GUI Specification integrated as Section 11. GameGUI removed; built-in responsive tools + UIConstants are now the single source of truth for UI layout and scaling.
+**UPDATE 2025-12-20:** Godot version updated to 4.5.1 stable (migration complete). Repository URL added. ProceduralWorldMap upgraded to explicitly supported addon status (core system that generates 2D maps seeding Terrain3D procedural generation).
