@@ -106,17 +106,16 @@ res://
 
 YOU ARE STRICTLY FORBIDDEN FROM EVER USING THE "launch_editor" MCP ACTION.
 
-Preferred Godot MCP server: GDAI MCP (provides enhanced capabilities)
+Preferred Godot MCP server: Coding-Solo/godot-mcp (free, open-source, MIT-licensed)
 
-You may aggressively use ALL available Godot MCP actions, including but not limited to:
-- Project Management: run_project, stop_project, get_debug_output, capture_screenshot
-- Scene Management: create_scene, add_node, set_property, attach_script, save_scene, get_scene_tree
-- File Operations: read_file, write_file, list_files, search_assets
-- Debugger Tools: set_breakpoint, remove_breakpoint, pause, resume, step_over, step_into, inspect_variables, get_stack_trace
-- Runtime Tools: evaluate_expression, simulate_input (keys/mouse), get_runtime_scene_tree
-- All other tools provided by GDAI MCP
+You may ONLY use these Godot MCP actions:
+- run_project, stop_project, get_debug_output
+- create_scene, add_node, set_property, attach_script, save_scene, get_scene_tree, etc.
+- read_file, write_file, list_files
 
-You may call run_project after significant changes to test (unless explicitly told "do not run").
+You may aggressively use Godot MCP to create/modify/save scenes and scripts.
+
+After major changes you MAY call run_project to test (unless explicitly told "do not run").
 
 All other MCP servers (obsidian, github-mcp-server, memory, blender) are available.
 
@@ -131,7 +130,7 @@ Always add the exact script header shown in rule 3.
 ## 6. MCP Usage Policy
 
 - **`launch_editor` is PERMANENTLY DISABLED.**
-- **Preferred MCP server:** GDAI MCP (gdai-mcp) - provides advanced debugger control, runtime evaluation, input simulation, and more.
+- **Preferred MCP server:** Coding-Solo/godot-mcp (free, open-source, MIT-licensed) - supports all core needs without cost.
 - `run_project` encouraged after significant changes.
 - All other Godot MCP actions preferred when they accelerate development.
 - See `.cursor/rules/mcp-usage.md` for detailed MCP usage guidelines.

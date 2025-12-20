@@ -1,25 +1,26 @@
 ---
 alwaysApply: true
 ---
-# Genesis Mythos MCP Usage Rules (Updated 2025-12-20 – GDAI MCP)
+# Genesis Mythos MCP Usage Rules (Updated 2025-12-20 – Reverted to Free Coding-Solo/godot-mcp)
 
 YOU ARE STRICTLY FORBIDDEN FROM EVER USING THE "launch_editor" MCP ACTION.
 
-**Preferred Godot MCP server:** GDAI MCP (gdai-mcp command)
+**Preferred Godot MCP server:** Coding-Solo/godot-mcp (free, open-source, MIT-licensed)
 
-You may aggressively use ALL available Godot MCP actions, including but not limited to:
+You may ONLY use these Godot MCP actions:
+- run_project, stop_project, get_debug_output
+- create_scene, add_node, set_property, attach_script, save_scene, get_scene_tree, etc.
+- read_file, write_file, list_files
 
-- **Project Management:** `run_project`, `stop_project`, `get_debug_output`, `capture_screenshot`
-- **Scene Management:** `create_scene`, `add_node`, `set_property`, `attach_script`, `save_scene`, `get_scene_tree`
-- **File Operations:** `read_file`, `write_file`, `list_files`, `search_assets`
-- **Debugger Tools:** `set_breakpoint`, `remove_breakpoint`, `pause`, `resume`, `step_over`, `step_into`, `inspect_variables`, `get_stack_trace`
-- **Runtime Tools:** `evaluate_expression`, `simulate_input` (keys/mouse), `get_runtime_scene_tree`
-- **All other tools provided by GDAI MCP**
+You may aggressively use Godot MCP to create/modify/save scenes and scripts.
 
-You may call `run_project` after significant changes to test (unless told not to).
+After major changes you MAY call run_project to test (unless explicitly told "do not run").
 
-Other MCP servers (obsidian, github-mcp-server, memory, etc.) remain available.
+All other MCP servers (obsidian, github-mcp-server, memory, etc.) are available.
 
 When finishing a logical feature → auto commit + push via github-mcp-server with clear message (`feat/genesis:`, `fix:`, `refactor:`, etc.).
 
-You MUST continue to obey 100% the folder structure, naming conventions, typed GDScript, theme rules, script headers, and all other project rules from `project-rules.md`.
+You MUST obey 100% the folder structure, naming conventions, typed GDScript, and theme rules above.
+Never create files outside allowed paths.
+Always use the current theme path res://themes/bg3_theme.tres
+Always add the exact script header shown in rule 3.
