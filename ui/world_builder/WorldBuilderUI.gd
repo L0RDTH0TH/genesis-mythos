@@ -159,8 +159,14 @@ func _ready() -> void:
 	_update_viewport_size()
 	MythosLogger.info("UI/WorldBuilder", "Wizard-style UI ready")
 	
-	# Disable _process() - no per-frame logic needed (saves 1.342ms per frame)
-	set_process(false)
+	# Connect to PerformanceLogger state changes to enable/disable _process() dynamically
+	if PerformanceLogger != null:
+		PerformanceLogger.logging_state_changed.connect(_on_performance_logging_state_changed)
+		# Set initial state
+		_on_performance_logging_state_changed(PerformanceLogger.is_logging_enabled)
+	else:
+		# Disable _process() if PerformanceLogger not available
+		set_process(false)
 	
 	# PROFILING: Setup 120-second summary timer
 	_setup_profiling_summary_timer()
@@ -173,11 +179,26 @@ func _notification(what: int) -> void:
 
 
 func _process(delta: float) -> void:
-	"""PROFILING: Per-frame processing - timing instrumentation."""
+	"""PROFILING: Per-frame processing - timing instrumentation and performance logging."""
 	var frame_start: int = Time.get_ticks_usec()
 	profiling_process_calls += 1
 	
-	# Existing per-frame logic would go here (currently none)
+	# Performance logging integration (if PerformanceLogger is available)
+	if PerformanceLogger != null:
+		# Collect custom data for logging
+		var custom_data: Dictionary = {
+			"scene": "WorldBuilder",
+			"notes": "Step %d" % current_step
+		}
+		
+		# Add MapMakerModule stats if available (example: could add draw_calls, primitives from MapRenderer)
+		if map_maker_module != null and map_maker_module.map_renderer != null:
+			# Future: could extract actual draw_calls/primitives from MapRenderer
+			# For now, just pass scene context
+			pass
+		
+		# Call performance logger (it handles interval throttling internally)
+		PerformanceLogger.log_current_frame(custom_data)
 	
 	# PROFILING: Report frame time if >1ms
 	var frame_time: int = Time.get_ticks_usec() - frame_start
@@ -196,6 +217,16 @@ func _process(delta: float) -> void:
 		if profiling_fps_samples.size() > 120:  # Keep last 120 samples (2 minutes)
 			profiling_fps_samples.pop_front()
 		print("PROFILING: WorldBuilderUI - Current FPS: ", fps, " current_step=", current_step)
+
+
+func _on_performance_logging_state_changed(is_enabled: bool) -> void:
+	"""Handle PerformanceLogger state changes - enable/disable _process() accordingly."""
+	if is_enabled:
+		set_process(true)
+		MythosLogger.debug("UI/WorldBuilder", "_process() enabled for PerformanceLogger")
+	else:
+		set_process(false)
+		MythosLogger.debug("UI/WorldBuilder", "_process() disabled (PerformanceLogger inactive)")
 
 
 func _setup_profiling_summary_timer() -> void:

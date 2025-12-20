@@ -17,6 +17,15 @@
 		"enabled": true,
 		"daily_rotation": true,
 		"max_file_size_mb": 10
+	},
+	"performance_logging": {
+		"enabled": true,
+		"log_interval_seconds": 0.1,
+		"include_physics_ms": true,
+		"include_draw_calls": true,
+		"include_primitives": true,
+		"include_nodes": true,
+		"include_memory": true
 	}
 }
 
