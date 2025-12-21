@@ -183,19 +183,36 @@ func _collect_stack_sample() -> void:
 	if PerformanceMonitorSingleton and not PerformanceMonitorSingleton.can_log():
 		return
 	
-	# Get stack trace
-	var stack: Array = get_stack()
+	# Get stack trace (get_stack() returns Array[Dictionary] with source, function, line)
+	var raw_stack: Array = get_stack()
 	var max_depth: int = config.get("max_stack_depth", 20)
 	
-	# Limit stack depth
-	if stack.size() > max_depth:
-		stack = stack.slice(0, max_depth)
+	# Limit stack depth (keep deepest frames, remove top-level ones)
+	var stack: Array = []
+	if raw_stack.size() > max_depth:
+		# Keep the deepest frames (most recent calls)
+		var start_idx: int = raw_stack.size() - max_depth
+		stack = raw_stack.slice(start_idx)
+	else:
+		stack = raw_stack.duplicate()
+	
+	# Format stack frames for better readability
+	var formatted_stack: Array[Dictionary] = []
+	for frame in stack:
+		if frame is Dictionary:
+			var formatted_frame: Dictionary = {
+				"function": frame.get("function", "unknown"),
+				"source": frame.get("source", "unknown"),
+				"line": frame.get("line", 0)
+			}
+			formatted_stack.append(formatted_frame)
 	
 	# Create sample dictionary
 	var sample: Dictionary = {
 		"frame_id": Engine.get_process_frames(),
 		"timestamp_usec": Time.get_ticks_usec(),
-		"stack": stack
+		"stack": formatted_stack,
+		"stack_depth": formatted_stack.size()
 	}
 	
 	# Push to buffer (thread-safe)
@@ -230,14 +247,30 @@ func push_flame_data(stack_trace: Array, time_ms: float, frame_id: int = -1) -> 
 		frame_id = Engine.get_process_frames()
 	
 	var max_depth: int = config.get("max_stack_depth", 20)
-	if stack_trace.size() > max_depth:
-		stack_trace = stack_trace.slice(0, max_depth)
+	
+	# Format and limit stack trace
+	var formatted_stack: Array[Dictionary] = []
+	var stack_size: int = stack_trace.size()
+	var start_idx: int = 0
+	if stack_size > max_depth:
+		start_idx = stack_size - max_depth
+	
+	for i in range(start_idx, stack_size):
+		var frame = stack_trace[i]
+		if frame is Dictionary:
+			var formatted_frame: Dictionary = {
+				"function": frame.get("function", "unknown"),
+				"source": frame.get("source", "unknown"),
+				"line": frame.get("line", 0)
+			}
+			formatted_stack.append(formatted_frame)
 	
 	var sample: Dictionary = {
 		"frame_id": frame_id,
 		"timestamp_usec": Time.get_ticks_usec(),
 		"time_ms": time_ms,
-		"stack": stack_trace
+		"stack": formatted_stack,
+		"stack_depth": formatted_stack.size()
 	}
 	
 	# Push to buffer (thread-safe)
@@ -281,11 +314,13 @@ func export_to_json() -> String:
 	var samples_to_export: Array[Dictionary] = stack_samples.duplicate()
 	_buffer_mutex.unlock()
 	
-	# Create export data structure
+	# Create export data structure (basic format for Phase 2, will be enhanced in Phase 3)
 	var export_data: Dictionary = {
 		"metadata": {
 			"export_timestamp": Time.get_datetime_string_from_system(),
 			"sample_count": samples_to_export.size(),
+			"profiler": "GenesisMythos_FlameGraphProfiler",
+			"version": "1.0.0",
 			"config": config
 		},
 		"samples": samples_to_export
