@@ -574,7 +574,7 @@ func _update_bottom_graph_bar() -> void:
 		waterfall_control.custom_minimum_size = Vector2(0, UIConstants.BOTTOM_GRAPH_BAR_HEIGHT)
 	
 	# Set visibility based on mode
-	bottom_graph_bar.visible = (current_mode == Mode.DETAILED)
+	bottom_graph_bar.visible = (current_mode == Mode.DETAILED or current_mode == Mode.FLAME)
 	
 	MythosLogger.debug("PerformanceMonitor", "Bottom graph bar updated (visible: %s, height: %d)" % [bottom_graph_bar.visible, UIConstants.BOTTOM_GRAPH_BAR_HEIGHT])
 
