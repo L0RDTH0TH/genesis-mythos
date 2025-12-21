@@ -237,10 +237,20 @@ func _emit_progress(phase: String, percent: float) -> void:
 func _push_thread_breakdown_main_thread(breakdown: Dictionary) -> void:
 	"""Push thread breakdown to PerformanceMonitorSingleton on main thread (callable from thread via call_deferred)."""
 	var frame_id: int = Engine.get_process_frames()
+	var total_ms: float = breakdown.get("total_ms", 0.0)
+	
+	# Phase 2: Set thread_time_ms directly (bypasses buffer, available for PerformanceLogger)
+	PerformanceMonitorSingleton.set_thread_time_ms(total_ms)
+	
+	# Phase 1: Also push to breakdown buffer (for waterfall view)
 	PerformanceMonitorSingleton.push_thread_breakdown(breakdown, frame_id)
-	MythosLogger.debug("WorldGenerator", "Pushed thread breakdown to buffer", {
+	
+	MythosLogger.info("WorldGenerator", "Pushed thread breakdown (both buffer and direct time)", {
 		"frame_id": frame_id,
-		"total_ms": breakdown.get("total_ms", 0.0)
+		"total_ms": total_ms,
+		"configure_noise_ms": breakdown.get("configure_noise_ms", 0.0),
+		"generate_heightmap_ms": breakdown.get("generate_heightmap_ms", 0.0),
+		"post_processing_ms": breakdown.get("post_processing_ms", 0.0)
 	})
 
 

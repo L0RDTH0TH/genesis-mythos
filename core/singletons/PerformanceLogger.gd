@@ -226,17 +226,28 @@ func log_current_frame(custom_data: Dictionary = {}) -> void:
 	var scene_name: String = custom_data.get("scene", "")
 	var notes: String = custom_data.get("notes", "")
 	
-	# Thread time: Try breakdown buffer first (frame-accurate), fallback to PerformanceMonitor
-	var thread_ms: float = 0.0
-	var frame_id: int = Engine.get_process_frames()
-	var thread_metric: Dictionary = PerformanceMonitorSingleton.consume_thread_for_frame(frame_id)
+	# Thread time: Phase 2 - Use direct thread_time_ms (bypasses buffer consumption conflict)
+	# Phase 1 fallback: Peek at breakdown buffer if direct time is 0.0
+	var thread_ms: float = PerformanceMonitorSingleton.get_thread_time_ms()
 	
-	if not thread_metric.is_empty():
-		var breakdown: Dictionary = thread_metric.get("breakdown", {})
-		thread_ms = breakdown.get("total_ms", 0.0)
-	elif PerformanceMonitorSingleton.monitor_instance:
-		# Fallback to PerformanceMonitor's aggregated thread compute time
-		thread_ms = PerformanceMonitorSingleton.monitor_instance.thread_compute_time_ms
+	if thread_ms == 0.0:
+		# Fallback: Peek at breakdown buffer (non-destructive read)
+		var frame_id: int = Engine.get_process_frames()
+		var thread_metric: Dictionary = PerformanceMonitorSingleton.peek_thread_for_frame(frame_id)
+		if not thread_metric.is_empty():
+			var breakdown: Dictionary = thread_metric.get("breakdown", {})
+			thread_ms = breakdown.get("total_ms", 0.0)
+			MythosLogger.debug("PerformanceLogger", "Using thread time from breakdown buffer (peek)", {
+				"frame_id": frame_id,
+				"thread_ms": thread_ms
+			})
+		elif PerformanceMonitorSingleton.monitor_instance:
+			# Final fallback: PerformanceMonitor's aggregated thread compute time
+			thread_ms = PerformanceMonitorSingleton.monitor_instance.thread_compute_time_ms
+			if thread_ms > 0.0:
+				MythosLogger.debug("PerformanceLogger", "Using thread time from PerformanceMonitor fallback", {
+					"thread_ms": thread_ms
+				})
 	
 	# Format timestamp
 	var timestamp: String = Time.get_datetime_string_from_system(false, true)

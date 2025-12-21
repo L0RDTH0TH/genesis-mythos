@@ -61,6 +61,11 @@ var _thread_breakdown_buffer: Array[Dictionary] = []
 var _other_process_buffer: Array[Dictionary] = []
 var _buffer_mutex: Mutex = Mutex.new()
 
+## Direct thread time storage (Phase 2: Separate from breakdown buffer)
+## Updated by WorldGenerator after generation completes, read by PerformanceLogger
+var thread_time_ms: float = 0.0
+var _thread_time_mutex: Mutex = Mutex.new()
+
 func push_refresh_breakdown(breakdown: Dictionary, frame_id: int = -1) -> void:
 	"""Push refresh breakdown with frame_id for waterfall view sync."""
 	if frame_id == -1:
@@ -85,9 +90,37 @@ func push_thread_breakdown(breakdown: Dictionary, frame_id: int = -1) -> void:
 		"breakdown": breakdown,
 		"timestamp_usec": Time.get_ticks_usec()
 	})
-	if _thread_breakdown_buffer.size() > UIConstants.WATERFALL_BUFFER_MAX:
+	var buffer_size: int = _thread_breakdown_buffer.size()
+	if buffer_size > UIConstants.WATERFALL_BUFFER_MAX:
 		_thread_breakdown_buffer.pop_front()
 	_buffer_mutex.unlock()
+	
+	var total_ms: float = breakdown.get("total_ms", 0.0)
+	MythosLogger.info("PerformanceMonitorSingleton", "Pushed thread breakdown to buffer", {
+		"frame_id": frame_id,
+		"buffer_size": buffer_size,
+		"total_ms": total_ms
+	})
+
+
+func set_thread_time_ms(time_ms: float) -> void:
+	"""Set thread compute time directly (Phase 2: Separate from breakdown buffer)."""
+	_thread_time_mutex.lock()
+	var old_value: float = thread_time_ms
+	thread_time_ms = time_ms
+	_thread_time_mutex.unlock()
+	MythosLogger.info("PerformanceMonitorSingleton", "Set thread_time_ms", {
+		"old_value": old_value,
+		"new_value": time_ms
+	})
+
+
+func get_thread_time_ms() -> float:
+	"""Get current thread compute time (Phase 2: Direct access, no buffer consumption)."""
+	_thread_time_mutex.lock()
+	var result: float = thread_time_ms
+	_thread_time_mutex.unlock()
+	return result
 
 func push_other_process_timing(timing_ms: float, frame_id: int = -1) -> void:
 	"""Push explicit other process timing with frame_id."""
@@ -137,15 +170,41 @@ func consume_refresh_for_frame(frame_id: int) -> Dictionary:
 	_buffer_mutex.unlock()
 	return {}
 
-func consume_thread_for_frame(frame_id: int) -> Dictionary:
-	"""Consume and return thread breakdown for a specific frame."""
+func peek_thread_for_frame(frame_id: int) -> Dictionary:
+	"""Peek at thread breakdown for a specific frame without removing it (non-destructive read)."""
 	_buffer_mutex.lock()
 	for i in range(_thread_breakdown_buffer.size() - 1, -1, -1):
 		var metric: Dictionary = _thread_breakdown_buffer[i]
 		if metric.get("frame_id", -1) == frame_id or metric.get("frame_id", -1) == frame_id - 1:
 			var result: Dictionary = metric.duplicate()
+			_buffer_mutex.unlock()
+			MythosLogger.debug("PerformanceMonitorSingleton", "Peeked thread breakdown", {
+				"frame_id": frame_id,
+				"buffer_size": _thread_breakdown_buffer.size()
+			})
+			return result
+	_buffer_mutex.unlock()
+	return {}
+
+
+func consume_thread_for_frame(frame_id: int) -> Dictionary:
+	"""Consume and return thread breakdown for a specific frame (removes from buffer)."""
+	_buffer_mutex.lock()
+	var buffer_size_before: int = _thread_breakdown_buffer.size()
+	for i in range(_thread_breakdown_buffer.size() - 1, -1, -1):
+		var metric: Dictionary = _thread_breakdown_buffer[i]
+		if metric.get("frame_id", -1) == frame_id or metric.get("frame_id", -1) == frame_id - 1:
+			var result: Dictionary = metric.duplicate()
+			var breakdown: Dictionary = result.get("breakdown", {})
+			var total_ms: float = breakdown.get("total_ms", 0.0)
 			_thread_breakdown_buffer.remove_at(i)
 			_buffer_mutex.unlock()
+			MythosLogger.info("PerformanceMonitorSingleton", "Consumed thread breakdown", {
+				"frame_id": frame_id,
+				"buffer_size_before": buffer_size_before,
+				"buffer_size_after": _thread_breakdown_buffer.size(),
+				"total_ms": total_ms
+			})
 			return result
 	_buffer_mutex.unlock()
 	return {}
