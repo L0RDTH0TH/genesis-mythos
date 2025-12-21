@@ -12,8 +12,8 @@ const CONFIG_PATH: String = "res://data/config/logging_config.json"
 ## Performance logging configuration
 var config: Dictionary = {}
 
-## Is performance logging currently enabled
-var is_logging_enabled: bool = false
+## Is performance logging currently enabled (default: true)
+var is_logging_enabled: bool = true
 
 ## Current log file handle
 var log_file: FileAccess = null
@@ -30,9 +30,6 @@ var last_log_time: float = 0.0
 ## Frame counter for CSV
 var frame_counter: int = 0
 
-## Track if F9 was just pressed (to prevent repeat triggers)
-var f9_pressed_last_frame: bool = false
-
 ## Notification label for on-screen status (optional)
 var status_label: Label = null
 
@@ -45,12 +42,12 @@ func _ready() -> void:
 	_load_config()
 	_ensure_log_directory()
 	
-	# Apply config setting
+	# Apply config setting (default: enabled = true)
 	var perf_config: Dictionary = config.get("performance_logging", {})
-	is_logging_enabled = perf_config.get("enabled", false)
+	is_logging_enabled = perf_config.get("enabled", true)
 	
 	if is_logging_enabled:
-		MythosLogger.info("PerformanceLogger", "Performance logging enabled via config")
+		MythosLogger.info("PerformanceLogger", "Performance logging active (press F9 to toggle)")
 		# Start log file immediately if enabled
 		_start_log_file()
 	else:
@@ -62,15 +59,16 @@ func _ready() -> void:
 	logging_state_changed.emit(is_logging_enabled)
 
 
+func _input(event: InputEvent) -> void:
+	"""Handle input for toggling performance logging."""
+	if event is InputEventKey:
+		if event.is_action_pressed("toggle_perf_logger"):
+			toggle_logging()
+			get_viewport().set_input_as_handled()
+
+
 func _process(_delta: float) -> void:
-	"""Process per-frame logic: check F9 toggle and handle interval logging."""
-	# Check F9 key toggle (manual override)
-	if Input.is_key_pressed(KEY_F9) and not f9_pressed_last_frame:
-		f9_pressed_last_frame = true
-		toggle_logging()
-	elif not Input.is_key_pressed(KEY_F9):
-		f9_pressed_last_frame = false
-	
+	"""Process per-frame logic: handle interval logging."""
 	# If logging is enabled but file not open, start new log file
 	if is_logging_enabled and log_file == null:
 		_start_log_file()
