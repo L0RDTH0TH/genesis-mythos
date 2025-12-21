@@ -3,6 +3,28 @@
 # ║ Desc: Singleton for flame graph profiling data collection
 # ║ Author: Lordthoth
 # ╚═══════════════════════════════════════════════════════════
+#
+# Flame Graph Profiler - Collects stack traces and builds hierarchical call trees
+# for performance analysis. Supports sampling-based profiling with configurable
+# intervals. Exports data in JSON format compatible with flame graph visualization tools.
+#
+# Usage:
+#   - Enable via config: res://data/config/flame_graph_config.json (set "enabled": true)
+#   - Or toggle at runtime: FlameGraphProfiler.start_profiling() / stop_profiling()
+#   - Hotkey: F10 (via PerformanceMonitor integration)
+#   - Export: FlameGraphProfiler.export_to_json() or automatic via auto_export_interval_seconds
+#
+# Performance Overhead:
+#   - Sampling mode: <2% CPU overhead (configurable via sampling_interval_ms)
+#   - Buffer size: MAX_SAMPLES (1000) samples, ~50KB memory
+#   - Thread-safe: Uses mutex for buffer operations
+#
+# Export Format:
+#   - JSON with metadata, call_tree (hierarchical), and raw samples
+#   - Call tree nodes include: function, source, line, total_time_ms, self_time_ms, call_count
+#   - Compatible with external flame graph tools (speedscope, flamegraph.pl)
+#
+# ╚═══════════════════════════════════════════════════════════
 
 extends Node
 

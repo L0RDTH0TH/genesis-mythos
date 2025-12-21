@@ -277,6 +277,9 @@ func _input(event: InputEvent) -> void:
 		elif event.is_action_pressed("perf_export_data"):
 			export_snapshot()
 			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("toggle_flame_graph"):
+			_toggle_flame_graph()
+			get_viewport().set_input_as_handled()
 
 func _unhandled_input(event: InputEvent) -> void:
 	"""Handle unhandled input as fallback for key detection."""
@@ -284,6 +287,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.physical_keycode == KEY_F3:
 			MythosLogger.debug("PerformanceMonitor", "F3 detected via _unhandled_input - cycling mode")
 			cycle_mode()
+			get_viewport().set_input_as_handled()
+		elif event.physical_keycode == KEY_F10:
+			MythosLogger.debug("PerformanceMonitor", "F10 detected via _unhandled_input - toggling flame graph")
+			_toggle_flame_graph()
 			get_viewport().set_input_as_handled()
 
 func cycle_mode() -> void:
@@ -854,5 +861,36 @@ func can_log() -> bool:
 		return true
 	
 	return false
+
+
+func _toggle_flame_graph() -> void:
+	"""Toggle flame graph profiling on/off (F10 hotkey handler)."""
+	if not FlameGraphProfiler:
+		MythosLogger.warn("PerformanceMonitor", "FlameGraphProfiler not available")
+		return
+	
+	if FlameGraphProfiler.is_profiling_enabled:
+		FlameGraphProfiler.stop_profiling()
+		MythosLogger.info("PerformanceMonitor", "Flame graph profiling stopped (F10)")
+	else:
+		FlameGraphProfiler.start_profiling()
+		MythosLogger.info("PerformanceMonitor", "Flame graph profiling started (F10)")
+
+
+func export_flame_graph() -> void:
+	"""Export flame graph data to JSON file."""
+	if not FlameGraphProfiler:
+		MythosLogger.warn("PerformanceMonitor", "FlameGraphProfiler not available")
+		return
+	
+	if not FlameGraphProfiler.is_profiling_enabled:
+		MythosLogger.warn("PerformanceMonitor", "Flame graph profiling is not enabled")
+		return
+	
+	var export_path: String = FlameGraphProfiler.export_to_json()
+	if export_path != "":
+		MythosLogger.info("PerformanceMonitor", "Flame graph exported to: %s" % export_path)
+	else:
+		MythosLogger.error("PerformanceMonitor", "Failed to export flame graph data")
 
 
