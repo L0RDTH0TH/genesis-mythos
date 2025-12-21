@@ -1,6 +1,6 @@
 # ╔═══════════════════════════════════════════════════════════
 # ║ PerformanceLogger.gd
-# ║ Desc: Lightweight performance logging system with CSV export and F9 toggle
+# ║ Desc: Lightweight performance logging system with CSV export (always-on by default)
 # ║ Author: Lordthoth
 # ╚═══════════════════════════════════════════════════════════
 
@@ -46,10 +46,10 @@ func _ready() -> void:
 	var perf_config: Dictionary = config.get("performance_logging", {})
 	is_logging_enabled = perf_config.get("enabled", true)
 	
+	# Always start logging if enabled in config (no hotkey toggle)
 	if is_logging_enabled:
-		MythosLogger.info("PerformanceLogger", "Performance logging active (press F9 to toggle)")
-		# Start log file immediately if enabled
-		_start_log_file()
+		start_logging()
+		MythosLogger.info("PerformanceLogger", "Performance logging active (always-on)")
 	else:
 		MythosLogger.debug("PerformanceLogger", "Performance logging disabled via config")
 	
@@ -57,14 +57,6 @@ func _ready() -> void:
 	
 	# Emit signal for initial state
 	logging_state_changed.emit(is_logging_enabled)
-
-
-func _input(event: InputEvent) -> void:
-	"""Handle input for toggling performance logging."""
-	if event is InputEventKey:
-		if event.is_action_pressed("toggle_perf_logger"):
-			toggle_logging()
-			get_viewport().set_input_as_handled()
 
 
 func _process(_delta: float) -> void:
@@ -157,20 +149,18 @@ func _close_log_file() -> void:
 		current_log_path = ""
 
 
-func toggle_logging() -> void:
-	"""Toggle performance logging on/off (F9 hotkey handler)."""
-	is_logging_enabled = not is_logging_enabled
-	
-	if is_logging_enabled:
+func start_logging() -> void:
+	"""Start performance logging (public method, called automatically if enabled in config)."""
+	if is_logging_enabled and log_file == null:
 		_start_log_file()
-	else:
+		MythosLogger.info("PerformanceLogger", "Performance logging started")
+
+
+func stop_logging() -> void:
+	"""Stop performance logging (public method, only used if explicitly disabled in config)."""
+	if log_file != null:
 		_close_log_file()
-		_show_status_notification("Perf Logging: OFF")
-	
-	# Emit signal to notify other systems (e.g., WorldBuilderUI can enable/disable _process)
-	logging_state_changed.emit(is_logging_enabled)
-	
-	MythosLogger.info("PerformanceLogger", "Performance logging toggled: %s" % ("ON" if is_logging_enabled else "OFF"))
+		MythosLogger.info("PerformanceLogger", "Performance logging stopped")
 
 
 func log_current_frame(custom_data: Dictionary = {}) -> void:

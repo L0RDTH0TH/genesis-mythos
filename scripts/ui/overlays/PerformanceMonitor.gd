@@ -7,7 +7,7 @@
 class_name PerformanceMonitor
 extends CanvasLayer
 
-enum Mode { OFF, SIMPLE, DETAILED }
+enum Mode { OFF, SIMPLE, DETAILED, FLAME }
 
 @onready var perf_panel: PanelContainer = $PerfPanel
 @onready var fps_label: Label = $PerfPanel/Content/FPSLabel
@@ -68,7 +68,10 @@ var node_label: Label
 @export var fps_bad_color: Color = Color(1.0, 0.2, 0.2)
 
 # Mode names for logging
-var mode_names: Array[String] = ["OFF", "SIMPLE", "DETAILED"]
+var mode_names: Array[String] = ["OFF", "SIMPLE", "DETAILED", "FLAME"]
+
+# Flame graph status label
+var flame_status_label: Label = null
 
 # DiagnosticDispatcher infrastructure (thread-safe, high-priority diagnostics)
 var _diagnostic_queue: Array[Callable] = []
@@ -135,12 +138,18 @@ func _ready() -> void:
 	object_label = _create_metric_label("Objects: --")
 	node_label = _create_metric_label("Nodes: --")
 	
+	# Flame status label
+	flame_status_label = _create_metric_label("Flame: OFF")
+	flame_status_label.modulate = Color(0.3, 0.7, 1.0)  # Blue tint for flame mode
+	flame_status_label.visible = false  # Hidden by default
+	
 	# Add all labels to container
 	var all_labels: Array[Label] = [
 		process_label, physics_label, refresh_label, system_status_label,  # Time
 		memory_label, vram_label, texture_mem_label,  # Memory
 		draw_calls_label, primitives_label, objects_drawn_label,  # Rendering
-		object_label, node_label  # Objects
+		object_label, node_label,  # Objects
+		flame_status_label  # Flame status
 	]
 	
 	for label in all_labels:
@@ -277,9 +286,6 @@ func _input(event: InputEvent) -> void:
 		elif event.is_action_pressed("perf_export_data"):
 			export_snapshot()
 			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed("toggle_flame_graph"):
-			_toggle_flame_graph()
-			get_viewport().set_input_as_handled()
 
 func _unhandled_input(event: InputEvent) -> void:
 	"""Handle unhandled input as fallback for key detection."""
@@ -287,10 +293,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.physical_keycode == KEY_F3:
 			MythosLogger.debug("PerformanceMonitor", "F3 detected via _unhandled_input - cycling mode")
 			cycle_mode()
-			get_viewport().set_input_as_handled()
-		elif event.physical_keycode == KEY_F10:
-			MythosLogger.debug("PerformanceMonitor", "F10 detected via _unhandled_input - toggling flame graph")
-			_toggle_flame_graph()
 			get_viewport().set_input_as_handled()
 
 func cycle_mode() -> void:
@@ -312,6 +314,10 @@ func set_mode(new_mode: Mode) -> void:
 				perf_panel.visible = false
 			if bottom_graph_bar:
 				bottom_graph_bar.visible = false
+			# Stop flame profiling if it was running
+			if FlameGraphProfiler and FlameGraphProfiler.is_profiling_enabled:
+				FlameGraphProfiler.stop_profiling()
+			_update_flame_status_label(false)
 			set_process(false)
 		Mode.SIMPLE:
 			MythosLogger.debug("PerformanceMonitor", "Setting SIMPLE mode - showing FPS only")
@@ -323,6 +329,10 @@ func set_mode(new_mode: Mode) -> void:
 				graphs_container.visible = false
 			if bottom_graph_bar:
 				bottom_graph_bar.visible = false
+			# Stop flame profiling if it was running
+			if FlameGraphProfiler and FlameGraphProfiler.is_profiling_enabled:
+				FlameGraphProfiler.stop_profiling()
+			_update_flame_status_label(false)
 			set_process(true)
 		Mode.DETAILED:
 			MythosLogger.debug("PerformanceMonitor", "Setting DETAILED mode - showing all metrics and graphs")
@@ -335,7 +345,29 @@ func set_mode(new_mode: Mode) -> void:
 			if graphs_container:
 				graphs_container.visible = true
 				MythosLogger.debug("PerformanceMonitor", "graphs_container.visible = %s" % graphs_container.visible)
+			if bottom_graph_bar:
+				bottom_graph_bar.visible = true
 			_update_bottom_graph_bar()  # Show bottom graph bar
+			# Stop flame profiling if it was running
+			if FlameGraphProfiler and FlameGraphProfiler.is_profiling_enabled:
+				FlameGraphProfiler.stop_profiling()
+			_update_flame_status_label(false)
+			set_process(true)
+		Mode.FLAME:
+			MythosLogger.debug("PerformanceMonitor", "Setting FLAME mode - showing all metrics, graphs, and flame profiling")
+			if perf_panel:
+				perf_panel.visible = true
+			if metrics_container:
+				metrics_container.visible = true
+			if graphs_container:
+				graphs_container.visible = true
+			if bottom_graph_bar:
+				bottom_graph_bar.visible = true
+			_update_bottom_graph_bar()
+			# Start flame profiling
+			if FlameGraphProfiler:
+				FlameGraphProfiler.start_profiling()
+			_update_flame_status_label(true)
 			set_process(true)
 	
 	MythosLogger.debug("PerformanceMonitor", "Mode set complete - perf_panel exists: %s, visible: %s" % [perf_panel != null, perf_panel.visible if perf_panel else "N/A"])
@@ -863,34 +895,16 @@ func can_log() -> bool:
 	return false
 
 
-func _toggle_flame_graph() -> void:
-	"""Toggle flame graph profiling on/off (F10 hotkey handler)."""
-	if not FlameGraphProfiler:
-		MythosLogger.warn("PerformanceMonitor", "FlameGraphProfiler not available")
+func _update_flame_status_label(is_flame_mode: bool) -> void:
+	"""Update flame status label visibility and text."""
+	if not flame_status_label:
 		return
 	
-	if FlameGraphProfiler.is_profiling_enabled:
-		FlameGraphProfiler.stop_profiling()
-		MythosLogger.info("PerformanceMonitor", "Flame graph profiling stopped (F10)")
+	if is_flame_mode:
+		flame_status_label.text = "Flame: ON"
+		flame_status_label.visible = true
 	else:
-		FlameGraphProfiler.start_profiling()
-		MythosLogger.info("PerformanceMonitor", "Flame graph profiling started (F10)")
-
-
-func export_flame_graph() -> void:
-	"""Export flame graph data to JSON file."""
-	if not FlameGraphProfiler:
-		MythosLogger.warn("PerformanceMonitor", "FlameGraphProfiler not available")
-		return
-	
-	if not FlameGraphProfiler.is_profiling_enabled:
-		MythosLogger.warn("PerformanceMonitor", "Flame graph profiling is not enabled")
-		return
-	
-	var export_path: String = FlameGraphProfiler.export_to_json()
-	if export_path != "":
-		MythosLogger.info("PerformanceMonitor", "Flame graph exported to: %s" % export_path)
-	else:
-		MythosLogger.error("PerformanceMonitor", "Failed to export flame graph data")
+		flame_status_label.text = "Flame: OFF"
+		flame_status_label.visible = false
 
 

@@ -9,10 +9,9 @@
 # intervals. Exports data in JSON format compatible with flame graph visualization tools.
 #
 # Usage:
-#   - Enable via config: res://data/config/flame_graph_config.json (set "enabled": true)
-#   - Or toggle at runtime: FlameGraphProfiler.start_profiling() / stop_profiling()
-#   - Hotkey: F10 (via PerformanceMonitor integration)
-#   - Export: FlameGraphProfiler.export_to_json() or automatic via auto_export_interval_seconds
+#   - Controlled via PerformanceMonitor F3 cycle (FLAME mode)
+#   - Or manually: FlameGraphProfiler.start_profiling() / stop_profiling()
+#   - Export: Automatic on stop_profiling() or via auto_export_interval_seconds
 #
 # Performance Overhead:
 #   - Sampling mode: <2% CPU overhead (configurable via sampling_interval_ms)
@@ -128,9 +127,9 @@ func _apply_config() -> void:
 
 
 func start_profiling() -> void:
-	"""Start flame graph profiling."""
+	"""Start flame graph profiling (safe to call multiple times)."""
 	if is_profiling_enabled:
-		MythosLogger.warn("FlameGraphProfiler", "Profiling already started")
+		MythosLogger.debug("FlameGraphProfiler", "Profiling already started, skipping")
 		return
 	
 	is_profiling_enabled = true
@@ -147,11 +146,20 @@ func start_profiling() -> void:
 
 
 func stop_profiling() -> void:
-	"""Stop flame graph profiling."""
+	"""Stop flame graph profiling and auto-export data (safe to call multiple times)."""
 	if not is_profiling_enabled:
+		MythosLogger.debug("FlameGraphProfiler", "Profiling already stopped, skipping")
 		return
 	
 	is_profiling_enabled = false
+	
+	# Auto-export data before stopping
+	if stack_samples.size() > 0:
+		var export_path: String = export_to_json()
+		if export_path != "":
+			MythosLogger.info("FlameGraphProfiler", "Auto-exported flame graph data to: %s" % export_path)
+		else:
+			MythosLogger.warn("FlameGraphProfiler", "Failed to auto-export flame graph data")
 	
 	# Stop timers
 	if sampling_timer:

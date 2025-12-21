@@ -62,6 +62,11 @@ var refresh_timer: Timer = null
 var pending_refresh: bool = false
 const REFRESH_THROTTLE_MS: float = 0.1  # Max 10 refreshes per second (100ms)
 
+## Threaded generation state
+var is_generating: bool = false
+var generation_thread: Thread = null
+var pending_biome_preview: bool = false
+
 ## PROFILING: Data accumulation
 var profiling_process_calls: int = 0
 var profiling_process_over_1ms: int = 0
@@ -438,7 +443,7 @@ func initialize_from_step_data(seed_value: int, width: int, height: int) -> void
 
 
 func generate_map() -> void:
-	"""Generate map using current parameters."""
+	"""Generate map using current parameters (uses threading to prevent blocking)."""
 	if world_map_data == null:
 		print("DEBUG: generate_map() - world_map_data is null, aborting")
 		return
@@ -448,9 +453,28 @@ func generate_map() -> void:
 		print("DEBUG: ERROR - map_generator is null!")
 		return
 	
-	# Use preview mode if specified (skips expensive post-processing)
-	map_generator.generate_map(world_map_data, false, false)  # Synchronous, no preview mode for full generation
-	print("DEBUG: Generation complete, checking heightmap...")
+	# Use threading to prevent main thread blocking (CRITICAL FIX for 1 FPS issue)
+	map_generator.generate_map(world_map_data, true, false)  # Use threading, no preview mode for full generation
+	
+	# Check if generation is using threading
+	if map_generator.generation_thread != null:
+		var thread: Thread = map_generator.generation_thread
+		if thread.is_alive():
+			# Threaded generation - poll for completion in _process()
+			is_generating = true
+			generation_thread = thread
+			pending_biome_preview = true
+			print("DEBUG: Map generation started in background thread - will poll for completion")
+			return
+		else:
+			# Thread already completed (very fast generation)
+			print("DEBUG: Map generation thread completed immediately")
+			thread.wait_to_finish()
+			_finalize_map_generation()
+			return
+	
+	# Synchronous generation (fallback)
+	print("DEBUG: Generation complete synchronously, checking heightmap...")
 	if world_map_data.heightmap_image != null:
 		var sample_pos: Vector2i = Vector2i(100, 100)
 		var size: Vector2i = world_map_data.heightmap_image.get_size()
@@ -612,37 +636,78 @@ func regenerate_map(params: Dictionary, use_low_res_preview: bool = false) -> bo
 		"image_size": Vector2i(map_size_x, map_size_y)
 	})
 	
-	# Use preview mode for faster generation when requested
-	map_generator.generate_map(world_map_data, false, use_low_res_preview)  # Synchronous, preview mode if requested
+	# Use threading to prevent main thread blocking (CRITICAL FIX for 1 FPS issue)
+	# Threading prevents 200-1000ms blocking that was causing ~1 FPS performance
+	map_generator.generate_map(world_map_data, true, use_low_res_preview)  # Use threading, preview mode if requested
 	
 	# Restore post-processing setting
 	if use_low_res_preview:
 		map_generator.post_processing_config["enabled"] = original_post_proc_enabled
 	
+	# Check if generation is using threading
+	# Note: MapGenerator may use threading based on map size and hardware profiler
+	if map_generator.generation_thread != null:
+		var thread: Thread = map_generator.generation_thread
+		if thread.is_alive():
+			# Threaded generation - poll for completion in _process()
+			is_generating = true
+			generation_thread = thread
+			pending_biome_preview = true
+			MythosLogger.info("UI/MapMakerModule", "Map generation started in background thread - will poll for completion")
+			# Return true immediately - completion will be handled in _process()
+			return true
+		else:
+			# Thread already completed (very fast generation)
+			MythosLogger.debug("UI/MapMakerModule", "Map generation thread completed immediately")
+			thread.wait_to_finish()
+			return _finalize_map_generation()
+	else:
+		# Synchronous generation (fallback for very small maps or threading disabled)
+		MythosLogger.debug("UI/MapMakerModule", "Map generation completed synchronously")
+		return _finalize_map_generation()
+
+
+func _set_viewport_update_always() -> void:
+	"""Helper to set viewport update mode back to always."""
+	if map_viewport != null:
+		map_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+
+
+func _finalize_map_generation() -> bool:
+	"""Finalize map generation after thread completion or synchronous generation.
+	
+	Validates results, generates biome preview, and refreshes renderer.
+	
+	Returns:
+		bool: True if generation succeeded, False on failure
+	"""
 	# Validate generation result
 	if world_map_data.heightmap_image == null:
-		MythosLogger.error("UI/MapMakerModule", "regenerate_map() - heightmap_image is null after generation")
+		MythosLogger.error("UI/MapMakerModule", "_finalize_map_generation() - heightmap_image is null after generation")
 		return false
 	
 	# Check if heightmap has valid data (not all zeros)
 	var sample_pos: Vector2i = Vector2i(min(100, world_map_data.heightmap_image.get_width() - 1), min(100, world_map_data.heightmap_image.get_height() - 1))
 	var sample_color: Color = world_map_data.heightmap_image.get_pixel(sample_pos.x, sample_pos.y)
 	if sample_color.r <= 0.0:
-		MythosLogger.warn("UI/MapMakerModule", "regenerate_map() - heightmap appears empty (sample is zero)")
+		MythosLogger.warn("UI/MapMakerModule", "_finalize_map_generation() - heightmap appears empty (sample is zero)")
 		# Don't fail here - might be valid for very low maps
 	
-	# Generate biome preview
-	map_generator.generate_biome_preview(world_map_data)
-	if world_map_data.biome_preview_image == null:
-		MythosLogger.warn("UI/MapMakerModule", "regenerate_map() - biome_preview_image is null after generation")
-		# Non-fatal, but log warning
+	# Generate biome preview (defer to next frame to prevent blocking)
+	if pending_biome_preview:
+		pending_biome_preview = false
+		call_deferred("_generate_biome_preview_deferred")
+	else:
+		# Generate immediately if not deferred
+		map_generator.generate_biome_preview(world_map_data)
+		if world_map_data.biome_preview_image == null:
+			MythosLogger.warn("UI/MapMakerModule", "_finalize_map_generation() - biome_preview_image is null after generation")
 	
 	# Refresh renderer to display new map (this will update textures and force redraw)
 	if map_renderer != null:
 		# Force renderer to update with new data
 		map_renderer.set_world_map_data(world_map_data)  # Ensure renderer has latest data
 		map_renderer.refresh()  # This updates textures and triggers redraw
-		generation_success = true
 		
 		# Force viewport update to ensure new map is displayed
 		if map_viewport != null:
@@ -652,18 +717,25 @@ func regenerate_map(params: Dictionary, use_low_res_preview: bool = false) -> bo
 		
 		# Update mini 3D preview if available
 		# call_deferred("update_mini_3d_preview")  # TODO: Implement in future phase
+		
+		MythosLogger.info("UI/MapMakerModule", "_finalize_map_generation() completed successfully")
+		return true
 	else:
-		MythosLogger.error("UI/MapMakerModule", "regenerate_map() - map_renderer is null, cannot refresh")
+		MythosLogger.error("UI/MapMakerModule", "_finalize_map_generation() - map_renderer is null, cannot refresh")
 		return false
-	
-	MythosLogger.info("UI/MapMakerModule", "regenerate_map() completed successfully")
-	return generation_success
 
 
-func _set_viewport_update_always() -> void:
-	"""Helper to set viewport update mode back to always."""
-	if map_viewport != null:
-		map_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+func _generate_biome_preview_deferred() -> void:
+	"""Generate biome preview in deferred call to prevent blocking."""
+	if map_generator != null and world_map_data != null:
+		MythosLogger.debug("UI/MapMakerModule", "Generating biome preview (deferred)")
+		map_generator.generate_biome_preview(world_map_data)
+		if world_map_data.biome_preview_image == null:
+			MythosLogger.warn("UI/MapMakerModule", "_generate_biome_preview_deferred() - biome_preview_image is null after generation")
+		# Refresh renderer to show biome colors
+		if map_renderer != null:
+			map_renderer.set_world_map_data(world_map_data)
+			map_renderer.refresh()
 
 
 func set_view_mode(mode: MapRenderer.ViewMode) -> void:
@@ -949,11 +1021,19 @@ func deactivate() -> void:
 
 
 func _process(delta: float) -> void:
-	"""PROFILING: Per-frame processing - timing instrumentation."""
+	"""PROFILING: Per-frame processing - timing instrumentation and thread completion polling."""
 	var frame_start: int = Time.get_ticks_usec()
 	profiling_process_calls += 1
 	
-	# Existing per-frame logic would go here (currently none)
+	# Poll for threaded generation completion
+	if is_generating and generation_thread != null:
+		if not generation_thread.is_alive():
+			# Thread completed - finalize generation
+			MythosLogger.info("UI/MapMakerModule", "Map generation thread completed")
+			generation_thread.wait_to_finish()
+			generation_thread = null
+			is_generating = false
+			_finalize_map_generation()
 	
 	# PROFILING: Report frame time if >1ms
 	var frame_time: int = Time.get_ticks_usec() - frame_start
@@ -971,7 +1051,7 @@ func _process(delta: float) -> void:
 		profiling_fps_samples.append(fps)
 		if profiling_fps_samples.size() > 120:  # Keep last 120 samples (2 minutes)
 			profiling_fps_samples.pop_front()
-		print("PROFILING: MapMakerModule - Current FPS: ", fps, " is_active=", is_active, " is_processing=", is_processing())
+		print("PROFILING: MapMakerModule - Current FPS: ", fps, " is_active=", is_active, " is_processing=", is_processing(), " is_generating=", is_generating)
 
 
 func _setup_keyboard_shortcuts() -> void:
