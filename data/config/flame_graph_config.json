@@ -1,7 +1,7 @@
 {
 	"enabled": false,
 	"sampling_mode": "sampling",
-	"sampling_interval_ms": 10.0,
+	"sampling_interval_ms": 100.0,
 	"max_stack_depth": 20,
 	"export_format": "json",
 	"export_directory": "user://flame_graphs/",

@@ -23,6 +23,7 @@ enum Mode { OFF, SIMPLE, DETAILED, FLAME }
 @onready var bottom_refresh_graph: GraphControl = get_node_or_null("BottomGraphBar/MarginContainer/BottomGraphsContainer/BottomRefreshGraph")
 @onready var bottom_thread_graph: GraphControl = get_node_or_null("BottomGraphBar/MarginContainer/BottomGraphsContainer/BottomThreadGraph")
 @onready var waterfall_control: Control = $BottomGraphBar/MarginContainer/BottomGraphsContainer/WaterfallControl
+@onready var flame_graph_control: FlameGraphControl = $BottomGraphBar/MarginContainer/BottomGraphsContainer/FlameGraphControl
 
 var current_mode: Mode = Mode.OFF : set = set_mode
 
@@ -348,6 +349,11 @@ func set_mode(new_mode: Mode) -> void:
 			if bottom_graph_bar:
 				bottom_graph_bar.visible = true
 			_update_bottom_graph_bar()  # Show bottom graph bar
+			# Show waterfall, hide flame graph
+			if waterfall_control:
+				waterfall_control.visible = true
+			if flame_graph_control:
+				flame_graph_control.visible = false
 			# Stop flame profiling if it was running
 			if FlameGraphProfiler and FlameGraphProfiler.is_profiling_enabled:
 				FlameGraphProfiler.stop_profiling()
@@ -364,6 +370,11 @@ func set_mode(new_mode: Mode) -> void:
 			if bottom_graph_bar:
 				bottom_graph_bar.visible = true
 			_update_bottom_graph_bar()
+			# Show flame graph, hide waterfall
+			if waterfall_control:
+				waterfall_control.visible = false
+			if flame_graph_control:
+				flame_graph_control.visible = true
 			# Start flame profiling
 			if FlameGraphProfiler:
 				FlameGraphProfiler.start_profiling()
@@ -409,7 +420,7 @@ func _process(_delta: float) -> void:
 	else:
 		fps_label.modulate = fps_bad_color
 	
-	if current_mode == Mode.DETAILED:
+	if current_mode == Mode.DETAILED or current_mode == Mode.FLAME:
 		# RenderingServer data requires at least 2 frames
 		if _frame_count >= 3:
 			_update_detailed_metrics()
@@ -419,8 +430,8 @@ func _process(_delta: float) -> void:
 		process_graph.add_value(process_ms)
 		refresh_graph.add_value(refresh_time_ms)
 		
-		# Update waterfall view (replaces bottom graphs)
-		if waterfall_control and _frame_count >= 3:
+		# Update waterfall view (only in DETAILED mode, not FLAME)
+		if current_mode == Mode.DETAILED and waterfall_control and _frame_count >= 3:
 			var frame_id: int = Engine.get_process_frames()
 			var frame_time_start: int = Time.get_ticks_usec()
 			var frame_delta_ms: float = _delta * 1000.0

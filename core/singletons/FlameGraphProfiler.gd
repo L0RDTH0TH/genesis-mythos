@@ -52,6 +52,14 @@ var _buffer_mutex: Mutex = Mutex.new()
 ## Auto-export timer
 var auto_export_timer: Timer = null
 
+## Aggregation timer (periodically update call tree for visualization)
+var aggregation_timer: Timer = null
+const AGGREGATION_INTERVAL_SECONDS: float = 1.0  ## Aggregate every 1 second
+
+## Throttling: Minimum time between samples (additional safety beyond timer interval)
+var _last_sample_time: int = 0
+const MIN_SAMPLE_INTERVAL_MSEC: int = 50  ## Minimum 50ms between samples (20 samples/sec max)
+
 
 func _ready() -> void:
 	"""Initialize the flame graph profiler on ready."""
@@ -142,6 +150,9 @@ func start_profiling() -> void:
 	# Setup auto-export timer
 	_setup_auto_export_timer()
 	
+	# Setup aggregation timer (for periodic call tree updates)
+	_setup_aggregation_timer()
+	
 	MythosLogger.info("FlameGraphProfiler", "Flame graph profiling started")
 
 
@@ -171,6 +182,11 @@ func stop_profiling() -> void:
 		auto_export_timer.stop()
 		auto_export_timer.queue_free()
 		auto_export_timer = null
+	
+	if aggregation_timer:
+		aggregation_timer.stop()
+		aggregation_timer.queue_free()
+		aggregation_timer = null
 	
 	MythosLogger.info("FlameGraphProfiler", "Flame graph profiling stopped")
 
@@ -207,17 +223,66 @@ func _setup_auto_export_timer() -> void:
 	MythosLogger.debug("FlameGraphProfiler", "Auto-export timer setup with interval: %.2f seconds" % interval_seconds)
 
 
+func _setup_aggregation_timer() -> void:
+	"""Setup timer for periodic call tree aggregation (for visualization)."""
+	if aggregation_timer:
+		return
+	
+	aggregation_timer = Timer.new()
+	aggregation_timer.name = "AggregationTimer"
+	aggregation_timer.wait_time = AGGREGATION_INTERVAL_SECONDS
+	aggregation_timer.timeout.connect(_periodic_aggregate)
+	add_child(aggregation_timer)
+	aggregation_timer.start()
+	
+	MythosLogger.debug("FlameGraphProfiler", "Aggregation timer setup with interval: %.2f seconds" % AGGREGATION_INTERVAL_SECONDS)
+
+
+func _periodic_aggregate() -> void:
+	"""Periodically aggregate samples into call tree for visualization."""
+	if not is_profiling_enabled:
+		return
+	
+	# Get current samples (thread-safe copy)
+	_buffer_mutex.lock()
+	var samples_to_aggregate: Array[Dictionary] = stack_samples.duplicate()
+	_buffer_mutex.unlock()
+	
+	# Aggregate if we have samples
+	if samples_to_aggregate.size() > 0:
+		_aggregate_samples_to_tree(samples_to_aggregate)
+		MythosLogger.debug("FlameGraphProfiler", "Periodic aggregation: %d samples -> call tree" % samples_to_aggregate.size())
+
+
 func _collect_stack_sample() -> void:
 	"""Collect a stack trace sample (called by sampling timer)."""
 	if not is_profiling_enabled:
 		return
 	
+	# Additional throttling: Ensure minimum time between samples
+	# This prevents excessive calls even if timer fires too frequently
+	var now: int = Time.get_ticks_msec()
+	if now - _last_sample_time < MIN_SAMPLE_INTERVAL_MSEC:
+		return  # Skip if sampled too recently
+	_last_sample_time = now
+	
 	# Check rate limiting via PerformanceMonitorSingleton
 	if PerformanceMonitorSingleton and not PerformanceMonitorSingleton.can_log():
 		return
 	
+	# DEBUG: Measure get_stack() cost
+	var stack_start: int = Time.get_ticks_usec()
+	
 	# Get stack trace (get_stack() returns Array[Dictionary] with source, function, line)
+	# WARNING: get_stack() is EXPENSIVE - can take 1-5ms with deep stacks
+	# Calling this too frequently causes severe performance issues
+	# Current config: 100ms interval = 10 samples/sec (acceptable)
+	# Previous config: 10ms interval = 100 samples/sec (TOO FREQUENT - causes freeze)
 	var raw_stack: Array = get_stack()
+	
+	var stack_elapsed: int = Time.get_ticks_usec() - stack_start
+	if stack_elapsed > 1000:  # Log if > 1ms
+		MythosLogger.warn("FlameGraphProfiler", "get_stack() took %d usec (%.2f ms) - consider increasing sampling_interval_ms" % [stack_elapsed, stack_elapsed / 1000.0])
 	var max_depth: int = config.get("max_stack_depth", 20)
 	
 	# Limit stack depth (keep deepest frames, remove top-level ones)

@@ -3,6 +3,7 @@
 [ext_resource type="Script" path="res://scripts/ui/overlays/PerformanceMonitor.gd" id="1_perf_monitor"]
 [ext_resource type="Script" path="res://scripts/ui/overlays/GraphControl.gd" id="2_graph_control"]
 [ext_resource type="Script" path="res://scripts/ui/overlays/WaterfallControl.gd" id="3_waterfall_control"]
+[ext_resource type="Script" path="res://scripts/ui/overlays/FlameGraphControl.gd" id="5_flame_graph_control"]
 [ext_resource type="Theme" uid="uid://dpiqolc47bhf4" path="res://themes/bg3_theme.tres" id="4_theme"]
 
 [node name="PerformanceMonitor" type="CanvasLayer"]
@@ -128,6 +129,48 @@ visible = false
 mouse_filter = 2
 
 [node name="TooltipLabel" type="Label" parent="BottomGraphBar/MarginContainer/BottomGraphsContainer/WaterfallControl/TooltipPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+text = "Tooltip"
+
+[node name="FlameGraphControl" type="Control" parent="BottomGraphBar/MarginContainer/BottomGraphsContainer"]
+layout_mode = 2
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 480)
+visible = false
+script = ExtResource("5_flame_graph_control")
+
+[node name="TooltipPanel" type="Panel" parent="BottomGraphBar/MarginContainer/BottomGraphsContainer/FlameGraphControl"]
+layout_mode = 1
+anchors_preset = 0
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -100.0
+offset_top = -75.0
+offset_right = 100.0
+offset_bottom = 75.0
+grow_horizontal = 2
+grow_vertical = 2
+visible = false
+mouse_filter = 2
+
+[node name="TooltipLabel" type="Label" parent="BottomGraphBar/MarginContainer/BottomGraphsContainer/FlameGraphControl/TooltipPanel"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
