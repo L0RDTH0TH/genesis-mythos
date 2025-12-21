@@ -228,8 +228,17 @@ func log_current_frame(custom_data: Dictionary = {}) -> void:
 	var scene_name: String = custom_data.get("scene", "")
 	var notes: String = custom_data.get("notes", "")
 	
-	# Thread time (placeholder - can be extended with custom tracking)
+	# Thread time: Try breakdown buffer first (frame-accurate), fallback to PerformanceMonitor
 	var thread_ms: float = 0.0
+	var frame_id: int = Engine.get_process_frames()
+	var thread_metric: Dictionary = PerformanceMonitorSingleton.consume_thread_for_frame(frame_id)
+	
+	if not thread_metric.is_empty():
+		var breakdown: Dictionary = thread_metric.get("breakdown", {})
+		thread_ms = breakdown.get("total_ms", 0.0)
+	elif PerformanceMonitorSingleton.monitor_instance:
+		# Fallback to PerformanceMonitor's aggregated thread compute time
+		thread_ms = PerformanceMonitorSingleton.monitor_instance.thread_compute_time_ms
 	
 	# Format timestamp
 	var timestamp: String = Time.get_datetime_string_from_system(false, true)

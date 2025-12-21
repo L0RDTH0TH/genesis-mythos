@@ -175,6 +175,16 @@ func _threaded_generate() -> void:
 		"postproc_ms": postproc_time
 	})
 	
+	# Aggregate phase metrics into breakdown and push to breakdown buffer (for waterfall view and CSV logging)
+	# Use call_deferred to push on main thread with correct frame_id
+	var breakdown: Dictionary = {
+		"total_ms": total_time,
+		"configure_noise_ms": config_time,
+		"generate_heightmap_ms": heightmap_time,
+		"post_processing_ms": postproc_time
+	}
+	call_deferred("_push_thread_breakdown_main_thread", breakdown)
+	
 	# Emit completion signal with data
 	var result_data: Dictionary = {
 		"world_map_data": current_world_data,
@@ -222,6 +232,16 @@ func is_generating() -> bool:
 func _emit_progress(phase: String, percent: float) -> void:
 	"""Emit progress signal (callable from thread via call_deferred)."""
 	progress_update.emit(phase, percent)
+
+
+func _push_thread_breakdown_main_thread(breakdown: Dictionary) -> void:
+	"""Push thread breakdown to PerformanceMonitorSingleton on main thread (callable from thread via call_deferred)."""
+	var frame_id: int = Engine.get_process_frames()
+	PerformanceMonitorSingleton.push_thread_breakdown(breakdown, frame_id)
+	MythosLogger.debug("WorldGenerator", "Pushed thread breakdown to buffer", {
+		"frame_id": frame_id,
+		"total_ms": breakdown.get("total_ms", 0.0)
+	})
 
 
 func _emit_complete(data: Dictionary) -> void:
