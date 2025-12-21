@@ -27,6 +27,9 @@
 
 extends Node
 
+## Signal emitted when aggregation completes
+signal aggregation_complete(samples_processed: int)
+
 ## Configuration file path
 const CONFIG_PATH: String = "res://data/config/flame_graph_config.json"
 
@@ -252,6 +255,10 @@ func _periodic_aggregate() -> void:
 	if samples_to_aggregate.size() > 0:
 		_aggregate_samples_to_tree(samples_to_aggregate)
 		MythosLogger.debug("FlameGraphProfiler", "Periodic aggregation: %d samples -> call tree" % samples_to_aggregate.size())
+		
+		# Emit signal when aggregation completes
+		var processed_count: int = samples_to_aggregate.size()
+		aggregation_complete.emit(processed_count)
 
 
 func _collect_stack_sample() -> void:

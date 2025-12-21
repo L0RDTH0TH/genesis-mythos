@@ -15,7 +15,7 @@ const MAX_RENDER_DEPTH: int = 15
 
 ## Update throttling: Only update every N frames
 var _update_frame_counter: int = 0
-const UPDATE_INTERVAL_FRAMES: int = 30  ## Update every 0.5s at 60 FPS
+const UPDATE_INTERVAL_FRAMES: int = 60  ## Update every 1s at 60 FPS (fallback)
 
 ## Total time for scaling (from root node)
 var _total_time_ms: float = 0.0
@@ -76,6 +76,10 @@ func _ready() -> void:
 	
 	# Enable mouse input for hover/click
 	mouse_filter = Control.MOUSE_FILTER_PASS
+	
+	# Connect to profiler aggregation signal for immediate updates
+	if FlameGraphProfiler and FlameGraphProfiler.has_signal("aggregation_complete"):
+		FlameGraphProfiler.aggregation_complete.connect(_on_aggregation_complete)
 
 
 func _process(_delta: float) -> void:
@@ -102,8 +106,20 @@ func update_from_profiler() -> void:
 	else:
 		_total_time_ms = 0.0
 	
+	# Debug logging
+	MythosLogger.debug("FlameGraphControl", "update_from_profiler() called - tree keys: %s, total_time_ms: %.2f" % [
+		call_tree.keys() if not call_tree.is_empty() else "empty",
+		_total_time_ms
+	])
+	
 	# Trigger redraw
 	queue_redraw()
+
+
+func _on_aggregation_complete(_samples_processed: int) -> void:
+	"""Called immediately when profiler finishes aggregating samples."""
+	MythosLogger.debug("FlameGraphControl", "Aggregation complete - updating from profiler (samples: %d)" % _samples_processed)
+	update_from_profiler()
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -252,17 +268,25 @@ func _clamp_tooltip_pos(pos: Vector2) -> Vector2:
 
 
 func _draw() -> void:
-	"""Draw the flame graph with nested rectangles."""
-	if call_tree.is_empty() or _total_time_ms <= 0.0:
-		# Draw background only
-		var bg_color: Color = Color(0.1, 0.08, 0.06, 0.9)  # Parchment-like
-		draw_rect(Rect2(Vector2.ZERO, size), bg_color)
-		return
+	"""Draw the flame graph with nested rectangles and status feedback."""
+	MythosLogger.debug("FlameGraphControl", "_draw() called - size: %s, call_tree empty: %s, total_time_ms: %.2f" % [
+		size, call_tree.is_empty(), _total_time_ms
+	])
 	
-	# Background (theme-based parchment)
-	var bg_color: Color = Color(0.1, 0.08, 0.06, 0.9)  # Parchment-like
+	# Always draw background
+	var bg_color: Color = Color(0.1, 0.08, 0.06, 0.9)
 	draw_rect(Rect2(Vector2.ZERO, size), bg_color)
 	
+	# If no data yet, show helpful status
+	if call_tree.is_empty():
+		_draw_status_message("Collecting samples...\nPress F3 to cycle modes")
+		return
+	
+	if _total_time_ms <= 0.1:  # Very small threshold instead of 0.0
+		_draw_status_message("Aggregating data...\nSamples collected but processing")
+		return
+	
+	# Valid data - draw the actual flame graph
 	# Draw grid lines
 	_draw_grid()
 	
@@ -274,6 +298,10 @@ func _draw() -> void:
 	# Draw hover highlight if tooltip is visible
 	if _tooltip_visible and _tooltip_node_key != "":
 		_draw_hover_highlight()
+	
+	# Optional: overlay total time
+	var info_text: String = "Total frame time: %.2f ms" % _total_time_ms
+	draw_string(ThemeDB.fallback_font, Vector2(10, size.y - 10), info_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.8, 0.8, 0.8, 0.8))
 
 
 func _draw_grid() -> void:
@@ -440,6 +468,21 @@ func _draw_node_highlight(node: Dictionary, x: float, y: float, width: float, ta
 		child_x += child_width
 	
 	return false
+
+
+func _draw_status_message(message: String) -> void:
+	"""Draw centered multi-line status text."""
+	var lines: PackedStringArray = message.split("\n")
+	var font: Font = ThemeDB.fallback_font
+	var line_height: int = font.get_height(18) + 4
+	var total_height: int = lines.size() * line_height
+	var start_y: float = (size.y - total_height) / 2.0
+	
+	for i in lines.size():
+		var line: String = lines[i]
+		var line_width: float = font.get_string_size(line, HORIZONTAL_ALIGNMENT_CENTER, -1, 18).x
+		var pos: Vector2 = Vector2((size.x - line_width) / 2.0, start_y + i * line_height)
+		draw_string(font, pos, line, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(0.9, 0.9, 0.7, 0.9))
 
 
 func _notification(what: int) -> void:
