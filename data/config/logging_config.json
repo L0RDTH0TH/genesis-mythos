@@ -26,6 +26,9 @@
 		"include_primitives": true,
 		"include_nodes": true,
 		"include_memory": true
+	},
+	"flame_graph": {
+		"enabled": false
 	}
 }
 

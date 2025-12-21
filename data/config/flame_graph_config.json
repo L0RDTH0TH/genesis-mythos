@@ -1,0 +1,15 @@
+{
+	"enabled": false,
+	"sampling_mode": "sampling",
+	"sampling_interval_ms": 10.0,
+	"max_stack_depth": 20,
+	"export_format": "json",
+	"export_directory": "user://flame_graphs/",
+	"auto_export_interval_seconds": 60.0,
+	"systems": {
+		"world_generation": true,
+		"rendering": true,
+		"entity_sim": false
+	}
+}
+

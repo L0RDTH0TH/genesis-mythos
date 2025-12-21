@@ -62,7 +62,7 @@ func _exit_tree() -> void:
 
 func _load_config() -> void:
 	"""Load configuration from JSON file."""
-	var config_path: String = "res://config/logging_config.json"
+	var config_path: String = "res://data/config/logging_config.json"
 	var config_file := FileAccess.open(config_path, FileAccess.READ)
 	
 	if not config_file:
