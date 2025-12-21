@@ -23,7 +23,7 @@ enum Mode { OFF, SIMPLE, DETAILED, FLAME }
 @onready var bottom_refresh_graph: GraphControl = get_node_or_null("BottomGraphBar/MarginContainer/BottomGraphsContainer/BottomRefreshGraph")
 @onready var bottom_thread_graph: GraphControl = get_node_or_null("BottomGraphBar/MarginContainer/BottomGraphsContainer/BottomThreadGraph")
 @onready var waterfall_control: Control = $BottomGraphBar/MarginContainer/BottomGraphsContainer/WaterfallControl
-@onready var flame_graph_control: FlameGraphControl = $BottomGraphBar/MarginContainer/BottomGraphsContainer/FlameGraphControl
+@onready var flame_graph_control: Control = $BottomGraphBar/MarginContainer/BottomGraphsContainer/FlameGraphControl
 
 var current_mode: Mode = Mode.OFF : set = set_mode
 
