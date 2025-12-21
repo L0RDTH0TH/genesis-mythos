@@ -351,31 +351,25 @@ func _draw_func_node(node: Dictionary, x: float, y: float, width: float, depth: 
 	var child_y: float = y + lane_height
 	var child_x: float = x
 	
-	# Calculate total children time for relative sizing
-	var children_total_time: float = 0.0
+	# Draw each child with proportional width
 	for child_key in children.keys():
 		var child: Dictionary = children[child_key]
-		children_total_time += child.get("total_time_ms", 0.0)
-	
-		# Draw each child with proportional width
-		for child_key in children.keys():
-			var child: Dictionary = children[child_key]
-			var child_time: float = child.get("total_time_ms", 0.0)
-			
-			# Calculate child width relative to parent node width
-			# Child width = (child_time / parent_total_time) * parent_width
-			# But we use node_time as parent_total_time for children
-			var child_width: float = 0.0
-			if node_time > 0.0:
-				child_width = (child_time / node_time) * node_width
-			else:
-				child_width = node_width / children.size()  # Equal distribution if no time data
+		var child_time: float = child.get("total_time_ms", 0.0)
 		
-			# Only draw if child has time and is wide enough
-			if child_time > 0.0 and child_width >= MIN_BAR_WIDTH:
-				_draw_func_node(child, child_x, child_y, child_width, depth + 1, node_time)
+		# Calculate child width relative to parent node width
+		# Child width = (child_time / parent_total_time) * parent_width
+		# But we use node_time as parent_total_time for children
+		var child_width: float = 0.0
+		if node_time > 0.0:
+			child_width = (child_time / node_time) * node_width
+		else:
+			child_width = node_width / children.size()  # Equal distribution if no time data
 		
-			child_x += child_width
+		# Only draw if child has time and is wide enough
+		if child_time > 0.0 and child_width >= MIN_BAR_WIDTH:
+			_draw_func_node(child, child_x, child_y, child_width, depth + 1, node_time)
+		
+		child_x += child_width
 
 
 func _get_node_color(self_time_ms: float, total_time_ms: float) -> Color:
