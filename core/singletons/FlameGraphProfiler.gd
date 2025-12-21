@@ -22,6 +22,9 @@ var sampling_timer: Timer = null
 var stack_samples: Array[Dictionary] = []
 const MAX_SAMPLES: int = 1000  ## Maximum samples in buffer
 
+## Hierarchical call tree (aggregated from samples)
+var call_tree: Dictionary = {}
+
 ## Mutex for thread-safe operations
 var _buffer_mutex: Mutex = Mutex.new()
 
@@ -314,7 +317,10 @@ func export_to_json() -> String:
 	var samples_to_export: Array[Dictionary] = stack_samples.duplicate()
 	_buffer_mutex.unlock()
 	
-	# Create export data structure (basic format for Phase 2, will be enhanced in Phase 3)
+	# Aggregate samples into hierarchical call tree
+	_aggregate_samples_to_tree(samples_to_export)
+	
+	# Create export data structure with hierarchical tree
 	var export_data: Dictionary = {
 		"metadata": {
 			"export_timestamp": Time.get_datetime_string_from_system(),
@@ -323,7 +329,8 @@ func export_to_json() -> String:
 			"version": "1.0.0",
 			"config": config
 		},
-		"samples": samples_to_export
+		"call_tree": call_tree,
+		"samples": samples_to_export  # Keep raw samples for reference
 	}
 	
 	# Write JSON file
@@ -336,7 +343,7 @@ func export_to_json() -> String:
 	file.store_string(json_string)
 	file.close()
 	
-	MythosLogger.info("FlameGraphProfiler", "Exported %d samples to: %s" % [samples_to_export.size(), full_path])
+	MythosLogger.info("FlameGraphProfiler", "Exported %d samples and call tree to: %s" % [samples_to_export.size(), full_path])
 	return full_path
 
 
@@ -352,6 +359,130 @@ func clear_samples() -> void:
 	"""Clear all collected samples."""
 	_buffer_mutex.lock()
 	stack_samples.clear()
+	call_tree.clear()
 	_buffer_mutex.unlock()
-	MythosLogger.debug("FlameGraphProfiler", "Cleared all samples")
+	MythosLogger.debug("FlameGraphProfiler", "Cleared all samples and call tree")
+
+
+func _aggregate_samples_to_tree(samples: Array[Dictionary]) -> void:
+	"""
+	Aggregate stack trace samples into hierarchical call tree.
+	
+	Builds a tree structure where each node represents a function call,
+	with parent-child relationships based on call stack depth.
+	"""
+	call_tree.clear()
+	
+	if samples.is_empty():
+		return
+	
+	# Initialize root node
+	call_tree = {
+		"function": "<root>",
+		"source": "",
+		"line": 0,
+		"total_time_ms": 0.0,
+		"self_time_ms": 0.0,
+		"call_count": 0,
+		"frame_ids": [],
+		"children": {}
+	}
+	
+	# Process each sample
+	for sample in samples:
+		var stack: Array = sample.get("stack", [])
+		var frame_id: int = sample.get("frame_id", -1)
+		var time_ms: float = sample.get("time_ms", 0.0)
+		
+		# If no time_ms provided, use sampling interval as estimate
+		if time_ms <= 0.0:
+			time_ms = config.get("sampling_interval_ms", 10.0)
+		
+		# Update root statistics
+		call_tree["total_time_ms"] += time_ms
+		call_tree["call_count"] += 1
+		if not call_tree["frame_ids"].has(frame_id):
+			call_tree["frame_ids"].append(frame_id)
+		
+		# Build tree from root to leaf (stack[0] is deepest, stack[-1] is shallowest)
+		var current_node: Dictionary = call_tree
+		
+		for i in range(stack.size()):
+			var frame: Dictionary = stack[i]
+			if not frame is Dictionary:
+				continue
+			
+			var function_name: String = frame.get("function", "unknown")
+			var source: String = frame.get("source", "unknown")
+			var line: int = frame.get("line", 0)
+			
+			# Create unique key for this function
+			var node_key: String = "%s:%s:%d" % [source, function_name, line]
+			
+			# Get or create child node
+			var children: Dictionary = current_node.get("children", {})
+			
+			if not children.has(node_key):
+				# Create new node
+				children[node_key] = {
+					"function": function_name,
+					"source": source,
+					"line": line,
+					"total_time_ms": 0.0,
+					"self_time_ms": 0.0,
+					"call_count": 0,
+					"frame_ids": [],
+					"children": {}
+				}
+			
+			var node: Dictionary = children[node_key]
+			
+			# Update node statistics
+			node["total_time_ms"] += time_ms
+			node["call_count"] += 1
+			if not node["frame_ids"].has(frame_id):
+				node["frame_ids"].append(frame_id)
+			
+			# Update current_node's children reference
+			current_node["children"] = children
+			
+			# Move to child node for next iteration
+			current_node = node
+		
+		# Add time to leaf node's self_time (time spent in the function itself)
+		if current_node.has("function") and current_node["function"] != "<root>":
+			current_node["self_time_ms"] += time_ms
+	
+	# Calculate self_time for all nodes (total_time - sum of children's total_time)
+	_calculate_self_times(call_tree)
+	
+	MythosLogger.debug("FlameGraphProfiler", "Aggregated %d samples into call tree" % samples.size())
+
+
+func _calculate_self_times(node: Dictionary) -> void:
+	"""Recursively calculate self_time for all nodes (total_time - children's total_time)."""
+	if not node.has("children"):
+		return
+	
+	var children: Dictionary = node.get("children", {})
+	var children_total: float = 0.0
+	
+	# First, recursively calculate self_times for all children
+	for child_key in children.keys():
+		var child: Dictionary = children[child_key]
+		_calculate_self_times(child)
+		children_total += child.get("total_time_ms", 0.0)
+	
+	# Then calculate self_time for this node
+	var total_time: float = node.get("total_time_ms", 0.0)
+	var self_time: float = max(0.0, total_time - children_total)
+	node["self_time_ms"] = self_time
+
+
+func get_call_tree() -> Dictionary:
+	"""Get the current aggregated call tree."""
+	_buffer_mutex.lock()
+	var tree: Dictionary = call_tree.duplicate(true)  # Deep copy
+	_buffer_mutex.unlock()
+	return tree
 
