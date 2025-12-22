@@ -122,44 +122,78 @@ func _draw() -> void:
 			points.append(Vector2(x, y))
 	
 	# Draw filled area under curve (semi-transparent)
-	# Need at least 3 points for a valid polygon (2 curve points + bottom corners)
+	# Need at least 2 points to form a polygon with bottom corners
 	if points.size() >= 2:
 		var filled_points: PackedVector2Array = PackedVector2Array()
+		const MIN_POINT_DISTANCE: float = 0.1  # Minimum distance between points
+		const EPSILON: float = 0.001
 		
-		# Remove duplicate consecutive points to avoid invalid geometry
+		# Remove duplicate and too-close consecutive points to avoid invalid geometry
 		var last_point: Vector2 = Vector2(-1.0, -1.0)
 		for i in range(points.size()):
 			var pt: Vector2 = points[i]
 			pt.y = clamp(pt.y, 0.0, size.y)  # Clamp y-coordinate
-			# Skip if this point is the same as the last one (within epsilon)
-			if i == 0 or not pt.is_equal_approx(last_point):
+			pt.x = clamp(pt.x, 0.0, size.x)  # Clamp x-coordinate
+			
+			# Skip if this point is too close to the last one
+			if i == 0:
 				filled_points.append(pt)
 				last_point = pt
+			else:
+				var distance: float = pt.distance_to(last_point)
+				if distance >= MIN_POINT_DISTANCE:
+					filled_points.append(pt)
+					last_point = pt
 		
 		# Need at least 2 unique points to form a polygon with bottom corners
 		if filled_points.size() >= 2:
 			# Add bottom corners to close the polygon
 			var last_x: float = filled_points[filled_points.size() - 1].x
 			var first_x: float = filled_points[0].x
-			filled_points.append(Vector2(last_x, size.y))
-			filled_points.append(Vector2(first_x, size.y))
+			var bottom_y: float = size.y
+			
+			# Ensure bottom corners are different from existing points
+			var last_pt: Vector2 = filled_points[filled_points.size() - 1]
+			var first_pt: Vector2 = filled_points[0]
+			
+			# Only add bottom corners if they're different from the curve endpoints
+			if abs(last_pt.y - bottom_y) > EPSILON or abs(last_pt.x - last_x) > EPSILON:
+				filled_points.append(Vector2(last_x, bottom_y))
+			if abs(first_pt.y - bottom_y) > EPSILON or abs(first_pt.x - first_x) > EPSILON:
+				filled_points.append(Vector2(first_x, bottom_y))
 			
 			# Validate polygon has at least 3 points (required for triangulation)
 			if filled_points.size() >= 3:
 				# Check for degenerate polygons (all points on same line)
 				var all_same_y: bool = true
+				var all_same_x: bool = true
 				var first_y: float = filled_points[0].y
-				const EPSILON: float = 0.001
+				var first_x_check: float = filled_points[0].x
+				
 				for pt in filled_points:
 					if abs(pt.y - first_y) > EPSILON:
 						all_same_y = false
+					if abs(pt.x - first_x_check) > EPSILON:
+						all_same_x = false
+					if not all_same_y and not all_same_x:
 						break
 				
-				# Only draw if polygon is not degenerate
-				if not all_same_y:
-					var fill_color: Color = line_color
-					fill_color.a = 0.25
-					draw_colored_polygon(filled_points, fill_color)
+				# Only draw if polygon is not degenerate (not all on same line)
+				if not all_same_y and not all_same_x:
+					# Additional validation: ensure polygon has non-zero area
+					# Calculate signed area (Shoelace formula)
+					var area: float = 0.0
+					for i in range(filled_points.size()):
+						var j: int = (i + 1) % filled_points.size()
+						area += filled_points[i].x * filled_points[j].y
+						area -= filled_points[j].x * filled_points[i].y
+					area = abs(area) / 2.0
+					
+					# Only draw if polygon has meaningful area
+					if area > EPSILON:
+						var fill_color: Color = line_color
+						fill_color.a = 0.25
+						draw_colored_polygon(filled_points, fill_color)
 	
 	# Draw line graph
 	if points.size() > 1:
