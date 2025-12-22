@@ -122,18 +122,44 @@ func _draw() -> void:
 			points.append(Vector2(x, y))
 	
 	# Draw filled area under curve (semi-transparent)
-	if points.size() > 1:
-		var filled_points: PackedVector2Array = points.duplicate()
-		# Clamp all y-coordinates to graph bounds before adding bottom corners
-		for i in range(filled_points.size()):
-			filled_points[i].y = clamp(filled_points[i].y, 0.0, size.y)
-		# Add bottom corners to close the polygon
-		filled_points.append(Vector2(points[points.size() - 1].x, size.y))
-		filled_points.append(Vector2(points[0].x, size.y))
-		# Draw filled polygon with 25% opacity
-		var fill_color: Color = line_color
-		fill_color.a = 0.25
-		draw_colored_polygon(filled_points, fill_color)
+	# Need at least 3 points for a valid polygon (2 curve points + bottom corners)
+	if points.size() >= 2:
+		var filled_points: PackedVector2Array = PackedVector2Array()
+		
+		# Remove duplicate consecutive points to avoid invalid geometry
+		var last_point: Vector2 = Vector2(-1.0, -1.0)
+		for i in range(points.size()):
+			var pt: Vector2 = points[i]
+			pt.y = clamp(pt.y, 0.0, size.y)  # Clamp y-coordinate
+			# Skip if this point is the same as the last one (within epsilon)
+			if i == 0 or not pt.is_equal_approx(last_point):
+				filled_points.append(pt)
+				last_point = pt
+		
+		# Need at least 2 unique points to form a polygon with bottom corners
+		if filled_points.size() >= 2:
+			# Add bottom corners to close the polygon
+			var last_x: float = filled_points[filled_points.size() - 1].x
+			var first_x: float = filled_points[0].x
+			filled_points.append(Vector2(last_x, size.y))
+			filled_points.append(Vector2(first_x, size.y))
+			
+			# Validate polygon has at least 3 points (required for triangulation)
+			if filled_points.size() >= 3:
+				# Check for degenerate polygons (all points on same line)
+				var all_same_y: bool = true
+				var first_y: float = filled_points[0].y
+				const EPSILON: float = 0.001
+				for pt in filled_points:
+					if abs(pt.y - first_y) > EPSILON:
+						all_same_y = false
+						break
+				
+				# Only draw if polygon is not degenerate
+				if not all_same_y:
+					var fill_color: Color = line_color
+					fill_color.a = 0.25
+					draw_colored_polygon(filled_points, fill_color)
 	
 	# Draw line graph
 	if points.size() > 1:
