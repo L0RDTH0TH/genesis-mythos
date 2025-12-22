@@ -285,6 +285,14 @@ func _push_thread_breakdown_main_thread(breakdown: Dictionary) -> void:
 
 func _emit_complete(data: Dictionary) -> void:
 	"""Emit completion signal (callable from thread via call_deferred)."""
+	# CRITICAL FIX: Duplicate Image from thread to main thread
+	# Images created in threads must be duplicated before use on main thread
+	if data.has("world_map_data") and data["world_map_data"] != null:
+		var world_map_data = data["world_map_data"]
+		if world_map_data.heightmap_image != null:
+			world_map_data.heightmap_image = world_map_data.heightmap_image.duplicate()
+			MythosLogger.debug("WorldGenerator", "Heightmap duplicated from thread to main thread")
+	
 	generation_complete.emit(data)
 	# Clean up thread reference after completion (on main thread)
 	if generation_thread != null:

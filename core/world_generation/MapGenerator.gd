@@ -206,11 +206,43 @@ func _generate_in_thread(world_map_data: WorldMapData) -> void:
 func _thread_generate(world_map_data: WorldMapData) -> void:
 	"""Thread function for map generation."""
 	MythosLogger.verbose("World/Generation", "MapGenerator._thread_generate() - Thread function started")
+	
+	# CRITICAL FIX: Create new FastNoiseLite instances for thread safety
+	# FastNoiseLite instances are not thread-safe and must be recreated in the thread
+	# We'll configure them from world_map_data in _configure_noise, so just create new instances
+	var thread_height_noise: FastNoiseLite = FastNoiseLite.new()
+	var thread_continent_noise: FastNoiseLite = FastNoiseLite.new()
+	var thread_temperature_noise: FastNoiseLite = FastNoiseLite.new()
+	var thread_moisture_noise: FastNoiseLite = FastNoiseLite.new()
+	var thread_landmass_mask_noise: FastNoiseLite = FastNoiseLite.new()
+	
+	# Store original references temporarily
+	var orig_height_noise: FastNoiseLite = height_noise
+	var orig_continent_noise: FastNoiseLite = continent_noise
+	var orig_temperature_noise: FastNoiseLite = temperature_noise
+	var orig_moisture_noise: FastNoiseLite = moisture_noise
+	var orig_landmass_mask_noise: FastNoiseLite = landmass_mask_noise
+	
+	# Use new instances in thread
+	height_noise = thread_height_noise
+	continent_noise = thread_continent_noise
+	temperature_noise = thread_temperature_noise
+	moisture_noise = thread_moisture_noise
+	landmass_mask_noise = thread_landmass_mask_noise
+	
+	# Configure noise with world_map_data (will set up all properties)
 	_configure_noise(world_map_data)
 	_generate_heightmap(world_map_data)
 	
 	# Apply post-processing pipeline
 	_apply_post_processing_pipeline(world_map_data)
+	
+	# Restore original references (for main thread use)
+	height_noise = orig_height_noise
+	continent_noise = orig_continent_noise
+	temperature_noise = orig_temperature_noise
+	moisture_noise = orig_moisture_noise
+	landmass_mask_noise = orig_landmass_mask_noise
 	
 	MythosLogger.verbose("World/Generation", "MapGenerator._thread_generate() - Thread generation complete")
 	# Note: Since MapGenerator extends RefCounted (not Node), we can't use call_deferred
@@ -222,6 +254,13 @@ func _on_generation_complete(world_map_data: WorldMapData) -> void:
 	MythosLogger.verbose("World/Generation", "MapGenerator._on_generation_complete() - Thread generation completed")
 	if generation_thread != null:
 		generation_thread.wait_to_finish()
+		
+		# CRITICAL FIX: Duplicate Image from thread to main thread
+		# Images created in threads must be duplicated before use on main thread
+		if world_map_data != null and world_map_data.heightmap_image != null:
+			world_map_data.heightmap_image = world_map_data.heightmap_image.duplicate()
+			MythosLogger.debug("World/Generation", "Heightmap duplicated from thread to main thread (MapGenerator)")
+		
 		generation_thread = null
 		MythosLogger.verbose("World/Generation", "MapGenerator._on_generation_complete() - Thread cleaned up")
 	

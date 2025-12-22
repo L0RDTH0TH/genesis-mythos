@@ -670,6 +670,10 @@ func regenerate_map(params: Dictionary, use_low_res_preview: bool = false) -> bo
 			# Thread already completed (very fast generation)
 			MythosLogger.debug("UI/MapMakerModule", "Map generation thread completed immediately")
 			thread.wait_to_finish()
+			# CRITICAL FIX: Duplicate Image from thread to main thread
+			if world_map_data != null and world_map_data.heightmap_image != null:
+				world_map_data.heightmap_image = world_map_data.heightmap_image.duplicate()
+				MythosLogger.debug("UI/MapMakerModule", "Heightmap duplicated from thread to main thread (immediate completion)")
 			return _finalize_map_generation()
 	else:
 		# Synchronous generation (fallback for very small maps or threading disabled)
@@ -1054,6 +1058,13 @@ func _process(delta: float) -> void:
 			generation_thread.wait_to_finish()
 			generation_thread = null
 			is_generating = false
+			
+			# CRITICAL FIX: Duplicate Image from thread to main thread
+			# Images created in threads must be duplicated before use on main thread
+			if world_map_data != null and world_map_data.heightmap_image != null:
+				world_map_data.heightmap_image = world_map_data.heightmap_image.duplicate()
+				MythosLogger.debug("UI/MapMakerModule", "Heightmap duplicated from thread to main thread")
+			
 			_finalize_map_generation()
 	
 	# PROFILING: Report frame time if >1ms
@@ -1072,7 +1083,10 @@ func _process(delta: float) -> void:
 		profiling_fps_samples.append(fps)
 		if profiling_fps_samples.size() > 120:  # Keep last 120 samples (2 minutes)
 			profiling_fps_samples.pop_front()
-		print("PROFILING: MapMakerModule - Current FPS: ", fps, " is_active=", is_active, " is_processing=", is_processing(), " is_generating=", is_generating)
+		var refresh_mode_str: String = "UNKNOWN"
+		if map_renderer != null:
+			refresh_mode_str = map_renderer._refresh_mode_to_string(map_renderer.current_refresh_mode)
+		print("PROFILING: MapMakerModule - Current FPS: ", fps, " is_active=", is_active, " is_processing=", is_processing(), " is_generating=", is_generating, " refresh_mode=", refresh_mode_str)
 
 
 func _setup_keyboard_shortcuts() -> void:
