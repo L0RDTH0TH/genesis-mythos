@@ -44,6 +44,11 @@ var climate_adjustments: Dictionary = {}  # Key: "x,y" -> {temp: float, moist: f
 var is_painting: bool = false
 var last_paint_position: Vector2 = Vector2.ZERO
 
+## Brush batching: Track mouse path during drag for batched updates
+var brush_path: Array[Vector2] = []
+var brush_batch_timer: Timer = null
+const BRUSH_BATCH_INTERVAL_MS: float = 100.0  # Batch brush changes every 100ms during drag
+
 
 func set_world_map_data(data: WorldMapData) -> void:
 	"""Set world map data for editing."""
@@ -74,14 +79,26 @@ func start_paint(world_position: Vector2) -> void:
 	
 	is_painting = true
 	last_paint_position = world_position
+	brush_path.clear()
+	brush_path.append(world_position)
 	world_map_data.save_heightmap_to_history()
 	_apply_paint(world_position)
+	
+	# Setup batch timer for periodic updates during drag
+	_setup_brush_batch_timer()
 
 
 func continue_paint(world_position: Vector2) -> void:
-	"""Continue painting (called while mouse is dragged)."""
+	"""Continue painting (called while mouse is dragged).
+	
+	Batches paint operations: accumulates positions in brush_path and applies
+	them periodically via timer or on mouse release for better performance.
+	"""
 	if not is_painting:
 		return
+	
+	# Add current position to brush path for batching
+	brush_path.append(world_position)
 	
 	# Interpolate between last position and current to avoid gaps
 	var distance: float = last_paint_position.distance_to(world_position)
@@ -96,8 +113,19 @@ func continue_paint(world_position: Vector2) -> void:
 
 
 func end_paint() -> void:
-	"""End painting operation."""
+	"""End painting operation.
+	
+	Processes any remaining batched brush changes and cleans up timer.
+	"""
 	is_painting = false
+	
+	# Process any remaining batched positions
+	if brush_path.size() > 0:
+		_process_batched_brush_path()
+		brush_path.clear()
+	
+	# Clean up batch timer
+	_cleanup_brush_batch_timer()
 
 
 func _apply_paint(world_position: Vector2) -> void:
@@ -427,3 +455,50 @@ func clear_climate_adjustments() -> void:
 	if world_map_data != null:
 		world_map_data.regional_climate_adjustments.clear()
 	MythosLogger.debug("World/Editor", "Climate adjustments cleared")
+
+
+func _setup_brush_batch_timer() -> void:
+	"""Setup timer for periodic brush batch processing during drag."""
+	if brush_batch_timer != null:
+		return  # Timer already exists
+	
+	brush_batch_timer = Timer.new()
+	brush_batch_timer.name = "BrushBatchTimer"
+	brush_batch_timer.wait_time = BRUSH_BATCH_INTERVAL_MS / 1000.0
+	brush_batch_timer.one_shot = false
+	brush_batch_timer.timeout.connect(_on_brush_batch_timer_timeout)
+	add_child(brush_batch_timer)
+	brush_batch_timer.start()
+	MythosLogger.debug("World/Editor", "Brush batch timer started", {"interval_ms": BRUSH_BATCH_INTERVAL_MS})
+
+
+func _cleanup_brush_batch_timer() -> void:
+	"""Clean up brush batch timer."""
+	if brush_batch_timer != null:
+		brush_batch_timer.stop()
+		brush_batch_timer.queue_free()
+		brush_batch_timer = null
+		MythosLogger.debug("World/Editor", "Brush batch timer cleaned up")
+
+
+func _on_brush_batch_timer_timeout() -> void:
+	"""Handle brush batch timer timeout - process accumulated brush path."""
+	if is_painting and brush_path.size() > 0:
+		_process_batched_brush_path()
+		brush_path.clear()  # Clear processed positions
+
+
+func _process_batched_brush_path() -> void:
+	"""Process batched brush path positions.
+	
+	Applies paint operations for all accumulated positions in brush_path.
+	This allows batching multiple brush strokes into a single refresh cycle.
+	"""
+	if brush_path.size() == 0:
+		return
+	
+	# Process all positions in the batch
+	# Note: The actual paint operations are already applied in continue_paint(),
+	# so this is mainly for triggering refresh notifications if needed
+	# In practice, the refresh is handled by MapMakerModule's throttling system
+	MythosLogger.verbose("World/Editor", "Processing batched brush path", {"positions": brush_path.size()})

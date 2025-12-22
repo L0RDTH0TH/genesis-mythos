@@ -453,6 +453,10 @@ func generate_map() -> void:
 		print("DEBUG: ERROR - map_generator is null!")
 		return
 	
+	# Set renderer to GENERATION mode for fast refresh during generation
+	if map_renderer != null:
+		map_renderer.set_refresh_mode(MapRenderer.RefreshMode.GENERATION)
+	
 	# Use threading to prevent main thread blocking (CRITICAL FIX for 1 FPS issue)
 	map_generator.generate_map(world_map_data, true, false)  # Use threading, no preview mode for full generation
 	
@@ -488,10 +492,12 @@ func generate_map() -> void:
 	if world_map_data.biome_preview_image != null:
 		print("DEBUG: Biome preview generated, size:", world_map_data.biome_preview_image.get_size())
 	
-	# Refresh renderer
+	# Refresh renderer only once at end (batched)
 	print("DEBUG: Refreshing renderer...")
 	if map_renderer != null:
 		map_renderer.refresh()
+		# Reset to INTERACTIVE mode after generation
+		map_renderer.set_refresh_mode(MapRenderer.RefreshMode.INTERACTIVE)
 	else:
 		print("DEBUG: ERROR - map_renderer is null, cannot refresh!")
 	
@@ -523,6 +529,10 @@ func regenerate_map(params: Dictionary, use_low_res_preview: bool = false) -> bo
 		bool: True if regeneration succeeded, False on failure
 	"""
 	MythosLogger.info("UI/MapMakerModule", "regenerate_map() called", {"params_keys": params.keys()})
+	
+	# Set renderer to GENERATION mode for fast refresh during regeneration
+	if map_renderer != null:
+		map_renderer.current_refresh_mode = MapRenderer.RefreshMode.GENERATION
 	
 	# Validate required parameters
 	if not params.has("seed") or not params.has("width") or not params.has("height"):
@@ -677,6 +687,7 @@ func _finalize_map_generation() -> bool:
 	"""Finalize map generation after thread completion or synchronous generation.
 	
 	Validates results, generates biome preview, and refreshes renderer.
+	Only refreshes once at the end (batched) to maintain performance.
 	
 	Returns:
 		bool: True if generation succeeded, False on failure
@@ -684,6 +695,9 @@ func _finalize_map_generation() -> bool:
 	# Validate generation result
 	if world_map_data.heightmap_image == null:
 		MythosLogger.error("UI/MapMakerModule", "_finalize_map_generation() - heightmap_image is null after generation")
+		# Reset to INTERACTIVE mode on failure
+		if map_renderer != null:
+			map_renderer.set_refresh_mode(MapRenderer.RefreshMode.INTERACTIVE)
 		return false
 	
 	# Check if heightmap has valid data (not all zeros)
@@ -703,11 +717,14 @@ func _finalize_map_generation() -> bool:
 		if world_map_data.biome_preview_image == null:
 			MythosLogger.warn("UI/MapMakerModule", "_finalize_map_generation() - biome_preview_image is null after generation")
 	
-	# Refresh renderer to display new map (this will update textures and force redraw)
+	# Refresh renderer to display new map (batched - only once at end)
 	if map_renderer != null:
 		# Force renderer to update with new data
 		map_renderer.set_world_map_data(world_map_data)  # Ensure renderer has latest data
 		map_renderer.refresh()  # This updates textures and triggers redraw
+		
+		# Reset to INTERACTIVE mode after generation complete
+		map_renderer.set_refresh_mode(MapRenderer.RefreshMode.INTERACTIVE)
 		
 		# Force viewport update to ensure new map is displayed
 		if map_viewport != null:
@@ -732,10 +749,12 @@ func _generate_biome_preview_deferred() -> void:
 		map_generator.generate_biome_preview(world_map_data)
 		if world_map_data.biome_preview_image == null:
 			MythosLogger.warn("UI/MapMakerModule", "_generate_biome_preview_deferred() - biome_preview_image is null after generation")
-		# Refresh renderer to show biome colors
+		# Refresh renderer to show biome colors (batched - only once after preview generated)
 		if map_renderer != null:
 			map_renderer.set_world_map_data(world_map_data)
 			map_renderer.refresh()
+			# Ensure we're back to INTERACTIVE mode after deferred preview
+			map_renderer.set_refresh_mode(MapRenderer.RefreshMode.INTERACTIVE)
 
 
 func set_view_mode(mode: MapRenderer.ViewMode) -> void:
@@ -923,8 +942,10 @@ func _on_viewport_container_input(event: InputEvent) -> void:
 				if map_editor != null:
 					map_editor.end_paint()
 				# Final refresh on mouse release (immediate, not throttled)
+				# Use INTERACTIVE mode for brush operations
 				if map_renderer != null:
 					pending_refresh = false  # Cancel pending, do immediate refresh
+					map_renderer.set_refresh_mode(MapRenderer.RefreshMode.INTERACTIVE)
 					map_renderer.refresh()
 	
 	elif event is InputEventMouseMotion:

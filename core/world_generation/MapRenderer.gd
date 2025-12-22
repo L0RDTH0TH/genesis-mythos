@@ -14,6 +14,17 @@ var world_map_data: WorldMapData
 enum ViewMode { HEIGHTMAP, BIOMES, POLITICAL }
 var current_view_mode: ViewMode = ViewMode.BIOMES
 
+## Refresh mode for adaptive throttling
+enum RefreshMode { INTERACTIVE, GENERATION, REGENERATION }
+@export var current_refresh_mode: RefreshMode = RefreshMode.INTERACTIVE
+
+## Mode-specific refresh intervals (milliseconds)
+const MIN_REFRESH_MS: Dictionary = {
+	RefreshMode.INTERACTIVE: 100,      # 10 refreshes/sec for light brushing
+	RefreshMode.GENERATION: 16,        # ~60 refreshes/sec for full initial gen
+	RefreshMode.REGENERATION: 33       # ~30 refreshes/sec for heavy brush re-sims
+}
+
 ## TextureRect, ColorRect, or Sprite2D for rendering
 var render_target: Node
 
@@ -33,7 +44,6 @@ var light_direction: Vector2 = Vector2(0.5, 0.5)
 
 ## Refresh throttling to prevent excessive refresh calls
 var last_refresh_time: int = 0
-const MIN_REFRESH_INTERVAL_MS: int = 100  # Max 10 refreshes per second
 var pending_refresh: bool = false
 
 ## PROFILING: Data accumulation
@@ -221,18 +231,48 @@ func set_light_direction(direction: Vector2) -> void:
 		shader_material.set_shader_parameter("light_direction", light_direction)
 
 
-func refresh() -> void:
-	"""Refresh rendering (call after map data changes)."""
+func set_refresh_mode(mode: RefreshMode) -> void:
+	"""Set refresh mode for adaptive throttling.
+	
+	Args:
+		mode: RefreshMode enum value (INTERACTIVE, GENERATION, REGENERATION)
+	"""
+	current_refresh_mode = mode
+	MythosLogger.debug("World/Rendering", "Refresh mode set", {"mode": _refresh_mode_to_string(mode)})
+
+
+func _refresh_mode_to_string(mode: RefreshMode) -> String:
+	"""Convert RefreshMode enum to string."""
+	match mode:
+		RefreshMode.INTERACTIVE:
+			return "INTERACTIVE"
+		RefreshMode.GENERATION:
+			return "GENERATION"
+		RefreshMode.REGENERATION:
+			return "REGENERATION"
+		_:
+			return "UNKNOWN"
+
+
+func refresh(batched_changes: Dictionary = {}) -> void:
+	"""Refresh rendering (call after map data changes).
+	
+	Args:
+		batched_changes: Optional dictionary of batched changes for bulk updates (future optimization)
+	"""
 	var now: int = Time.get_ticks_msec()
 	
-	# Throttle refreshes - skip if called too frequently (prevents 12ms+ blocking)
-	if now - last_refresh_time < MIN_REFRESH_INTERVAL_MS:
+	# Get mode-specific minimum interval
+	var min_interval: int = MIN_REFRESH_MS.get(current_refresh_mode, MIN_REFRESH_MS[RefreshMode.INTERACTIVE])
+	
+	# Throttle refreshes - skip if called too frequently (prevents blocking)
+	if now - last_refresh_time < min_interval:
 		pending_refresh = true
 		# Schedule deferred refresh if not already scheduled
 		if not has_node("RefreshThrottleTimer"):
 			var timer: Timer = Timer.new()
 			timer.name = "RefreshThrottleTimer"
-			timer.wait_time = (MIN_REFRESH_INTERVAL_MS - (now - last_refresh_time)) / 1000.0
+			timer.wait_time = (min_interval - (now - last_refresh_time)) / 1000.0
 			timer.one_shot = true
 			timer.timeout.connect(_do_pending_refresh)
 			add_child(timer)
