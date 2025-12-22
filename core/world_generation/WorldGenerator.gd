@@ -136,44 +136,73 @@ func _threaded_generate() -> void:
 	"""Thread function that runs generation logic."""
 	MythosLogger.debug("WorldGenerator", "_threaded_generate() started in thread")
 	
-	var total_start: int = Time.get_ticks_usec()
+	var total_start: int = Time.get_ticks_msec()
 	var phase_start: int
 	
 	# Phase 1: Configure noise
 	var current_phase: String = "Configuring Noise"
-	phase_start = Time.get_ticks_usec()
+	phase_start = Time.get_ticks_msec()
 	call_deferred("_emit_progress", current_phase, 0.0)
 	map_generator._configure_noise(current_world_data)
-	var config_time: float = (Time.get_ticks_usec() - phase_start) / 1000.0
+	var config_time: float = Time.get_ticks_msec() - phase_start
 	_record_metric("configure_noise", config_time)
+	# Instrumentation for flamegraph
+	if FlameGraphProfiler:
+		FlameGraphProfiler.push_flame_data_instrumented("configure_noise", config_time, {
+			"seed": current_world_data.seed if current_world_data else 0,
+			"noise_type": current_world_data.noise_type if current_world_data else 0
+		})
 	call_deferred("_emit_progress", current_phase, 1.0)
 	
 	# Phase 2: Generate heightmap
 	current_phase = "Generating Heightmap"
-	phase_start = Time.get_ticks_usec()
+	phase_start = Time.get_ticks_msec()
 	call_deferred("_emit_progress", current_phase, 0.0)
 	map_generator._generate_heightmap(current_world_data)
-	var heightmap_time: float = (Time.get_ticks_usec() - phase_start) / 1000.0
+	var heightmap_time: float = Time.get_ticks_msec() - phase_start
 	_record_metric("generate_heightmap", heightmap_time)
+	# Instrumentation for flamegraph
+	if FlameGraphProfiler:
+		FlameGraphProfiler.push_flame_data_instrumented("generate_heightmap", heightmap_time, {
+			"seed": current_world_data.seed if current_world_data else 0,
+			"size": "%dx%d" % [current_world_data.world_width if current_world_data else 0, current_world_data.world_height if current_world_data else 0]
+		})
 	call_deferred("_emit_progress", current_phase, 1.0)
 	
 	# Phase 3: Post-processing
 	current_phase = "Post-Processing"
-	phase_start = Time.get_ticks_usec()
+	phase_start = Time.get_ticks_msec()
 	call_deferred("_emit_progress", current_phase, 0.0)
 	map_generator._apply_post_processing_pipeline(current_world_data)
-	var postproc_time: float = (Time.get_ticks_usec() - phase_start) / 1000.0
+	var postproc_time: float = Time.get_ticks_msec() - phase_start
 	_record_metric("post_processing", postproc_time)
+	# Instrumentation for flamegraph
+	if FlameGraphProfiler:
+		FlameGraphProfiler.push_flame_data_instrumented("post_processing_pipeline", postproc_time, {
+			"seed": current_world_data.seed if current_world_data else 0,
+			"erosion_enabled": current_world_data.erosion_enabled if current_world_data else false,
+			"rivers_enabled": current_world_data.rivers_enabled if current_world_data else false
+		})
 	call_deferred("_emit_progress", current_phase, 1.0)
 	
-	var total_time: float = (Time.get_ticks_usec() - total_start) / 1000.0
+	var total_time: float = Time.get_ticks_msec() - total_start
 	_record_metric("total_generation", total_time)
+	# Instrumentation for flamegraph - top-level generation
+	if FlameGraphProfiler:
+		FlameGraphProfiler.push_flame_data_instrumented("world_generation", total_time, {
+			"seed": current_world_data.seed if current_world_data else 0,
+			"map_size": current_world_data.world_width if current_world_data else 0,
+			"config_ms": config_time,
+			"heightmap_ms": heightmap_time,
+			"postproc_ms": postproc_time
+		})
 	MythosLogger.info("WorldGenerator", "Thread generation complete", {
 		"total_time_ms": total_time,
 		"config_ms": config_time,
 		"heightmap_ms": heightmap_time,
 		"postproc_ms": postproc_time
 	})
+	# Note: time values are now in milliseconds (not microseconds) for consistency with instrumentation
 	
 	# Aggregate phase metrics into breakdown and push to breakdown buffer (for waterfall view and CSV logging)
 	# Use call_deferred to push on main thread with correct frame_id

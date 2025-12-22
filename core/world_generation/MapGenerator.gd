@@ -318,6 +318,9 @@ func _generate_heightmap(world_map_data: WorldMapData) -> void:
 	var size: Vector2i = img.get_size()
 	MythosLogger.debug("World/Generation", "Generating heightmap", {"size": size})
 	
+	# Instrumentation: Start timing heightmap noise generation
+	var heightmap_start_ms: int = Time.get_ticks_msec()
+	
 	# Generate noise values (Images are thread-safe in Godot 4.3, no lock needed)
 	for y in range(size.y):
 		for x in range(size.x):
@@ -357,6 +360,16 @@ func _generate_heightmap(world_map_data: WorldMapData) -> void:
 			# Store as grayscale (RF format uses red channel)
 			var color: Color = Color(height_value, height_value, height_value, 1.0)
 			img.set_pixel(x, size.y - 1 - y, color)  # Flip Y for proper orientation
+	
+	# Instrumentation: Record heightmap generation time
+	var heightmap_time_ms: int = Time.get_ticks_msec() - heightmap_start_ms
+	if FlameGraphProfiler:
+		FlameGraphProfiler.push_flame_data_instrumented("generate_heightmap", heightmap_time_ms, {
+			"seed": world_map_data.seed,
+			"size": "%dx%d" % [size.x, size.y],
+			"noise_type": world_map_data.noise_type,
+			"octaves": world_map_data.noise_octaves
+		})
 	
 	# Apply landmass mask if configured
 	if world_map_data.landmass_type != "Continents" and landmass_configs.has(world_map_data.landmass_type):
@@ -419,6 +432,9 @@ func _use_default_post_processing() -> void:
 
 func _apply_post_processing_pipeline(world_map_data: WorldMapData) -> void:
 	"""Apply modular post-processing pipeline based on configuration."""
+	# Instrumentation: Start timing post-processing pipeline
+	var postproc_start_ms: int = Time.get_ticks_msec()
+	
 	# Check if post-processing is enabled (can be disabled for previews)
 	if not post_processing_config.get("enabled", true) or use_preview_mode:
 		MythosLogger.verbose("World/Generation", "Post-processing pipeline disabled (preview mode or config)")
@@ -468,6 +484,21 @@ func _apply_post_processing_pipeline(world_map_data: WorldMapData) -> void:
 		# Report progress
 		var progress: float = 0.5 + (float(step_index) / float(steps.size())) * 0.4
 		_report_progress(progress)
+	
+	# Instrumentation for flamegraph
+	var postproc_time_ms: int = Time.get_ticks_msec() - postproc_start_ms
+	if FlameGraphProfiler:
+		var enabled_steps: Array[String] = []
+		for step_config: Dictionary in steps:
+			if step_config.get("enabled", true):
+				enabled_steps.append(step_config.get("type", "unknown"))
+		FlameGraphProfiler.push_flame_data_instrumented("post_processing_pipeline", postproc_time_ms, {
+			"seed": world_map_data.seed,
+			"step_count": steps.size(),
+			"enabled_steps": enabled_steps,
+			"erosion_enabled": world_map_data.erosion_enabled,
+			"rivers_enabled": world_map_data.rivers_enabled
+		})
 	
 	MythosLogger.info("World/Generation", "Post-processing pipeline complete")
 
@@ -601,12 +632,23 @@ func _apply_advanced_erosion(world_map_data: WorldMapData, iterations: int, stre
 	
 	world_map_data.heightmap_image = img
 	
-	var total_time: float = (Time.get_ticks_msec() - start_time) / 1000.0
+	var total_time_ms: int = Time.get_ticks_msec() - start_time
+	var total_time: float = total_time_ms / 1000.0
 	MythosLogger.info("World/Generation", "Advanced erosion complete", {
 		"iterations": iterations,
 		"time_sec": total_time,
 		"pixels_per_sec": float(pixel_count * iterations) / total_time if total_time > 0.0 else 0.0
 	})
+	
+	# Instrumentation for flamegraph
+	if FlameGraphProfiler:
+		FlameGraphProfiler.push_flame_data_instrumented("apply_erosion", total_time_ms, {
+			"seed": world_map_data.seed,
+			"iterations": iterations,
+			"strength": strength,
+			"size": "%dx%d" % [size.x, size.y],
+			"pixel_count": pixel_count
+		})
 
 
 func _apply_smoothing(world_map_data: WorldMapData, iterations: int, radius: int) -> void:
@@ -645,6 +687,9 @@ func _apply_smoothing(world_map_data: WorldMapData, iterations: int, radius: int
 
 func _apply_river_carving(world_map_data: WorldMapData, river_count: int, start_elevation: float, carving_strength: float) -> void:
 	"""Apply river carving by tracing paths from high points."""
+	# Instrumentation: Start timing river carving
+	var river_start_ms: int = Time.get_ticks_msec()
+	
 	var img: Image = world_map_data.heightmap_image
 	var size: Vector2i = img.get_size()
 	
@@ -719,6 +764,18 @@ func _apply_river_carving(world_map_data: WorldMapData, river_count: int, start_
 	
 	world_map_data.heightmap_image = img
 	MythosLogger.info("World/Generation", "River carving complete", {"rivers_carved": river_sources.size()})
+	
+	# Instrumentation for flamegraph
+	var river_time_ms: int = Time.get_ticks_msec() - river_start_ms
+	if FlameGraphProfiler:
+		FlameGraphProfiler.push_flame_data_instrumented("carve_rivers", river_time_ms, {
+			"seed": world_map_data.seed,
+			"river_count": river_count,
+			"rivers_carved": river_sources.size(),
+			"size": "%dx%d" % [size.x, size.y],
+			"start_elevation": start_elevation,
+			"carving_strength": carving_strength
+		})
 
 
 func _generate_rivers(world_map_data: WorldMapData) -> void:
