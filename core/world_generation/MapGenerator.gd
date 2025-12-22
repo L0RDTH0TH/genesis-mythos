@@ -102,8 +102,9 @@ func generate_map(world_map_data: WorldMapData, use_thread: bool = true, preview
 	# Use hardware profiler to determine threading threshold if available
 	var use_threading: bool = false
 	if hardware_profiler != null:
-		var max_dimension: int = max(world_map_data.world_width, world_map_data.world_height)
-		use_threading = use_thread and hardware_profiler.should_use_threading(max_dimension)
+		# FIX: Pass total pixel count (map_size), not max_dimension, to should_use_threading()
+		# For 1024x1024 = 1,048,576 pixels, should use threading (threshold is typically 512x512 = 262K)
+		use_threading = use_thread and hardware_profiler.should_use_threading(map_size)
 	else:
 		# Fallback: Auto-enable threading for large maps (512x512 = 262K pixels)
 		use_threading = use_thread and map_size > 512 * 512

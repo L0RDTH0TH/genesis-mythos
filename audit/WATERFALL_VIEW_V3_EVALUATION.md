@@ -552,3 +552,4 @@ const WATERFALL_ZOOM_MAX: float = 10.0  # Maximum zoom (zoom into frame)
 ---
 
 **Overall Assessment:** Specification is **solid conceptually** but requires these technical refinements for production-quality implementation. The frame synchronization issue is the most critical - without it, waterfall view will show misleading data.
+

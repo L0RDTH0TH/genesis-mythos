@@ -11,7 +11,8 @@ extends Control
 var call_tree: Dictionary = {}
 
 ## Maximum depth to render (prevents excessive recursion)
-const MAX_RENDER_DEPTH: int = 15
+## Loaded from config, defaults to 30
+var max_render_depth: int = 30
 
 ## Update throttling: Only update every N frames
 var _update_frame_counter: int = 0
@@ -76,6 +77,13 @@ func _ready() -> void:
 	
 	# Enable mouse input for hover/click
 	mouse_filter = Control.MOUSE_FILTER_PASS
+	
+	# Load max_render_depth from config (with fallback if config not loaded yet)
+	if FlameGraphProfiler and FlameGraphProfiler.config and not FlameGraphProfiler.config.is_empty():
+		max_render_depth = FlameGraphProfiler.config.get("max_render_depth", 30)
+		MythosLogger.debug("FlameGraphControl", "Loaded max_render_depth from config: %d" % max_render_depth)
+	else:
+		MythosLogger.debug("FlameGraphControl", "Using default max_render_depth: %d" % max_render_depth)
 	
 	# Connect to profiler aggregation signal for immediate updates
 	if FlameGraphProfiler and FlameGraphProfiler.has_signal("aggregation_complete"):
@@ -169,11 +177,20 @@ func _find_node_at_position_recursive(node: Dictionary, x: float, y: float, widt
 	
 	# Check if position is within this node's bounds
 	if pos.x >= x and pos.x < x + node_width and pos.y >= y and pos.y < y + UIConstants.WATERFALL_LANE_HEIGHT:
-		# Found the node - return its key
+		# Found the node - return its key (with call site if available)
 		var source: String = node.get("source", "")
 		var function: String = node.get("function", "")
 		var line: int = node.get("line", 0)
-		return {"node_key": "%s:%s:%d" % [source, function, line], "node": node}
+		var node_key: String = "%s:%s:%d" % [source, function, line]
+		
+		# Add call site information to key if available
+		var caller_function: String = node.get("caller_function", "")
+		var caller_source: String = node.get("caller_source", "")
+		var caller_line: int = node.get("caller_line", 0)
+		if caller_function != "" and caller_source != "":
+			node_key += "@%s:%s:%d" % [caller_source, caller_function, caller_line]
+		
+		return {"node_key": node_key, "node": node}
 	
 	# Check children
 	var children: Dictionary = node.get("children", {})
@@ -218,20 +235,41 @@ func _update_tooltip() -> void:
 	var self_time: float = node.get("self_time_ms", 0.0)
 	var call_count: int = node.get("call_count", 0)
 	
+	# Add call site information if available
+	var caller_function: String = node.get("caller_function", "")
+	var caller_source: String = node.get("caller_source", "")
+	var caller_line: int = node.get("caller_line", 0)
+	
+	# Get parameters if available
+	var params: Dictionary = node.get("params", {})
+	
 	var text: String = "Function: %s\n" % function_name
+	if caller_function != "" and caller_source != "":
+		text += "Called from: %s:%s:%d\n" % [caller_source, caller_function, caller_line]
 	text += "Source: %s:%d\n" % [source, line]
 	text += "Total Time: %.2f ms\n" % total_time
 	text += "Self Time: %.2f ms\n" % self_time
 	text += "Call Count: %d" % call_count
 	
+	# Add parameters if available
+	if not params.is_empty():
+		text += "\n\nParameters:"
+		for param_key in params.keys():
+			var param_value = params[param_key]
+			text += "\n  %s: %s" % [param_key, str(param_value)]
+	
 	tooltip_label.text = text
 	tooltip_panel.position = _clamp_tooltip_pos(_hover_pos)
-	tooltip_panel.size = Vector2(250, 120)
+	# Adjust tooltip size based on content (larger if parameters are present)
+	var tooltip_height: int = 120
+	if not params.is_empty():
+		tooltip_height = 120 + (params.size() * 20)  # Add 20px per parameter
+	tooltip_panel.size = Vector2(300, tooltip_height)
 	tooltip_panel.visible = true
 
 
 func _find_node_by_key(node: Dictionary, key: String) -> Dictionary:
-	"""Recursively find node by key."""
+	"""Recursively find node by key (supports call site distinction)."""
 	if not node is Dictionary:
 		return {}
 	
@@ -239,6 +277,13 @@ func _find_node_by_key(node: Dictionary, key: String) -> Dictionary:
 	var function: String = node.get("function", "")
 	var line: int = node.get("line", 0)
 	var node_key: String = "%s:%s:%d" % [source, function, line]
+	
+	# Add call site information to key if available
+	var caller_function: String = node.get("caller_function", "")
+	var caller_source: String = node.get("caller_source", "")
+	var caller_line: int = node.get("caller_line", 0)
+	if caller_function != "" and caller_source != "":
+		node_key += "@%s:%s:%d" % [caller_source, caller_function, caller_line]
 	
 	if node_key == key:
 		return node
@@ -313,7 +358,7 @@ func _draw_grid() -> void:
 	var y: float = UIConstants.SPACING_MEDIUM
 	var depth: int = 0
 	
-	while y < size.y and depth < MAX_RENDER_DEPTH:
+	while y < size.y and depth < max_render_depth:
 		draw_line(Vector2(0, y), Vector2(size.x, y), grid_color, 1.0)
 		y += lane_height
 		depth += 1
@@ -334,7 +379,7 @@ func _draw_func_node(node: Dictionary, x: float, y: float, width: float, depth: 
 		depth: Current recursion depth
 		parent_total_time: Total time of parent node (for proportional sizing)
 	"""
-	if depth >= MAX_RENDER_DEPTH:
+	if depth >= max_render_depth:
 		return  # Prevent excessive recursion
 	
 	if not node is Dictionary:
@@ -367,6 +412,12 @@ func _draw_func_node(node: Dictionary, x: float, y: float, width: float, depth: 
 	# Draw function name label if bar is wide enough
 	if node_width > UIConstants.LABEL_WIDTH_NARROW:
 		var function_name: String = node.get("function", "unknown")
+		# Add call site information if available
+		var caller_function: String = node.get("caller_function", "")
+		var caller_line: int = node.get("caller_line", 0)
+		if caller_function != "" and caller_line > 0:
+			function_name += "@%s:%d" % [caller_function, caller_line]
+		
 		var label_pos: Vector2 = Vector2(x + UIConstants.SPACING_SMALL, y + lane_height / 2 - 8)
 		var label_color: Color = Color(1.0, 0.843, 0.0)  # Gold text
 		draw_string(ThemeDB.fallback_font, label_pos, function_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, label_color)
@@ -441,6 +492,13 @@ func _draw_node_highlight(node: Dictionary, x: float, y: float, width: float, ta
 	var function: String = node.get("function", "")
 	var line: int = node.get("line", 0)
 	var node_key: String = "%s:%s:%d" % [source, function, line]
+	
+	# Add call site information to key if available
+	var caller_function: String = node.get("caller_function", "")
+	var caller_source: String = node.get("caller_source", "")
+	var caller_line: int = node.get("caller_line", 0)
+	if caller_function != "" and caller_source != "":
+		node_key += "@%s:%s:%d" % [caller_source, caller_function, caller_line]
 	
 	var lane_height: float = UIConstants.WATERFALL_LANE_HEIGHT
 	

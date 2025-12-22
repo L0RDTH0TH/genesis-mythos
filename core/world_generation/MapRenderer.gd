@@ -112,18 +112,21 @@ func _update_textures() -> void:
 	var image_size: Vector2i = world_map_data.heightmap_image.get_size()
 	MythosLogger.debug("World/Rendering", "Updating textures", {"heightmap_size": image_size})
 	
-	# Update heightmap texture - only update if image reference changed (optimization)
+	# Update heightmap texture - use update() if same image reference (faster, non-blocking)
 	if heightmap_texture == null:
 		heightmap_texture = ImageTexture.new()
 		heightmap_texture.set_image(world_map_data.heightmap_image)
 		MythosLogger.debug("World/Rendering", "Heightmap texture created", {"size": heightmap_texture.get_size()})
 	else:
 		var current_image: Image = heightmap_texture.get_image()
-		if current_image != world_map_data.heightmap_image:
-			# Different image reference, need full update
+		if current_image == world_map_data.heightmap_image:
+			# Same image reference - use update() instead of set_image() (faster, non-blocking)
+			heightmap_texture.update()
+			MythosLogger.debug("World/Rendering", "Heightmap texture updated via update()", {"size": heightmap_texture.get_size()})
+		else:
+			# Different image reference, need full update (blocking, but necessary)
 			heightmap_texture.set_image(world_map_data.heightmap_image)
-			MythosLogger.debug("World/Rendering", "Heightmap texture updated", {"size": heightmap_texture.get_size()})
-		# If same image reference, skip update (no GPU re-upload needed)
+			MythosLogger.debug("World/Rendering", "Heightmap texture updated via set_image()", {"size": heightmap_texture.get_size()})
 	
 	# Update biome texture - use update() if same image reference (optimization)
 	var biome_image: Image = null
@@ -145,11 +148,14 @@ func _update_textures() -> void:
 			MythosLogger.debug("World/Rendering", "Biome texture created", {"size": biome_image.get_size()})
 		else:
 			var current_image: Image = biome_texture.get_image()
-			if current_image != biome_image:
-				# Different image reference, need full update
+			if current_image == biome_image:
+				# Same image reference - use update() instead of set_image() (faster, non-blocking)
+				biome_texture.update()
+				MythosLogger.debug("World/Rendering", "Biome texture updated via update()", {"size": biome_image.get_size()})
+			else:
+				# Different image reference, need full update (blocking, but necessary)
 				biome_texture.set_image(biome_image)
-				MythosLogger.debug("World/Rendering", "Biome texture updated", {"size": biome_image.get_size()})
-			# If same image reference, skip update (no GPU re-upload needed)
+				MythosLogger.debug("World/Rendering", "Biome texture updated via set_image()", {"size": biome_image.get_size()})
 	
 	# Create empty rivers texture (for now) - only create once, reuse
 	if rivers_texture == null:
@@ -293,12 +299,22 @@ func _do_pending_refresh() -> void:
 
 
 func _do_actual_refresh() -> void:
-	"""Actually perform the refresh operation."""
+	"""Actually perform the refresh operation.
+	
+	Deferred to avoid blocking main thread with expensive texture uploads.
+	"""
+	# Defer expensive texture operations to avoid blocking main thread
+	# This prevents 100ms+ stalls that cause low FPS
+	call_deferred("_do_actual_refresh_deferred")
+
+
+func _do_actual_refresh_deferred() -> void:
+	"""Actually perform the refresh operation (deferred to avoid blocking)."""
 	# PROFILING: Time refresh operation
 	var refresh_start: int = Time.get_ticks_usec()
 	profiling_refresh_calls += 1
 	
-	MythosLogger.verbose("World/Rendering", "refresh() called")
+	MythosLogger.verbose("World/Rendering", "refresh() called (deferred)")
 	_update_textures()
 	
 	if render_target != null:

@@ -262,10 +262,22 @@ func get_adapted_generation_params(base_params: Dictionary) -> Dictionary:
 
 
 func should_use_threading(map_size: int) -> bool:
-	"""Determine if threading should be used for given map size."""
+	"""Determine if threading should be used for given map size.
+	
+	Args:
+		map_size: Total pixel count (width * height) of the map
+		
+	Note: Threshold values in config are dimensions (e.g., 512 = 512x512 = 262K pixels).
+	We compare against map_size (pixel count), so threshold represents minimum pixel count.
+	For 1024x1024 = 1,048,576 pixels, threshold of 512 means 512x512 = 262K pixels minimum.
+	Use >= to ensure maps at threshold use threading (e.g., 1024x1024 with threshold 1024).
+	"""
 	var preset: Dictionary = get_quality_preset()
-	var threshold: int = preset.get("use_threading_threshold", 512)
-	return map_size > threshold
+	var threshold_dimension: int = preset.get("use_threading_threshold", 512)
+	# Convert dimension threshold to pixel count (threshold^2)
+	var threshold_pixels: int = threshold_dimension * threshold_dimension
+	# Use >= so maps at threshold use threading (1024x1024 with threshold 1024 will thread)
+	return map_size >= threshold_pixels
 
 
 func should_skip_post_processing_for_preview() -> bool:

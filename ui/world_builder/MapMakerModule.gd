@@ -532,7 +532,7 @@ func regenerate_map(params: Dictionary, use_low_res_preview: bool = false) -> bo
 	
 	# Set renderer to GENERATION mode for fast refresh during regeneration
 	if map_renderer != null:
-		map_renderer.current_refresh_mode = MapRenderer.RefreshMode.GENERATION
+		map_renderer.set_refresh_mode(MapRenderer.RefreshMode.GENERATION)
 	
 	# Validate required parameters
 	if not params.has("seed") or not params.has("width") or not params.has("height"):
