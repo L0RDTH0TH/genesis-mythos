@@ -11,6 +11,7 @@
 # Usage:
 #   - Controlled via PerformanceMonitor F3 cycle (FLAME mode)
 #   - Or manually: FlameGraphProfiler.start_profiling() / stop_profiling()
+#   - Manual instrumentation: FlameGraphProfiler.push_flame_data_instrumented(function_name, time_ms, params)
 #   - Export: Automatic on stop_profiling() or via auto_export_interval_seconds
 #
 # Performance Overhead:
@@ -120,7 +121,8 @@ func _get_default_config() -> Dictionary:
 		"enabled": false,
 		"sampling_mode": "sampling",
 		"sampling_interval_ms": 10.0,
-		"max_stack_depth": 20,
+		"max_stack_depth": 40,
+		"max_render_depth": 30,
 		"export_format": "json",
 		"export_directory": "user://flame_graphs/",
 		"auto_export_interval_seconds": 60.0,
@@ -290,7 +292,7 @@ func _collect_stack_sample() -> void:
 	var stack_elapsed: int = Time.get_ticks_usec() - stack_start
 	if stack_elapsed > 1000:  # Log if > 1ms
 		MythosLogger.warn("FlameGraphProfiler", "get_stack() took %d usec (%.2f ms) - consider increasing sampling_interval_ms" % [stack_elapsed, stack_elapsed / 1000.0])
-	var max_depth: int = config.get("max_stack_depth", 20)
+	var max_depth: int = config.get("max_stack_depth", 40)
 	
 	# Limit stack depth (keep deepest frames, remove top-level ones)
 	var stack: Array = []
@@ -301,15 +303,25 @@ func _collect_stack_sample() -> void:
 	else:
 		stack = raw_stack.duplicate()
 	
-	# Format stack frames for better readability
+	# Format stack frames for better readability with parameter support
 	var formatted_stack: Array[Dictionary] = []
-	for frame in stack:
+	for i in range(stack.size()):
+		var frame = stack[i]
 		if frame is Dictionary:
 			var formatted_frame: Dictionary = {
 				"function": frame.get("function", "unknown"),
 				"source": frame.get("source", "unknown"),
-				"line": frame.get("line", 0)
+				"line": frame.get("line", 0),
+				"params": frame.get("params", {})  # Parameters dictionary (placeholder for future use)
 			}
+			# Add caller information for call site distinction
+			# stack[0] is deepest (current function), stack[1] is caller of stack[0], etc.
+			# So for stack[i], the caller is stack[i+1] (shallower in the stack)
+			if i < stack.size() - 1 and stack[i + 1] is Dictionary:
+				var caller_frame: Dictionary = stack[i + 1]
+				formatted_frame["caller_function"] = caller_frame.get("function", "unknown")
+				formatted_frame["caller_source"] = caller_frame.get("source", "unknown")
+				formatted_frame["caller_line"] = caller_frame.get("line", 0)
 			formatted_stack.append(formatted_frame)
 	
 	# Create sample dictionary
@@ -319,6 +331,9 @@ func _collect_stack_sample() -> void:
 		"stack": formatted_stack,
 		"stack_depth": formatted_stack.size()
 	}
+	
+	# Diagnostic logging: log stack depth
+	MythosLogger.debug("FlameGraphProfiler", "Collected stack sample: depth=%d" % formatted_stack.size())
 	
 	# Push to buffer (thread-safe)
 	_buffer_mutex.lock()
@@ -336,6 +351,68 @@ func _auto_export_data() -> void:
 	export_to_json()
 
 
+func push_flame_data_instrumented(function_name: String, time_ms: float, params: Dictionary = {}, frame_id: int = -1) -> void:
+	"""
+	Push flame graph data for manual instrumentation of a single function.
+	
+	This method allows systems to report actual measured times for specific functions,
+	providing more accurate profiling than statistical sampling.
+	
+	Args:
+		function_name: Name of the function being instrumented
+		time_ms: Actual time spent in the function (measured, not estimated)
+		params: Optional dictionary of function parameters for context
+		frame_id: Frame ID for synchronization (defaults to current frame)
+	"""
+	if not is_profiling_enabled:
+		return
+	
+	if frame_id == -1:
+		frame_id = Engine.get_process_frames()
+	
+	# Create a synthetic stack trace with just this function
+	# In a real scenario, you might want to include the actual caller
+	var current_stack: Array = get_stack()
+	var caller_info: Dictionary = {}
+	
+	# Try to get caller from actual stack (skip this function and push_flame_data_instrumented)
+	if current_stack.size() > 2:
+		var caller_frame: Dictionary = current_stack[2]  # Skip [0]=this, [1]=push_flame_data_instrumented
+		if caller_frame is Dictionary:
+			caller_info = {
+				"function": caller_frame.get("function", "unknown"),
+				"source": caller_frame.get("source", "unknown"),
+				"line": caller_frame.get("line", 0)
+			}
+	
+	# Create synthetic frame for the instrumented function
+	var formatted_frame: Dictionary = {
+		"function": function_name,
+		"source": "instrumented",  # Mark as instrumented
+		"line": 0,
+		"params": params,
+		"caller_function": caller_info.get("function", ""),
+		"caller_source": caller_info.get("source", ""),
+		"caller_line": caller_info.get("line", 0)
+	}
+	
+	var sample: Dictionary = {
+		"frame_id": frame_id,
+		"timestamp_usec": Time.get_ticks_usec(),
+		"time_ms": time_ms,  # Use actual measured time
+		"stack": [formatted_frame],  # Single-frame stack for instrumented function
+		"stack_depth": 1,
+		"instrumented": true  # Flag to indicate this is instrumented data
+	}
+	
+	# Push to buffer (thread-safe)
+	_buffer_mutex.lock()
+	stack_samples.append(sample)
+	if stack_samples.size() > MAX_SAMPLES:
+		stack_samples.pop_front()
+	_buffer_mutex.unlock()
+
+
 func push_flame_data(stack_trace: Array, time_ms: float, frame_id: int = -1) -> void:
 	"""
 	Push flame graph data with stack trace and timing.
@@ -351,7 +428,7 @@ func push_flame_data(stack_trace: Array, time_ms: float, frame_id: int = -1) -> 
 	if frame_id == -1:
 		frame_id = Engine.get_process_frames()
 	
-	var max_depth: int = config.get("max_stack_depth", 20)
+	var max_depth: int = config.get("max_stack_depth", 40)
 	
 	# Format and limit stack trace
 	var formatted_stack: Array[Dictionary] = []
@@ -366,8 +443,17 @@ func push_flame_data(stack_trace: Array, time_ms: float, frame_id: int = -1) -> 
 			var formatted_frame: Dictionary = {
 				"function": frame.get("function", "unknown"),
 				"source": frame.get("source", "unknown"),
-				"line": frame.get("line", 0)
+				"line": frame.get("line", 0),
+				"params": frame.get("params", {})  # Parameters dictionary
 			}
+			# Add caller information for call site distinction
+			# stack_trace[0] is deepest (current function), stack_trace[1] is caller, etc.
+			# So for stack_trace[i], the caller is stack_trace[i+1] (shallower in the stack)
+			if i < stack_trace.size() - 1 and stack_trace[i + 1] is Dictionary:
+				var caller_frame: Dictionary = stack_trace[i + 1]
+				formatted_frame["caller_function"] = caller_frame.get("function", "unknown")
+				formatted_frame["caller_source"] = caller_frame.get("source", "unknown")
+				formatted_frame["caller_line"] = caller_frame.get("line", 0)
 			formatted_stack.append(formatted_frame)
 	
 	var sample: Dictionary = {
@@ -518,15 +604,27 @@ func _aggregate_samples_to_tree(samples: Array[Dictionary]) -> void:
 			var source: String = frame.get("source", "unknown")
 			var line: int = frame.get("line", 0)
 			
-			# Create unique key for this function
+			# Create unique key for this function with call site distinction
+			# Format: source:function:line@caller_source:caller_function:caller_line
 			var node_key: String = "%s:%s:%d" % [source, function_name, line]
+			
+			# Add call site information if available (caller function + line)
+			var caller_function: String = frame.get("caller_function", "")
+			var caller_source: String = frame.get("caller_source", "")
+			var caller_line: int = frame.get("caller_line", 0)
+			
+			if caller_function != "" and caller_source != "":
+				node_key += "@%s:%s:%d" % [caller_source, caller_function, caller_line]
+				# Diagnostic logging: log distinct call site nodes
+				if caller_function != "unknown" and caller_function != "":
+					MythosLogger.debug("FlameGraphProfiler", "Created distinct call site node: %s" % node_key)
 			
 			# Get or create child node
 			var children: Dictionary = current_node.get("children", {})
 			
 			if not children.has(node_key):
-				# Create new node
-				children[node_key] = {
+				# Create new node with call site information
+				var new_node: Dictionary = {
 					"function": function_name,
 					"source": source,
 					"line": line,
@@ -534,8 +632,17 @@ func _aggregate_samples_to_tree(samples: Array[Dictionary]) -> void:
 					"self_time_ms": 0.0,
 					"call_count": 0,
 					"frame_ids": [],
-					"children": {}
+					"children": {},
+					"params": frame.get("params", {})  # Store parameters if available
 				}
+				
+				# Add call site information to node
+				if caller_function != "" and caller_source != "":
+					new_node["caller_function"] = caller_function
+					new_node["caller_source"] = caller_source
+					new_node["caller_line"] = caller_line
+				
+				children[node_key] = new_node
 			
 			var node: Dictionary = children[node_key]
 			
@@ -558,7 +665,11 @@ func _aggregate_samples_to_tree(samples: Array[Dictionary]) -> void:
 	# Calculate self_time for all nodes (total_time - sum of children's total_time)
 	_calculate_self_times(call_tree)
 	
+	# Diagnostic logging: tree statistics
+	var tree_depth: int = _get_tree_depth(call_tree)
+	var root_children_count: int = call_tree.get("children", {}).size()
 	MythosLogger.debug("FlameGraphProfiler", "Aggregated %d samples into call tree" % samples.size())
+	MythosLogger.debug("FlameGraphProfiler", "Call tree max depth: %d, root children: %d" % [tree_depth, root_children_count])
 
 
 func _calculate_self_times(node: Dictionary) -> void:
@@ -587,4 +698,23 @@ func get_call_tree() -> Dictionary:
 	var tree: Dictionary = call_tree.duplicate(true)  # Deep copy
 	_buffer_mutex.unlock()
 	return tree
+
+
+func _get_tree_depth(node: Dictionary, current_depth: int = 0) -> int:
+	"""
+	Recursively calculate maximum depth of the call tree.
+	
+	Args:
+		node: Current node in the call tree
+		current_depth: Current recursion depth
+		
+	Returns:
+		Maximum depth found in the tree
+	"""
+	var max_depth: int = current_depth
+	var children: Dictionary = node.get("children", {})
+	for child in children.values():
+		var child_depth: int = _get_tree_depth(child, current_depth + 1)
+		max_depth = max(max_depth, child_depth)
+	return max_depth
 
