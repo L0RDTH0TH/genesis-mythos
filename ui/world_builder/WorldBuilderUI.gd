@@ -89,6 +89,16 @@ var preview_terrain: Node = null
 ## MapMakerModule instance (Step 2)
 var map_maker_module = null  # MapMakerModule - type hint removed to avoid parser error
 
+## Azgaar UI references
+@onready var archetype_option_button: OptionButton = null
+@onready var azgaar_tab_container: TabContainer = null
+@onready var generate_azgaar_button: Button = null
+@onready var world_builder_azgaar: Node = null  # WorldBuilderAzgaar node (CenterPanel with script attached)
+@onready var azgaar_status_label: Label = null
+
+## Azgaar parameter controls storage (param_name -> Control)
+var azgaar_parameter_controls: Dictionary = {}
+
 ## Paths
 const MAP_ICONS_PATH: String = "res://data/map_icons.json"
 const UI_CONFIG_PATH: String = "res://data/config/world_builder_ui.json"
@@ -149,6 +159,7 @@ func _ready() -> void:
 	_setup_step_content()
 	_setup_buttons()
 	_setup_procedural_world_map_controls()
+	_setup_azgaar_ui()
 	
 	# Hide ProceduralWorldMap by default - MapMakerModule is the primary renderer
 	if procedural_world_map != null:
@@ -527,6 +538,448 @@ func _load_azgaar_configs() -> void:
 	
 	# Initialize step_data for Azgaar
 	step_data["Azgaar"] = {}
+
+
+func _setup_azgaar_ui() -> void:
+	"""Setup Azgaar UI: populate archetype dropdown, build parameter UI, connect signals."""
+	# Get references from control_references (nodes are created dynamically)
+	archetype_option_button = control_references.get("Azgaar/archetype_option_button", null) as OptionButton
+	azgaar_tab_container = control_references.get("Azgaar/azgaar_tab_container", null) as TabContainer
+	generate_azgaar_button = control_references.get("Azgaar/generate_azgaar_button", null) as Button
+	azgaar_status_label = control_references.get("Azgaar/azgaar_status_label", null) as Label
+	
+	if archetype_option_button == null or azgaar_tab_container == null:
+		MythosLogger.warn("UI/WorldBuilder", "Azgaar UI nodes not found, skipping setup")
+		return
+	
+	# Get WorldBuilderAzgaar node (it's the CenterPanel with script attached)
+	world_builder_azgaar = center_panel
+	if world_builder_azgaar == null:
+		MythosLogger.warn("UI/WorldBuilder", "CenterPanel not found for WorldBuilderAzgaar")
+		return
+	if not world_builder_azgaar.has_method("trigger_generation_with_options"):
+		MythosLogger.warn("UI/WorldBuilder", "WorldBuilderAzgaar script methods not available on CenterPanel")
+		return
+	
+	# Populate archetype dropdown
+	archetype_option_button.clear()
+	for preset_name: String in archetype_presets.keys():
+		archetype_option_button.add_item(preset_name)
+	
+	if archetype_presets.size() > 0:
+		archetype_option_button.selected = 0
+		# Apply first preset
+		call_deferred("_apply_archetype_preset", archetype_presets.keys()[0])
+	
+	# Build parameter UI from mapping
+	_build_azgaar_parameter_ui()
+	
+	# Connect WorldBuilderAzgaar signals
+	if world_builder_azgaar.has_signal("generation_started"):
+		world_builder_azgaar.generation_started.connect(_on_azgaar_generation_started)
+	if world_builder_azgaar.has_signal("generation_complete"):
+		world_builder_azgaar.generation_complete.connect(_on_azgaar_generation_complete)
+	if world_builder_azgaar.has_signal("generation_failed"):
+		world_builder_azgaar.generation_failed.connect(_on_azgaar_generation_failed)
+	
+	MythosLogger.info("UI/WorldBuilder", "Azgaar UI setup complete", {
+		"archetypes": archetype_presets.size(),
+		"parameters": azgaar_mapping.size()
+	})
+
+
+func _create_slider(param: Dictionary, param_name: String) -> HSlider:
+	"""Create an HSlider control for a parameter."""
+	var slider: HSlider = HSlider.new()
+	slider.name = param_name
+	slider.min_value = param.get("min", 0.0)
+	slider.max_value = param.get("max", 100.0)
+	slider.step = param.get("step", 0.01)
+	slider.value = param.get("default", slider.min_value)
+	slider.custom_minimum_size = Vector2(200, 0)
+	
+	# Store param_name in metadata
+	slider.set_meta("param_name", param_name)
+	
+	# Connect value changed
+	slider.value_changed.connect(func(v): _on_param_changed(param_name, v))
+	
+	return slider
+
+
+func _create_spinbox(param: Dictionary, param_name: String) -> SpinBox:
+	"""Create a SpinBox control for a parameter."""
+	var spinbox: SpinBox = SpinBox.new()
+	spinbox.name = param_name
+	spinbox.min_value = param.get("min", 0.0)
+	spinbox.max_value = param.get("max", 100.0)
+	spinbox.step = param.get("step", 1.0) if param.has("step") else 1.0
+	spinbox.value = param.get("default", spinbox.min_value)
+	spinbox.custom_minimum_size = Vector2(100, 0)
+	
+	# Store param_name in metadata
+	spinbox.set_meta("param_name", param_name)
+	
+	# Connect value changed
+	spinbox.value_changed.connect(func(v): _on_param_changed(param_name, v))
+	
+	return spinbox
+
+
+func _create_checkbox(param: Dictionary, param_name: String) -> CheckBox:
+	"""Create a CheckBox control for a parameter."""
+	var checkbox: CheckBox = CheckBox.new()
+	checkbox.name = param_name
+	checkbox.button_pressed = param.get("default", false)
+	
+	# Store param_name in metadata
+	checkbox.set_meta("param_name", param_name)
+	
+	# Connect toggled
+	checkbox.toggled.connect(func(pressed): _on_param_changed(param_name, pressed))
+	
+	return checkbox
+
+
+func _create_option_button(param: Dictionary, param_name: String) -> OptionButton:
+	"""Create an OptionButton control for a parameter."""
+	var option_button: OptionButton = OptionButton.new()
+	option_button.name = param_name
+	
+	# Add options
+	var options: Array = param.get("options", [])
+	if options.is_empty():
+		# For templateInput, add common templates from AZGAAR_PARAMETERS.md
+		if param_name == "templateInput":
+			options = [
+				"pangea", "continents", "archipelago", "highIsland", "lowIsland",
+				"mediterranean", "peninsula", "isthmus", "atoll", "volcano",
+				"shattered", "world", "africa-centric", "arabia", "atlantics",
+				"britain", "caribbean", "east-asia", "eurasia", "europe",
+				"europe-accented", "europe-and-central-asia", "europe-central",
+				"europe-north", "greenland", "hellenica", "iceland", "indian-ocean",
+				"mediterranean-sea", "middle-east", "north-america", "us-centric",
+				"us-mainland", "world-from-pacific"
+			]
+		else:
+			MythosLogger.warn("UI/WorldBuilder", "OptionButton parameter has no options", {"param": param_name})
+			options = ["option1", "option2"]
+	
+	for option: String in options:
+		option_button.add_item(option)
+	
+	# Set default
+	var default_value: String = param.get("default", "")
+	if default_value != "":
+		var default_idx: int = options.find(default_value)
+		if default_idx >= 0:
+			option_button.selected = default_idx
+		else:
+			option_button.selected = 0
+	
+	# Store param_name in metadata
+	option_button.set_meta("param_name", param_name)
+	
+	# Connect item selected - pass the selected text value
+	option_button.item_selected.connect(func(idx): _on_param_changed(param_name, option_button.get_item_text(idx)))
+	
+	return option_button
+
+
+func _build_azgaar_parameter_ui() -> void:
+	"""Build the Azgaar parameter UI from mapping, grouped by category."""
+	if azgaar_tab_container == null or azgaar_mapping.is_empty():
+		MythosLogger.warn("UI/WorldBuilder", "Cannot build Azgaar UI: tab container or mapping missing")
+		return
+	
+	# Clear existing tabs
+	for child: Node in azgaar_tab_container.get_children():
+		child.queue_free()
+	
+	azgaar_parameter_controls.clear()
+	
+	# Group parameters by category
+	var category_params: Dictionary = {}
+	for param_name: String in azgaar_mapping.keys():
+		var param: Dictionary = azgaar_mapping[param_name]
+		var category: String = param.get("category", "Other")
+		if not category_params.has(category):
+			category_params[category] = []
+		category_params[category].append(param_name)
+	
+	# Create tabs for each category
+	var category_order: Array[String] = [
+		"Terrain & Heightmap",
+		"Climate & Environment",
+		"Societies & Politics",
+		"Settlements & Scale"
+	]
+	
+	# Add any other categories not in the order
+	for category: String in category_params.keys():
+		if category not in category_order:
+			category_order.append(category)
+	
+	# Create tab for each category
+	for category: String in category_order:
+		if not category_params.has(category):
+			continue
+		
+		# Create ScrollContainer + VBoxContainer for the tab
+		var scroll: ScrollContainer = ScrollContainer.new()
+		scroll.name = category.replace(" ", "").replace("&", "")
+		var vbox: VBoxContainer = VBoxContainer.new()
+		vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		vbox.add_theme_constant_override("separation", UIConstants.SPACING_MEDIUM)
+		scroll.add_child(vbox)
+		azgaar_tab_container.add_child(scroll)
+		azgaar_tab_container.set_tab_title(azgaar_tab_container.get_tab_count() - 1, category)
+		
+		# Add parameters for this category
+		for param_name: String in category_params[category]:
+			var param: Dictionary = azgaar_mapping[param_name]
+			var ui_type: String = param.get("ui_type", "SpinBox")
+			
+			# Create parameter row
+			var param_row: HBoxContainer = HBoxContainer.new()
+			param_row.add_theme_constant_override("separation", UIConstants.SPACING_SMALL)
+			
+			# Label
+			var label: Label = Label.new()
+			label.text = param_name.replace("Input", "").replace("Number", "").replace("Set", "")
+			label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_STANDARD, 0)
+			param_row.add_child(label)
+			
+			# Control based on ui_type
+			var control: Control = null
+			if ui_type == "HSlider":
+				control = _create_slider(param, param_name)
+				# Add value label for slider
+				var value_label: Label = Label.new()
+				value_label.name = param_name + "_value"
+				value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
+				value_label.text = str(control.value)
+				param_row.add_child(control)
+				param_row.add_child(value_label)
+				# Update value label when slider changes
+				control.value_changed.connect(func(v): value_label.text = str(v))
+			elif ui_type == "SpinBox":
+				control = _create_spinbox(param, param_name)
+				param_row.add_child(control)
+			elif ui_type == "CheckBox":
+				control = _create_checkbox(param, param_name)
+				param_row.add_child(control)
+			elif ui_type == "OptionButton":
+				control = _create_option_button(param, param_name)
+				param_row.add_child(control)
+			else:
+				MythosLogger.warn("UI/WorldBuilder", "Unknown UI type for parameter", {"param": param_name, "ui_type": ui_type})
+				continue
+			
+			if control != null:
+				azgaar_parameter_controls[param_name] = control
+				control.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				vbox.add_child(param_row)
+				
+				# Store initial value in step_data
+				var initial_value: Variant = ""
+				if control is HSlider:
+					initial_value = (control as HSlider).value
+				elif control is SpinBox:
+					initial_value = (control as SpinBox).value
+				elif control is CheckBox:
+					initial_value = (control as CheckBox).button_pressed
+				elif control is OptionButton:
+					var option_button: OptionButton = control as OptionButton
+					if option_button.get_item_count() > 0:
+						initial_value = option_button.get_item_text(option_button.selected)
+				step_data["Azgaar"][param_name] = initial_value
+	
+	MythosLogger.info("UI/WorldBuilder", "Azgaar parameter UI built", {
+		"tabs": azgaar_tab_container.get_tab_count(),
+		"controls": azgaar_parameter_controls.size()
+	})
+
+
+func _apply_archetype_preset(preset_name: String) -> void:
+	"""Apply an archetype preset to all parameter controls."""
+	if not archetype_presets.has(preset_name):
+		MythosLogger.warn("UI/WorldBuilder", "Archetype preset not found", {"preset": preset_name})
+		return
+	
+	var preset: Dictionary = archetype_presets[preset_name]
+	MythosLogger.info("UI/WorldBuilder", "Applying archetype preset", {"preset": preset_name})
+	
+	# Apply each parameter value from preset
+	for param_name: String in preset.keys():
+		var value: Variant = preset[param_name]
+		
+		# Clamp value based on hardware
+		value = _clamp_parameter(param_name, value)
+		
+		# Set control value
+		if azgaar_parameter_controls.has(param_name):
+			var control: Control = azgaar_parameter_controls[param_name]
+			if control is HSlider:
+				(control as HSlider).value = value
+			elif control is SpinBox:
+				(control as SpinBox).value = value
+			elif control is CheckBox:
+				(control as CheckBox).button_pressed = value
+			elif control is OptionButton:
+				var option_button: OptionButton = control as OptionButton
+				var value_str: String = str(value)
+				var idx: int = -1
+				for i in range(option_button.get_item_count()):
+					if option_button.get_item_text(i) == value_str:
+						idx = i
+						break
+				if idx >= 0:
+					option_button.selected = idx
+				else:
+					MythosLogger.warn("UI/WorldBuilder", "Option value not found in options", {
+						"param": param_name,
+						"value": value_str
+					})
+		
+		# Store in step_data
+		step_data["Azgaar"][param_name] = value
+
+
+func _clamp_parameter(param_name: String, value: Variant) -> Variant:
+	"""Clamp parameter value based on hardware capabilities."""
+	if param_name != "pointsInput":
+		return value
+	
+	var param: Dictionary = azgaar_mapping.get(param_name, {})
+	if param.get("performance_impact", "") != "high":
+		return value
+	
+	# Get hardware quality level
+	var quality_level: int = hardware_profiler.detected_quality
+	var max_points: int = 13  # Default max
+	
+	match quality_level:
+		HardwareProfiler.QualityLevel.LOW:
+			max_points = 3
+		HardwareProfiler.QualityLevel.MEDIUM:
+			max_points = 6
+		HardwareProfiler.QualityLevel.HIGH:
+			max_points = 13
+	
+	var int_value: int = int(value)
+	if int_value > max_points:
+		# Show warning
+		var quality_name: String = ["LOW", "MEDIUM", "HIGH"][quality_level]
+		MythosLogger.warn("UI/WorldBuilder", "Clamped pointsInput for hardware", {
+			"requested": int_value,
+			"clamped": max_points,
+			"quality": quality_name
+		})
+		if azgaar_status_label != null:
+			azgaar_status_label.text = "Warning: pointsInput clamped to %d for %s hardware" % [max_points, quality_name]
+		return max_points
+	
+	return int_value
+
+
+func _on_param_changed(param_name: String, value: Variant) -> void:
+	"""Handle parameter value change."""
+	# Clamp if needed
+	value = _clamp_parameter(param_name, value)
+	
+	# Store in step_data
+	step_data["Azgaar"][param_name] = value
+	
+	MythosLogger.debug("UI/WorldBuilder", "Azgaar parameter changed", {"param": param_name, "value": value})
+
+
+func _on_archetype_selected(idx: int) -> void:
+	"""Handle archetype preset selection."""
+	if idx < 0 or idx >= archetype_option_button.get_item_count():
+		return
+	
+	var preset_name: String = archetype_option_button.get_item_text(idx)
+	_apply_archetype_preset(preset_name)
+
+
+func _on_generate_azgaar_pressed() -> void:
+	"""Handle Generate with Azgaar button press."""
+	if world_builder_azgaar == null:
+		MythosLogger.error("UI/WorldBuilder", "WorldBuilderAzgaar node not available")
+		return
+	
+	# Collect current options from controls
+	var options: Dictionary = {}
+	for param_name: String in azgaar_parameter_controls.keys():
+		var control: Control = azgaar_parameter_controls[param_name]
+		var value: Variant = null
+		if control is HSlider:
+			value = (control as HSlider).value
+		elif control is SpinBox:
+			value = (control as SpinBox).value
+		elif control is CheckBox:
+			value = (control as CheckBox).button_pressed
+		elif control is OptionButton:
+			var option_button: OptionButton = control as OptionButton
+			value = option_button.get_item_text(option_button.selected)
+		
+		if value != null:
+			options[param_name] = value
+	
+	# Also include seed from Step 1
+	var seed_value: int = step_data.get("Map Gen", {}).get("seed", 12345)
+	options["optionsSeed"] = seed_value
+	
+	MythosLogger.info("UI/WorldBuilder", "Triggering Azgaar generation", {"options_count": options.size()})
+	
+	# Disable button and show status
+	if generate_azgaar_button != null:
+		generate_azgaar_button.disabled = true
+	if azgaar_status_label != null:
+		azgaar_status_label.text = "Generating..."
+	
+	# Trigger generation
+	world_builder_azgaar.trigger_generation_with_options(options)
+
+
+func _on_azgaar_generation_started() -> void:
+	"""Handle Azgaar generation started signal."""
+	MythosLogger.info("UI/WorldBuilder", "Azgaar generation started")
+	if azgaar_status_label != null:
+		azgaar_status_label.text = "Generation in progress..."
+
+
+func _on_azgaar_generation_complete() -> void:
+	"""Handle Azgaar generation complete signal."""
+	MythosLogger.info("UI/WorldBuilder", "Azgaar generation complete")
+	if generate_azgaar_button != null:
+		generate_azgaar_button.disabled = false
+	if azgaar_status_label != null:
+		azgaar_status_label.text = "Generation complete!"
+
+
+func _on_azgaar_generation_failed(reason: String) -> void:
+	"""Handle Azgaar generation failed signal."""
+	MythosLogger.error("UI/WorldBuilder", "Azgaar generation failed", {"reason": reason})
+	if generate_azgaar_button != null:
+		generate_azgaar_button.disabled = false
+	if azgaar_status_label != null:
+		azgaar_status_label.text = "Generation failed: " + reason
+	
+	# Show error dialog
+	_show_error_dialog("Azgaar Generation Failed", reason)
+
+
+func _show_error_dialog(title: String, message: String) -> void:
+	"""Show an error dialog to the user."""
+	# Simple implementation using AcceptDialog
+	var dialog: AcceptDialog = AcceptDialog.new()
+	dialog.title = title
+	dialog.dialog_text = message
+	add_child(dialog)
+	dialog.popup_centered()
+	dialog.confirmed.connect(func(): dialog.queue_free())
 
 
 func _load_archetype_file(file_path: String) -> Dictionary:
@@ -1374,6 +1827,60 @@ func _create_step_map_gen_editor(parent: VBoxContainer) -> void:
 	# MapMakerModule will be added to center panel when step is shown
 	# Store reference for later initialization
 	control_references["Map Gen/step_panel"] = step_panel
+	
+	# Separator for Azgaar section
+	var azgaar_separator: HSeparator = HSeparator.new()
+	container.add_child(azgaar_separator)
+	
+	# Azgaar Map Generator Section
+	var azgaar_title: Label = Label.new()
+	azgaar_title.text = "Azgaar Map Generator"
+	azgaar_title.add_theme_font_size_override("font_size", 18)
+	azgaar_title.add_theme_color_override("font_color", Color(1, 0.843137, 0, 1))
+	container.add_child(azgaar_title)
+	
+	# Archetype preset selector
+	var archetype_container: HBoxContainer = HBoxContainer.new()
+	var archetype_label: Label = Label.new()
+	archetype_label.text = "Archetype Preset:"
+	archetype_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_STANDARD, 0)
+	archetype_container.add_child(archetype_label)
+	
+	archetype_option_button = OptionButton.new()
+	archetype_option_button.name = "ArchetypeOptionButton"
+	archetype_option_button.item_selected.connect(_on_archetype_selected)
+	archetype_container.add_child(archetype_option_button)
+	container.add_child(archetype_container)
+	
+	# TabContainer for categorized parameters
+	azgaar_tab_container = TabContainer.new()
+	azgaar_tab_container.name = "AzgaarTabContainer"
+	azgaar_tab_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	azgaar_tab_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	azgaar_tab_container.custom_minimum_size = Vector2(0, 400)  # Minimum height for visibility
+	container.add_child(azgaar_tab_container)
+	
+	# Generate with Azgaar button
+	generate_azgaar_button = Button.new()
+	generate_azgaar_button.name = "GenerateAzgaarButton"
+	generate_azgaar_button.text = "Generate with Azgaar"
+	generate_azgaar_button.custom_minimum_size = Vector2(0, UIConstants.BUTTON_HEIGHT_MEDIUM)
+	generate_azgaar_button.pressed.connect(_on_generate_azgaar_pressed)
+	container.add_child(generate_azgaar_button)
+	
+	# Status label for generation feedback
+	azgaar_status_label = Label.new()
+	azgaar_status_label.name = "AzgaarStatusLabel"
+	azgaar_status_label.text = ""
+	azgaar_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	azgaar_status_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8, 1))
+	container.add_child(azgaar_status_label)
+	
+	# Store references for later setup
+	control_references["Azgaar/archetype_option_button"] = archetype_option_button
+	control_references["Azgaar/azgaar_tab_container"] = azgaar_tab_container
+	control_references["Azgaar/generate_azgaar_button"] = generate_azgaar_button
+	control_references["Azgaar/azgaar_status_label"] = azgaar_status_label
 
 
 func _create_step_terrain(parent: VBoxContainer) -> void:
@@ -2628,10 +3135,6 @@ func _create_biome_image_from_heightmap(height_img: Image, map_width: int, map_h
 
 func _on_bake_to_3d_pressed() -> void:
 	"""Bake generated map to Terrain3D."""
-	# TODO: DEFER INITIALIZATION - Currently Terrain3D is already initialized when world_root scene loads.
-	# Should be changed to lazy initialization: check if terrain_manager.terrain is null, and if so,
-	# call terrain_manager.create_terrain() and terrain_manager.configure_terrain() here BEFORE generating.
-	# This ensures Terrain3D only initializes when user actually clicks "Bake to 3D", not on scene load.
 	var height_img: Image = step_data.get("Map Gen", {}).get("heightmap_image", null)
 	var biome_img: Image = step_data.get("Map Gen", {}).get("biome_image", null)
 	
@@ -2642,6 +3145,12 @@ func _on_bake_to_3d_pressed() -> void:
 	if terrain_manager == null:
 		MythosLogger.warn("UI/WorldBuilder", "Cannot bake to 3D - terrain manager not assigned")
 		return
+	
+	# Lazy initialization: Initialize Terrain3D only when "Bake to 3D" is clicked
+	if terrain_manager.terrain == null:
+		MythosLogger.info("UI/WorldBuilder", "Initializing Terrain3D on demand (Bake to 3D clicked)")
+		terrain_manager.create_terrain()
+		terrain_manager.configure_terrain()
 	
 	var map_width: int = step_data.get("Map Gen", {}).get("width", 1024)
 	var map_height: int = step_data.get("Map Gen", {}).get("height", 1024)
