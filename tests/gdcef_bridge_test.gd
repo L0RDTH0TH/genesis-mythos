@@ -240,11 +240,11 @@ func _run() -> void:
 							print("  No script/execute/eval methods found either.")
 							var first_browser_methods: Array[String] = []
 							for i in range(min(30, browser_node_methods.size())):
-								var method_info = browser_node_methods[i]
-								if method_info is Dictionary:
-									first_browser_methods.append(method_info.get("name", "unknown"))
+								var browser_method_info = browser_node_methods[i]
+								if browser_method_info is Dictionary:
+									first_browser_methods.append(browser_method_info.get("name", "unknown"))
 								else:
-									first_browser_methods.append(str(method_info))
+									first_browser_methods.append(str(browser_method_info))
 							print("  First 30 methods: %s" % str(first_browser_methods))
 						else:
 							print("  Script/execute/eval methods: %s" % str(browser_interesting_methods))
