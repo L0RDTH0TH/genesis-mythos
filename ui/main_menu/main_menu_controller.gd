@@ -14,13 +14,10 @@ const WORLD_CREATION_SCENE: String = "res://core/scenes/world_root.tscn"
 @onready var world_button: Button = %WorldCreationButton
 @onready var vbox_container: VBoxContainer = $CenterContainer/VBoxContainer
 
-## WorldGenerator instance for threaded world generation
+## WorldGenerator instance (stub - no longer used, kept for interface compatibility)
 var world_generator
 
-## Preload WorldGenerator to ensure it's available
-const WorldGeneratorScript = preload("res://core/world_generation/WorldGenerator.gd")
-
-## Progress bar for world generation
+## Progress bar for world generation (stub - no longer used)
 var progress_bar: ProgressBar
 var progress_label: Label
 
@@ -29,13 +26,8 @@ func _ready() -> void:
 	# Apply UIConstants for consistent sizing
 	_apply_ui_constants()
 	
-	# Create WorldGenerator instance
-	world_generator = WorldGeneratorScript.new()
-	add_child(world_generator)
-	world_generator.progress_update.connect(_on_generation_progress)
-	world_generator.generation_complete.connect(_on_generation_complete)
-	
-	# Create progress bar UI
+	# OLD: WorldGenerator instantiation removed (old generation disabled for Azgaar integration)
+	# Create progress bar UI (kept for interface compatibility, but won't be used)
 	_setup_progress_bar()
 	
 	if character_button:
@@ -76,30 +68,11 @@ func _on_create_character_pressed() -> void:
 	get_tree().change_scene_to_file(CHARACTER_CREATION_SCENE)
 
 func _on_create_world_pressed() -> void:
-	"""Start threaded world generation."""
-	if world_generator == null:
-		MythosLogger.error("MainMenuController", "WorldGenerator is null, cannot start generation")
-		return
-	
-	if world_generator.is_generating():
-		MythosLogger.warn("MainMenuController", "Generation already in progress")
-		return
-	
-	# Show progress bar
-	if progress_bar:
-		progress_bar.visible = true
-		progress_bar.value = 0.0
-	if progress_label:
-		progress_label.visible = true
-		progress_label.text = "Initializing..."
-	
-	# Disable world button during generation
-	if world_button:
-		world_button.disabled = true
-	
-	# Start generation
-	world_generator.start_generation()
-	MythosLogger.info("MainMenuController", "World generation started")
+	"""Stub - old world generation disabled (preparing for Azgaar integration)."""
+	print("World Builder: Old generator disabled – Azgaar integration in progress")
+	push_warning("MainMenuController._on_create_world_pressed() called but old generation is disabled – Azgaar integration in progress")
+	# Transition to world scene (UI still works, just generation is disabled)
+	get_tree().change_scene_to_file(WORLD_CREATION_SCENE)
 
 
 func _setup_progress_bar() -> void:
@@ -136,31 +109,10 @@ func _setup_progress_bar() -> void:
 
 
 func _on_generation_progress(phase: String, percent: float) -> void:
-	"""Handle generation progress updates."""
-	if progress_bar:
-		progress_bar.value = percent
-	if progress_label:
-		progress_label.text = "%s: %.0f%%" % [phase, percent * 100.0]
-	MythosLogger.debug("MainMenuController", "Generation progress: %s - %.1f%%" % [phase, percent * 100.0])
+	"""Stub - old generation progress handling disabled (preparing for Azgaar integration)."""
+	print("Old generation progress disabled – preparing for Azgaar integration")
 
 
 func _on_generation_complete(data: Dictionary) -> void:
-	"""Handle generation completion."""
-	MythosLogger.info("MainMenuController", "World generation complete", {
-		"total_time_ms": data.get("total_time_ms", 0.0)
-	})
-	
-	# Hide progress bar
-	if progress_bar:
-		progress_bar.visible = false
-	if progress_label:
-		progress_label.visible = false
-	
-	# Re-enable world button
-	if world_button:
-		world_button.disabled = false
-	
-	# Store generated world data (could be passed to world scene)
-	# For now, transition to world scene
-	# TODO: Pass generated data to world scene
-	get_tree().change_scene_to_file(WORLD_CREATION_SCENE)
+	"""Stub - old generation completion handling disabled (preparing for Azgaar integration)."""
+	print("Old generation completion disabled – preparing for Azgaar integration")

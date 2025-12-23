@@ -443,242 +443,29 @@ func initialize_from_step_data(seed_value: int, width: int, height: int) -> void
 
 
 func generate_map() -> void:
-	"""Generate map using current parameters (uses threading to prevent blocking)."""
-	if world_map_data == null:
-		print("DEBUG: generate_map() - world_map_data is null, aborting")
-		return
-	
-	print("DEBUG: MapMakerModule: Generating map...")
-	if map_generator == null:
-		print("DEBUG: ERROR - map_generator is null!")
-		return
-	
-	# Set renderer to GENERATION mode for fast refresh during generation
-	if map_renderer != null:
-		map_renderer.set_refresh_mode(MapRenderer.RefreshMode.GENERATION)
-	
-	# Use threading to prevent main thread blocking (CRITICAL FIX for 1 FPS issue)
-	map_generator.generate_map(world_map_data, true, false)  # Use threading, no preview mode for full generation
-	
-	# Check if generation is using threading
-	if map_generator.generation_thread != null:
-		var thread: Thread = map_generator.generation_thread
-		if thread.is_alive():
-			# Threaded generation - poll for completion in _process()
-			is_generating = true
-			generation_thread = thread
-			pending_biome_preview = true
-			print("DEBUG: Map generation started in background thread - will poll for completion")
-			return
-		else:
-			# Thread already completed (very fast generation)
-			print("DEBUG: Map generation thread completed immediately")
-			thread.wait_to_finish()
-			_finalize_map_generation()
-			return
-	
-	# Synchronous generation (fallback)
-	print("DEBUG: Generation complete synchronously, checking heightmap...")
-	if world_map_data.heightmap_image != null:
-		var sample_pos: Vector2i = Vector2i(100, 100)
-		var size: Vector2i = world_map_data.heightmap_image.get_size()
-		if sample_pos.x < size.x and sample_pos.y < size.y:
-			var sample_color: Color = world_map_data.heightmap_image.get_pixel(sample_pos.x, sample_pos.y)
-			print("DEBUG: Heightmap sample at (100,100): r=", sample_color.r, " (should be > 0)")
-	
-	# Generate biome preview
-	print("DEBUG: Generating biome preview...")
-	map_generator.generate_biome_preview(world_map_data)
-	if world_map_data.biome_preview_image != null:
-		print("DEBUG: Biome preview generated, size:", world_map_data.biome_preview_image.get_size())
-	
-	# Refresh renderer only once at end (batched)
-	print("DEBUG: Refreshing renderer...")
-	if map_renderer != null:
-		map_renderer.refresh()
-		# Reset to INTERACTIVE mode after generation
-		map_renderer.set_refresh_mode(MapRenderer.RefreshMode.INTERACTIVE)
-	else:
-		print("DEBUG: ERROR - map_renderer is null, cannot refresh!")
-	
-	print("DEBUG: MapMakerModule: Map generation complete")
+	"""Stub - old procedural generation disabled (preparing for Azgaar integration)."""
+	print("Old procedural generation disabled – preparing for Azgaar integration")
+	push_warning("MapMakerModule.generate_map() called but old generation is disabled – Azgaar integration in progress")
+	# OLD GENERATION CODE REMOVED - UI structure preserved for Azgaar migration
 
 
 func regenerate_map(params: Dictionary, use_low_res_preview: bool = false) -> bool:
 	"""
-	Regenerate map with new parameters from dictionary.
+	Stub - old procedural regeneration disabled (preparing for Azgaar integration).
 	
-	Custom MapMakerModule is the default and preferred 2D preview renderer.
-	This method reconfigures and regenerates the map with provided parameters.
+	OLD GENERATION CODE REMOVED - UI structure preserved for Azgaar migration
+	This method signature is kept for interface compatibility.
 	
 	Args:
-		params: Dictionary containing generation parameters:
-			- seed (int): Generation seed
-			- width (int): Map width
-			- height (int): Map height
-			- noise_frequency (float): Noise frequency
-			- noise_octaves (int): Noise octaves
-			- noise_persistence (float): Noise persistence
-			- noise_lacunarity (float): Noise lacunarity
-			- sea_level (float): Sea level (0.0-1.0)
-			- erosion_enabled (bool): Enable erosion
-			- noise_type (int, optional): FastNoiseLite noise type
-		use_low_res_preview: If true, skip expensive post-processing for faster preview
+		params: Dictionary containing generation parameters (no longer used)
+		use_low_res_preview: If true, skip expensive post-processing (no longer used)
 	
 	Returns:
-		bool: True if regeneration succeeded, False on failure
+		bool: Always returns false (generation disabled)
 	"""
-	MythosLogger.info("UI/MapMakerModule", "regenerate_map() called", {"params_keys": params.keys()})
-	
-	# Set renderer to GENERATION mode for fast refresh during regeneration
-	if map_renderer != null:
-		map_renderer.set_refresh_mode(MapRenderer.RefreshMode.GENERATION)
-	
-	# Validate required parameters
-	if not params.has("seed") or not params.has("width") or not params.has("height"):
-		MythosLogger.error("UI/MapMakerModule", "regenerate_map() missing required parameters (seed, width, height)")
-		return false
-	
-	# Initialize or update world_map_data
-	if world_map_data == null:
-		world_map_data = WorldMapData.new()
-		is_initialized = false
-	
-	# Update basic parameters
-	world_map_data.seed = params.get("seed", world_map_data.seed)
-	world_map_data.world_width = params.get("width", world_map_data.world_width)
-	world_map_data.world_height = params.get("height", world_map_data.world_height)
-	world_map_data.landmass_type = params.get("landmass_type", world_map_data.landmass_type)
-	
-	# Update noise parameters
-	world_map_data.noise_frequency = params.get("noise_frequency", world_map_data.noise_frequency)
-	world_map_data.noise_octaves = params.get("noise_octaves", world_map_data.noise_octaves)
-	world_map_data.noise_persistence = params.get("noise_persistence", world_map_data.noise_persistence)
-	world_map_data.noise_lacunarity = params.get("noise_lacunarity", world_map_data.noise_lacunarity)
-	world_map_data.sea_level = params.get("sea_level", world_map_data.sea_level)
-	world_map_data.erosion_enabled = params.get("erosion_enabled", world_map_data.erosion_enabled)
-	world_map_data.biome_temperature_noise_frequency = params.get("temperature_noise_frequency", world_map_data.biome_temperature_noise_frequency)
-	world_map_data.biome_moisture_noise_frequency = params.get("moisture_noise_frequency", world_map_data.biome_moisture_noise_frequency)
-	world_map_data.temperature_bias = params.get("temperature_bias", world_map_data.temperature_bias)
-	world_map_data.moisture_bias = params.get("moisture_bias", world_map_data.moisture_bias)
-	
-	if params.has("noise_type"):
-		world_map_data.noise_type = params.get("noise_type", world_map_data.noise_type)
-	
-	# Update MapGenerator biome transition width if provided
-	if params.has("biome_transition_width") and map_generator != null:
-		map_generator.biome_transition_width = params.get("biome_transition_width", 0.05)
-	
-	# Check if heightmap needs to be recreated (size changed or not initialized)
-	var map_size_x: int = max(512, _next_power_of_2(int(world_map_data.world_width)))
-	var map_size_y: int = max(512, _next_power_of_2(int(world_map_data.world_height)))
-	var needs_recreate: bool = false
-	
-	if not is_initialized or world_map_data.heightmap_image == null:
-		needs_recreate = true
-	else:
-		# Check if size changed
-		var existing_size: Vector2i = world_map_data.heightmap_image.get_size()
-		if existing_size.x != map_size_x or existing_size.y != map_size_y:
-			needs_recreate = true
-		else:
-			# Size is same, but we still need to clear old data for regeneration
-			# Clear the existing heightmap to remove old map data
-			world_map_data.heightmap_image.fill(Color.BLACK)
-			MythosLogger.debug("UI/MapMakerModule", "Cleared existing heightmap for regeneration")
-	
-	# Recreate heightmap if needed
-	if needs_recreate:
-		world_map_data.create_heightmap(map_size_x, map_size_y)
-		
-		# Update render target sprite scale
-		var render_target: Sprite2D = map_root.get_node_or_null("RenderTarget") as Sprite2D
-		if render_target != null and render_target.texture != null:
-			var tex_size: Vector2 = render_target.texture.get_size()
-			if tex_size.x > 0 and tex_size.y > 0:
-				render_target.scale = Vector2(float(world_map_data.world_width) / tex_size.x, float(world_map_data.world_height) / tex_size.y)
-		
-		# Connect components if not already done
-		if map_renderer != null:
-			map_renderer.set_world_map_data(world_map_data)
-		if map_editor != null:
-			map_editor.set_world_map_data(world_map_data)
-		if marker_manager != null:
-			marker_manager.set_world_map_data(world_map_data)
-		
-		is_initialized = true
-	else:
-		# Ensure components are connected even if not recreating
-		if map_renderer != null and map_renderer.world_map_data != world_map_data:
-			map_renderer.set_world_map_data(world_map_data)
-		if map_editor != null and map_editor.world_map_data != world_map_data:
-			map_editor.set_world_map_data(world_map_data)
-		if marker_manager != null and marker_manager.world_map_data != world_map_data:
-			marker_manager.set_world_map_data(world_map_data)
-	
-	# Clear old map data before generating new map
-	# This ensures the old map is completely removed before new generation
-	if world_map_data.heightmap_image != null:
-		world_map_data.heightmap_image.fill(Color.BLACK)
-		MythosLogger.debug("UI/MapMakerModule", "Cleared existing heightmap before regeneration")
-	
-	# Clear biome preview image to force regeneration
-	world_map_data.biome_preview_image = null
-	
-	# Attempt generation with error handling
-	var generation_success: bool = false
-	if map_generator == null:
-		MythosLogger.error("UI/MapMakerModule", "regenerate_map() - map_generator is null")
-		return false
-	
-	# Try to generate map
-	# For low-res preview, skip expensive post-processing for faster generation
-	var original_post_proc_enabled: bool = true
-	if use_low_res_preview:
-		if map_generator.post_processing_config.has("enabled"):
-			original_post_proc_enabled = map_generator.post_processing_config.get("enabled", true)
-		map_generator.post_processing_config["enabled"] = false
-	
-	MythosLogger.debug("UI/MapMakerModule", "Starting map generation", {
-		"seed": world_map_data.seed,
-		"size": Vector2i(world_map_data.world_width, world_map_data.world_height),
-		"preview_mode": use_low_res_preview,
-		"image_size": Vector2i(map_size_x, map_size_y)
-	})
-	
-	# Use threading to prevent main thread blocking (CRITICAL FIX for 1 FPS issue)
-	# Threading prevents 200-1000ms blocking that was causing ~1 FPS performance
-	map_generator.generate_map(world_map_data, true, use_low_res_preview)  # Use threading, preview mode if requested
-	
-	# Restore post-processing setting
-	if use_low_res_preview:
-		map_generator.post_processing_config["enabled"] = original_post_proc_enabled
-	
-	# Check if generation is using threading
-	# Note: MapGenerator may use threading based on map size and hardware profiler
-	if map_generator.generation_thread != null:
-		var thread: Thread = map_generator.generation_thread
-		if thread.is_alive():
-			# Threaded generation - poll for completion in _process()
-			is_generating = true
-			generation_thread = thread
-			pending_biome_preview = true
-			MythosLogger.info("UI/MapMakerModule", "Map generation started in background thread - will poll for completion")
-			# Return true immediately - completion will be handled in _process()
-			return true
-		else:
-			# Thread already completed (very fast generation)
-			MythosLogger.debug("UI/MapMakerModule", "Map generation thread completed immediately")
-			thread.wait_to_finish()
-			# CRITICAL FIX: Duplicate Image from thread to main thread
-			if world_map_data != null and world_map_data.heightmap_image != null:
-				world_map_data.heightmap_image = world_map_data.heightmap_image.duplicate()
-				MythosLogger.debug("UI/MapMakerModule", "Heightmap duplicated from thread to main thread (immediate completion)")
-			return _finalize_map_generation()
-	else:
-		# Synchronous generation (fallback for very small maps or threading disabled)
-		MythosLogger.debug("UI/MapMakerModule", "Map generation completed synchronously")
-		return _finalize_map_generation()
+	print("Old procedural regeneration disabled – preparing for Azgaar integration")
+	push_warning("MapMakerModule.regenerate_map() called but old generation is disabled – Azgaar integration in progress")
+	return false
 
 
 func _set_viewport_update_always() -> void:
@@ -688,77 +475,22 @@ func _set_viewport_update_always() -> void:
 
 
 func _finalize_map_generation() -> bool:
-	"""Finalize map generation after thread completion or synchronous generation.
+	"""Stub - old map generation finalization disabled (preparing for Azgaar integration).
 	
-	Validates results, generates biome preview, and refreshes renderer.
-	Only refreshes once at the end (batched) to maintain performance.
+	OLD GENERATION CODE REMOVED - UI structure preserved for Azgaar migration
 	
 	Returns:
-		bool: True if generation succeeded, False on failure
+		bool: Always returns false (generation disabled)
 	"""
-	# Validate generation result
-	if world_map_data.heightmap_image == null:
-		MythosLogger.error("UI/MapMakerModule", "_finalize_map_generation() - heightmap_image is null after generation")
-		# Reset to INTERACTIVE mode on failure
-		if map_renderer != null:
-			map_renderer.set_refresh_mode(MapRenderer.RefreshMode.INTERACTIVE)
-		return false
-	
-	# Check if heightmap has valid data (not all zeros)
-	var sample_pos: Vector2i = Vector2i(min(100, world_map_data.heightmap_image.get_width() - 1), min(100, world_map_data.heightmap_image.get_height() - 1))
-	var sample_color: Color = world_map_data.heightmap_image.get_pixel(sample_pos.x, sample_pos.y)
-	if sample_color.r <= 0.0:
-		MythosLogger.warn("UI/MapMakerModule", "_finalize_map_generation() - heightmap appears empty (sample is zero)")
-		# Don't fail here - might be valid for very low maps
-	
-	# Generate biome preview (defer to next frame to prevent blocking)
-	if pending_biome_preview:
-		pending_biome_preview = false
-		call_deferred("_generate_biome_preview_deferred")
-	else:
-		# Generate immediately if not deferred
-		map_generator.generate_biome_preview(world_map_data)
-		if world_map_data.biome_preview_image == null:
-			MythosLogger.warn("UI/MapMakerModule", "_finalize_map_generation() - biome_preview_image is null after generation")
-	
-	# Refresh renderer to display new map (batched - only once at end)
-	if map_renderer != null:
-		# Force renderer to update with new data
-		map_renderer.set_world_map_data(world_map_data)  # Ensure renderer has latest data
-		map_renderer.refresh()  # This updates textures and triggers redraw
-		
-		# Reset to INTERACTIVE mode after generation complete
-		map_renderer.set_refresh_mode(MapRenderer.RefreshMode.INTERACTIVE)
-		
-		# Force viewport update to ensure new map is displayed
-		if map_viewport != null:
-			map_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
-			# Then set back to always update
-			call_deferred("_set_viewport_update_always")
-		
-		# Update mini 3D preview if available
-		# call_deferred("update_mini_3d_preview")  # TODO: Implement in future phase
-		
-		MythosLogger.info("UI/MapMakerModule", "_finalize_map_generation() completed successfully")
-		return true
-	else:
-		MythosLogger.error("UI/MapMakerModule", "_finalize_map_generation() - map_renderer is null, cannot refresh")
-		return false
+	print("Old map generation finalization disabled – preparing for Azgaar integration")
+	push_warning("MapMakerModule._finalize_map_generation() called but old generation is disabled – Azgaar integration in progress")
+	return false
 
 
 func _generate_biome_preview_deferred() -> void:
-	"""Generate biome preview in deferred call to prevent blocking."""
-	if map_generator != null and world_map_data != null:
-		MythosLogger.debug("UI/MapMakerModule", "Generating biome preview (deferred)")
-		map_generator.generate_biome_preview(world_map_data)
-		if world_map_data.biome_preview_image == null:
-			MythosLogger.warn("UI/MapMakerModule", "_generate_biome_preview_deferred() - biome_preview_image is null after generation")
-		# Refresh renderer to show biome colors (batched - only once after preview generated)
-		if map_renderer != null:
-			map_renderer.set_world_map_data(world_map_data)
-			map_renderer.refresh()
-			# Ensure we're back to INTERACTIVE mode after deferred preview
-			map_renderer.set_refresh_mode(MapRenderer.RefreshMode.INTERACTIVE)
+	"""Stub - old biome preview generation disabled (preparing for Azgaar integration)."""
+	print("Old biome preview generation disabled – preparing for Azgaar integration")
+	push_warning("MapMakerModule._generate_biome_preview_deferred() called but old generation is disabled – Azgaar integration in progress")
 
 
 func set_view_mode(mode: MapRenderer.ViewMode) -> void:
@@ -1055,6 +787,7 @@ func _process(delta: float) -> void:
 		if not generation_thread.is_alive():
 			# Thread completed - finalize generation
 			MythosLogger.info("UI/MapMakerModule", "Map generation thread completed")
+			print("PREVIEW: Thread completion detected in _process(), calling _finalize_map_generation()")
 			generation_thread.wait_to_finish()
 			generation_thread = null
 			is_generating = false

@@ -2521,204 +2521,24 @@ func _on_landmass_param_changed(param_name: String, value: Variant) -> void:
 
 func _on_generate_map_pressed() -> void:
 	"""
-	Generate procedural 2D map using custom MapMakerModule as default renderer.
+	Stub - old procedural generation disabled (preparing for Azgaar integration).
 	
-	Custom MapMakerModule is the default and preferred 2D preview renderer.
-	ProceduralWorldMap is used only as graceful fallback on custom failure.
-	This ensures visual consistency while maintaining addon compatibility for future Terrain3D seeding.
+	OLD GENERATION CODE REMOVED - UI structure preserved for Azgaar migration
+	Button click is handled but generation is disabled.
 	"""
-	var seed_value: int = step_data.get("Map Gen", {}).get("seed", 12345)
-	var style_name: String = step_data.get("Map Gen", {}).get("style", "")
-	var map_width: int = step_data.get("Map Gen", {}).get("width", 1024)
-	var map_height: int = step_data.get("Map Gen", {}).get("height", 1024)
-	var landmass: String = step_data.get("Map Gen", {}).get("landmass", "Continents")
-	
-	if style_name.is_empty() or not fantasy_archetypes.has(style_name):
-		MythosLogger.warn("UI/WorldBuilder", "Invalid fantasy style selected")
-		return
-	
-	var arch: Dictionary = _load_archetype_by_name(style_name)
-	if arch.is_empty():
-		MythosLogger.warn("UI/WorldBuilder", "Failed to load archetype: %s" % style_name)
-		return
-	
-	# Collect all generation parameters for MapMakerModule
-	var base_params: Dictionary = {
-		"seed": seed_value,
-		"width": map_width,
-		"height": map_height,
-		"landmass_type": landmass,
-		"noise_frequency": step_data.get("Map Gen", {}).get("noise_frequency", 0.0005),
-		"noise_octaves": step_data.get("Map Gen", {}).get("noise_octaves", 4),
-		"noise_persistence": step_data.get("Map Gen", {}).get("noise_persistence", 0.5),
-		"noise_lacunarity": step_data.get("Map Gen", {}).get("noise_lacunarity", 2.0),
-		"sea_level": step_data.get("Map Gen", {}).get("sea_level", 0.4),
-		"erosion_enabled": step_data.get("Map Gen", {}).get("erosion_enabled", true),
-		"erosion_iterations": step_data.get("Map Gen", {}).get("erosion_iterations", 5),
-		"temperature_bias": step_data.get("Climate", {}).get("temperature_bias", 0.0),
-		"moisture_bias": step_data.get("Climate", {}).get("moisture_bias", 0.0),
-		"temperature_noise_frequency": step_data.get("Climate", {}).get("temperature_noise_frequency", 0.002),
-		"moisture_noise_frequency": step_data.get("Climate", {}).get("moisture_noise_frequency", 0.002),
-		"biome_transition_width": step_data.get("Biomes", {}).get("biome_transition_width", 0.05)
-	}
-	
-	# Apply hardware adaptation to parameters
-	var generation_params: Dictionary = base_params
-	if hardware_profiler != null:
-		generation_params = hardware_profiler.get_adapted_generation_params(base_params)
-		MythosLogger.info("UI/WorldBuilder", "Applied hardware adaptation", {
-			"original_octaves": base_params.get("noise_octaves", 4),
-			"adapted_octaves": generation_params.get("noise_octaves", 4),
-			"erosion_enabled": generation_params.get("erosion_enabled", true)
-		})
-	
-	# Add landmass-specific parameters if they exist
-	var landmass_params: Array[String] = ["landmass_radius", "landmass_center_x", "landmass_center_y", "landmass_count", 
-		"landmass_frequency", "landmass_threshold", "landmass_cell_count", "landmass_inner_radius", "landmass_outer_radius",
-		"landmass_island_count", "landmass_base_radius", "landmass_length", "landmass_width", "landmass_fjord_count", "landmass_fjord_length"]
-	for param: String in landmass_params:
-		if step_data.get("Map Gen", {}).has(param):
-			generation_params[param] = step_data["Map Gen"][param]
-	
-	# Map noise type from archetype if available
-	if arch.has("noise_type"):
-		var noise_type_str: String = arch.get("noise_type", "TYPE_PERLIN")
-		match noise_type_str:
-			"TYPE_SIMPLEX":
-				generation_params["noise_type"] = FastNoiseLite.TYPE_SIMPLEX
-			"TYPE_SIMPLEX_SMOOTH":
-				generation_params["noise_type"] = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-			"TYPE_PERLIN":
-				generation_params["noise_type"] = FastNoiseLite.TYPE_PERLIN
-			"TYPE_VALUE":
-				generation_params["noise_type"] = FastNoiseLite.TYPE_VALUE
-			"TYPE_CELLULAR":
-				generation_params["noise_type"] = FastNoiseLite.TYPE_CELLULAR
-			_:
-				generation_params["noise_type"] = FastNoiseLite.TYPE_PERLIN
-	
-	# Ensure MapMakerModule is initialized
-	if map_maker_module == null:
-		_initialize_map_maker_module()
-	
-	# Try custom MapMakerModule regeneration first (default path)
-	# Use preview mode for faster initial generation on low-end hardware
-	var use_preview: bool = false
-	if hardware_profiler != null:
-		use_preview = hardware_profiler.should_skip_post_processing_for_preview()
-		# Also limit map size for preview
-		var max_preview_size: int = hardware_profiler.get_max_map_size_for_preview()
-		if map_width > max_preview_size or map_height > max_preview_size:
-			MythosLogger.info("UI/WorldBuilder", "Limiting preview size for hardware", {
-				"original": Vector2i(map_width, map_height),
-				"max_preview": max_preview_size
-			})
-			generation_params["width"] = min(map_width, max_preview_size)
-			generation_params["height"] = min(map_height, max_preview_size)
-	
-	var custom_success: bool = false
-	if map_maker_module != null and map_maker_module.has_method("regenerate_map"):
-		MythosLogger.info("UI/WorldBuilder", "Using custom MapMakerModule renderer for map generation", {
-			"preview_mode": use_preview
-		})
-		custom_success = map_maker_module.regenerate_map(generation_params, use_preview)
-		
-		if custom_success:
-			# Extract images from MapMakerModule's world_map_data
-			var world_map_data = map_maker_module.get_world_map_data()
-			if world_map_data != null and world_map_data.heightmap_image != null:
-				# Store images in step_data for later use (baking to 3D, etc.)
-				step_data["Map Gen"]["heightmap_image"] = world_map_data.heightmap_image.duplicate()
-				if world_map_data.biome_preview_image != null:
-					step_data["Map Gen"]["biome_image"] = world_map_data.biome_preview_image.duplicate()
-				else:
-					# Fallback: create biome image from heightmap if preview not available
-					step_data["Map Gen"]["biome_image"] = _create_biome_image_from_heightmap(
-						world_map_data.heightmap_image, map_width, map_height, arch
-					)
-				
-				# Ensure MapMakerModule viewport is visible
-				if map_maker_module.visible == false:
-					map_maker_module.visible = true
-				
-				# Hide ProceduralWorldMap (fallback system)
-				if procedural_world_map != null:
-					procedural_world_map.visible = false
-				
-				MythosLogger.info("UI/WorldBuilder", "Custom map generation complete - images stored, MapMakerModule displays automatically", {
-					"style": style_name,
-					"landmass": landmass,
-					"size": str(map_width) + "x" + str(map_height),
-					"seed": seed_value
-				})
-				return
-	
-	# Fallback to ProceduralWorldMap if custom generation failed
-	if not custom_success:
-		MythosLogger.warn("UI/WorldBuilder", "Custom map generation failed, falling back to ProceduralWorldMap addon")
-		
-		# Ensure ProceduralWorldMap node exists
-		if procedural_world_map == null:
-			MythosLogger.error("UI/WorldBuilder", "ProceduralWorldMap node not found in scene - cannot use fallback")
-			return
-		
-		# Create custom datasource for ProceduralWorldMap
-		var datasource_script = load("res://data/ProceduralWorldDatasource.gd")
-		var ds = datasource_script.new()  # ProceduralWorldDatasource - type hint removed for addon compatibility
-		ds.configure_from_archetype(arch, landmass, seed_value)
-		
-		# Configure ProceduralWorldMap
-		procedural_world_map.datasource = ds
-		procedural_world_map.camera_size = Vector2i(map_width, map_height)
-		procedural_world_map.coordinates = Vector2.ZERO
-		procedural_world_map.zoom = 1.0
-		procedural_world_map.incremental_quality = false  # Generate immediately
-		
-		# Connect to update signal if not already connected
-		if not procedural_world_map.update.is_connected(_on_map_generation_complete_fallback):
-			procedural_world_map.update.connect(_on_map_generation_complete_fallback)
-		
-		# Make ProceduralWorldMap visible temporarily for fallback
-		procedural_world_map.visible = true
-		procedural_world_map.set_process(true)
-		procedural_world_map.set_physics_process(true)
-		
-		# Hide MapMakerModule if it exists (fallback mode)
-		if map_maker_module != null:
-			map_maker_module.visible = false
-		
-		# Trigger generation - ProceduralWorldMap will handle display automatically
-		procedural_world_map.refresh()
-		
-		# Store datasource reference for later use
-		step_data["Map Gen"]["datasource"] = ds
-		
-		MythosLogger.info("UI/WorldBuilder", "Started ProceduralWorldMap fallback generation", {
-			"style": style_name,
-			"landmass": landmass,
-			"size": str(map_width) + "x" + str(map_height),
-			"seed": seed_value
-		})
+	print("Old procedural generation disabled – preparing for Azgaar integration")
+	push_warning("WorldBuilderUI._on_generate_map_pressed() called but old generation is disabled – Azgaar integration in progress")
 
 
 func _on_map_generation_complete_fallback() -> void:
 	"""
-	Handle ProceduralWorldMap fallback generation completion - extract images for storage.
+	Stub - old fallback generation completion disabled (preparing for Azgaar integration).
 	
-	This is only called when using ProceduralWorldMap as fallback renderer.
-	Custom MapMakerModule handles its own completion internally.
+	OLD GENERATION CODE REMOVED - UI structure preserved for Azgaar migration
 	"""
-	var ds = step_data.get("Map Gen", {}).get("datasource", null)  # ProceduralWorldDatasource - type hint removed
-	if ds == null:
-		MythosLogger.warn("UI/WorldBuilder", "Datasource not found in _on_map_generation_complete_fallback")
-		return
-	
-	var map_width: int = step_data.get("Map Gen", {}).get("width", 1024)
-	var map_height: int = step_data.get("Map Gen", {}).get("height", 1024)
-	
-	# Get height and biome images from datasource (uses configurable thresholds/climate/fantasy biomes)
-	var height_img: Image = ds.get_height_image()
-	var biome_img: Image = ds.get_cached_biome_image()
+	print("Old fallback generation completion disabled – preparing for Azgaar integration")
+	push_warning("WorldBuilderUI._on_map_generation_complete_fallback() called but old generation is disabled – Azgaar integration in progress")
+	# OLD GENERATION CODE REMOVED
 	
 	if height_img == null:
 		MythosLogger.warn("UI/WorldBuilder", "Height image not available from datasource")
