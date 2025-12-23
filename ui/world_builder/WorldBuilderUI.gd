@@ -2538,38 +2538,8 @@ func _on_map_generation_complete_fallback() -> void:
 	"""
 	print("Old fallback generation completion disabled – preparing for Azgaar integration")
 	push_warning("WorldBuilderUI._on_map_generation_complete_fallback() called but old generation is disabled – Azgaar integration in progress")
-	# OLD GENERATION CODE REMOVED
-	
-	if height_img == null:
-		MythosLogger.warn("UI/WorldBuilder", "Height image not available from datasource")
-		return
-	
-	if biome_img == null:
-		MythosLogger.warn("UI/WorldBuilder", "Biome image not available from datasource")
-		# Fallback: create a simple biome image from height
-		var style_name: String = step_data.get("Map Gen", {}).get("style", "")
-		var arch: Dictionary = _load_archetype_by_name(style_name) if not style_name.is_empty() else {}
-		biome_img = _create_biome_image_from_heightmap(height_img, map_width, map_height, arch)
-	
-	# Store images in step_data for later use (baking to 3D, etc.)
-	step_data["Map Gen"]["heightmap_image"] = height_img
-	step_data["Map Gen"]["biome_image"] = biome_img
-	
-	# ProceduralWorldMap handles its own display automatically via shader material
-	# Ensure it's visible - the map should already be rendering from the refresh() call
-	if procedural_world_map != null:
-		procedural_world_map.visible = true
-		procedural_world_map.set_process(true)
-		procedural_world_map.set_physics_process(true)
-		MythosLogger.debug("UI/WorldBuilder", "ProceduralWorldMap fallback display confirmed", {
-			"visible": procedural_world_map.visible,
-			"has_material": procedural_world_map.material != null,
-			"camera_size": procedural_world_map.camera_size
-		})
-	else:
-		MythosLogger.warn("UI/WorldBuilder", "ProceduralWorldMap node not found - display may not update")
-	
-	MythosLogger.info("UI/WorldBuilder", "ProceduralWorldMap fallback generation complete - images stored")
+	# OLD GENERATION CODE REMOVED - This function is a stub for Azgaar integration
+	MythosLogger.info("UI/WorldBuilder", "Fallback generation disabled - Azgaar integration in progress")
 
 
 func _create_biome_image_from_heightmap(height_img: Image, map_width: int, map_height: int, arch: Dictionary) -> Image:

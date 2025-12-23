@@ -1,7 +1,7 @@
 [gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://ui/world_builder/WorldBuilderUI.gd" id="1_worldbuilder"]
-[ext_resource type="Theme" path="res://themes/bg3_theme.tres" id="2_theme"
+[ext_resource type="Theme" path="res://themes/bg3_theme.tres" id="2_theme"]
 [ext_resource type="Script" path="res://scripts/ui/WorldBuilderAzgaar.gd" id="6_azgaar"]
 [ext_resource type="Shader" path="res://shaders/overlay_vignette.gdshader" id="3_vignette"]
 [ext_resource type="Environment" path="res://assets/environments/eryndor_base.tres" id="4_environment"]
