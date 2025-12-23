@@ -36,7 +36,7 @@ func _run() -> void:
 	if js_methods.is_empty():
 		print("No obvious JavaScript execution methods found.")
 	else:
-		print("Potential JS methods found: %s" % js_methods)
+		print("Potential JS methods found: %s" % str(js_methods))
 	
 	# Simple runtime test if common methods exist
 	if web_view.has_method("execute_js"):

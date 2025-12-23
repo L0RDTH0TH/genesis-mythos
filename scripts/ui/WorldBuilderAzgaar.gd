@@ -124,7 +124,7 @@ func _initialize_webview() -> void:
 				MythosLogger.error("WorldBuilderAzgaar", "Node class: %s" % web_view.get_class())
 				var url_methods: Array[String] = []
 				for m in all_methods:
-					var method_name_lower := m.to_lower()
+					var method_name_lower: String = m.to_lower()
 					if "url" in method_name_lower or "navigate" in method_name_lower or "load" in method_name_lower:
 						url_methods.append(m)
 				MythosLogger.error("WorldBuilderAzgaar", "URL-related methods: %s" % str(url_methods))
