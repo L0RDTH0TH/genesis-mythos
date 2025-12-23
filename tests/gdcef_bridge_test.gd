@@ -220,13 +220,13 @@ func _run() -> void:
 					print("  Class: %s" % browser_node.get_class())
 					
 					# Get methods on the browser node
-					var browser_methods = browser_node.get_method_list()
-					print("  Browser node methods count: %d" % browser_methods.size())
+					var browser_node_methods = browser_node.get_method_list()
+					print("  Browser node methods count: %d" % browser_node_methods.size())
 					
 					# Search for JS-related methods on browser node
 					var browser_js_methods: Array[String] = []
 					var browser_interesting_methods: Array[String] = []
-					for method in browser_methods:
+					for method in browser_node_methods:
 						var method_name: String = method.name
 						var method_name_lower: String = method_name.to_lower()
 						if "js" in method_name_lower or "javascript" in method_name_lower:
@@ -241,7 +241,10 @@ func _run() -> void:
 							var first_methods: Array[String] = []
 							for i in range(min(30, browser_methods.size())):
 								first_methods.append(browser_methods[i].name)
-							print("  First 30 methods: %s" % str(first_methods))
+							var first_browser_methods: Array[String] = []
+							for i in range(min(30, browser_node_methods.size())):
+								first_browser_methods.append(browser_node_methods[i].name)
+							print("  First 30 methods: %s" % str(first_browser_methods))
 						else:
 							print("  Script/execute/eval methods: %s" % str(browser_interesting_methods))
 					else:
