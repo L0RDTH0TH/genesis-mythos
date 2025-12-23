@@ -258,54 +258,54 @@ func _run() -> void:
 					print("    Child: %s (%s)" % [child.name, child.get_class()])
 			else:
 				print("  ✓ Found %d browser child node(s) to inspect" % existing_browser_nodes.size())
-					
-					# Inspect the first browser node
-					var browser_node = existing_browser_nodes[0]
-					print("\n  === INSPECTING BROWSER CHILD NODE: %s ===" % browser_node.name)
-					print("  Class: %s" % browser_node.get_class())
-					
-					# Get methods on the browser node
-					var browser_node_methods = browser_node.get_method_list()
-					print("  Browser node methods count: %d" % browser_node_methods.size())
-					
-					# Search for JS-related methods on browser node
-					var browser_js_methods: Array[String] = []
-					var browser_interesting_methods: Array[String] = []
-					for method in browser_node_methods:
-						var method_name: String = method.get("name", "") if method is Dictionary else str(method)
-						var method_name_lower: String = method_name.to_lower()
-						if "js" in method_name_lower or "javascript" in method_name_lower:
-							browser_js_methods.append(method_name)
-						if "script" in method_name_lower or "execute" in method_name_lower or "eval" in method_name_lower or "run" in method_name_lower:
-							browser_interesting_methods.append(method_name)
-					
-					if browser_js_methods.is_empty():
-						print("  No JS-related methods found on browser node.")
-						if browser_interesting_methods.is_empty():
-							print("  No script/execute/eval methods found either.")
-							var first_browser_methods: Array[String] = []
-							for i in range(min(30, browser_node_methods.size())):
-								var browser_method_info = browser_node_methods[i]
-								if browser_method_info is Dictionary:
-									first_browser_methods.append(browser_method_info.get("name", "unknown"))
-								else:
-									first_browser_methods.append(str(browser_method_info))
-							print("  First 30 methods: %s" % str(first_browser_methods))
-						else:
-							print("  Script/execute/eval methods: %s" % str(browser_interesting_methods))
+				
+				# Inspect the first browser node
+				var browser_node = existing_browser_nodes[0]
+				print("\n  === INSPECTING BROWSER CHILD NODE: %s ===" % browser_node.name)
+				print("  Class: %s" % browser_node.get_class())
+				
+				# Get methods on the browser node
+				var browser_node_methods = browser_node.get_method_list()
+				print("  Browser node methods count: %d" % browser_node_methods.size())
+				
+				# Search for JS-related methods on browser node
+				var browser_js_methods: Array[String] = []
+				var browser_interesting_methods: Array[String] = []
+				for method in browser_node_methods:
+					var method_name: String = method.get("name", "") if method is Dictionary else str(method)
+					var method_name_lower: String = method_name.to_lower()
+					if "js" in method_name_lower or "javascript" in method_name_lower:
+						browser_js_methods.append(method_name)
+					if "script" in method_name_lower or "execute" in method_name_lower or "eval" in method_name_lower or "run" in method_name_lower:
+						browser_interesting_methods.append(method_name)
+				
+				if browser_js_methods.is_empty():
+					print("  No JS-related methods found on browser node.")
+					if browser_interesting_methods.is_empty():
+						print("  No script/execute/eval methods found either.")
+						var first_browser_methods: Array[String] = []
+						for i in range(min(30, browser_node_methods.size())):
+							var browser_method_info = browser_node_methods[i]
+							if browser_method_info is Dictionary:
+								first_browser_methods.append(browser_method_info.get("name", "unknown"))
+							else:
+								first_browser_methods.append(str(browser_method_info))
+						print("  First 30 methods: %s" % str(first_browser_methods))
 					else:
-						print("  ✓✓✓ JS-RELATED METHODS ON BROWSER NODE: %s" % str(browser_js_methods))
-					
-					# Check properties on browser node
-					var browser_props = browser_node.get_property_list()
-					var browser_js_props: Array[String] = []
-					for prop in browser_props:
-						var prop_name: String = prop.name
-						if "js" in prop_name.to_lower() or "javascript" in prop_name.to_lower():
-							browser_js_props.append(prop_name)
-					
-					if not browser_js_props.is_empty():
-						print("  JS-related properties: %s" % str(browser_js_props))
+						print("  Script/execute/eval methods: %s" % str(browser_interesting_methods))
+				else:
+					print("  ✓✓✓ JS-RELATED METHODS ON BROWSER NODE: %s" % str(browser_js_methods))
+				
+				# Check properties on browser node
+				var browser_props = browser_node.get_property_list()
+				var browser_js_props: Array[String] = []
+				for prop in browser_props:
+					var prop_name: String = prop.name
+					if "js" in prop_name.to_lower() or "javascript" in prop_name.to_lower():
+						browser_js_props.append(prop_name)
+				
+				if not browser_js_props.is_empty():
+					print("  JS-related properties: %s" % str(browser_js_props))
 	
 	# Look for getter methods that might return browser objects
 	print("\n=== BROWSER GETTER METHODS ===")
