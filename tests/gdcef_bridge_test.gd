@@ -102,20 +102,75 @@ func _run() -> void:
 	else:
 		print("Interesting methods: %s" % str(interesting_methods))
 	
-	# Check properties
-	print("\n=== PROPERTIES ===")
+	# Check ALL properties
+	print("\n=== ALL PROPERTIES ===")
 	var property_list := web_view.get_property_list()
+	print("Total properties: %d" % property_list.size())
 	var interesting_properties: Array[String] = []
+	var all_property_names: Array[String] = []
+	
 	for prop in property_list:
 		var name: String = prop.name
+		all_property_names.append(name)
 		var name_lower: String = name.to_lower()
-		if "browser" in name_lower or "webview" in name_lower or "page" in name_lower or "frame" in name_lower or "js" in name_lower or "javascript" in name_lower:
+		if "browser" in name_lower or "webview" in name_lower or "page" in name_lower or "frame" in name_lower or "js" in name_lower or "javascript" in name_lower or "url" in name_lower:
 			interesting_properties.append(name)
 	
+	print("All property names (first 30): %s" % str(all_property_names.slice(0, 30)))
+	
 	if interesting_properties.is_empty():
-		print("No interesting properties found.")
+		print("\nNo interesting properties found.")
 	else:
-		print("Interesting properties: %s" % str(interesting_properties))
+		print("\nInteresting properties: %s" % str(interesting_properties))
+		# Try to get values of interesting properties
+		print("\n=== INTERESTING PROPERTY VALUES ===")
+		for prop_name in interesting_properties:
+			if web_view.has_method("get_" + prop_name):
+				var value = web_view.call("get_" + prop_name)
+				print("  %s = %s (type: %s)" % [prop_name, str(value), typeof(value)])
+			elif web_view.has(prop_name):
+				var value = web_view.get(prop_name)
+				print("  %s = %s (type: %s)" % [prop_name, str(value), typeof(value)])
+	
+	# Try to inspect create_browser method signature
+	print("\n=== INSPECTING create_browser METHOD ===")
+	if web_view.has_method("create_browser"):
+		var method_info = null
+		for method in method_list:
+			if method.name == "create_browser":
+				method_info = method
+				break
+		
+		if method_info:
+			print("create_browser found:")
+			print("  Arguments: %d" % method_info.args.size())
+			for i in range(method_info.args.size()):
+				var arg = method_info.args[i]
+				print("    arg[%d]: %s (type: %s)" % [i, arg.name, arg.type])
+			print("  Return type: %s" % method_info.return_val.type)
+			
+			# Try to call it (if it doesn't require arguments or we can provide defaults)
+			print("\n  Attempting to inspect return value...")
+			# Note: We can't actually call it in EditorScript without proper setup
+			# But we can check if there are getter methods for browser objects
+	
+	# Look for getter methods that might return browser objects
+	print("\n=== BROWSER GETTER METHODS ===")
+	var browser_getters: Array[String] = []
+	for method in method_list:
+		var name: String = method.name
+		var name_lower: String = name.to_lower()
+		if (name.begins_with("get_") and ("browser" in name_lower or "webview" in name_lower or "page" in name_lower or "frame" in name_lower)) or name == "get_browser" or name == "get_webview":
+			browser_getters.append(name)
+	
+	if browser_getters.is_empty():
+		print("No browser getter methods found.")
+	else:
+		print("Browser getters: %s" % str(browser_getters))
+		# Try to call them
+		for getter_name in browser_getters:
+			print("  Attempting %s()..." % getter_name)
+			# Note: Can't actually call in EditorScript, but we can see the signature
 	
 	# Test common method name variations
 	print("\n=== TESTING COMMON METHOD NAMES ===")
@@ -135,6 +190,22 @@ func _run() -> void:
 		print("No common JS execution method names found.")
 	else:
 		print("Found methods: %s" % str(found_methods))
+	
+	# Check signals
+	print("\n=== SIGNALS ===")
+	var signal_list := web_view.get_signal_list()
+	var browser_signals: Array[String] = []
+	for signal_info in signal_list:
+		var name: String = signal_info.name
+		var name_lower: String = name.to_lower()
+		if "browser" in name_lower or "webview" in name_lower or "page" in name_lower or "frame" in name_lower or "load" in name_lower or "ready" in name_lower:
+			browser_signals.append(name)
+	
+	if browser_signals.is_empty():
+		print("No browser-related signals found.")
+		print("Total signals: %d" % signal_list.size())
+	else:
+		print("Browser-related signals: %s" % str(browser_signals))
 	
 	print("=== GDCef Bridge Test End ===")
 	
