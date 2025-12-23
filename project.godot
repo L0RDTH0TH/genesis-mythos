@@ -26,6 +26,7 @@ FactionEconomy="*res://core/sim/faction_economy.gd"
 PerformanceMonitorSingleton="*res://core/singletons/PerformanceMonitorSingleton.gd"
 PerformanceLogger="*res://core/singletons/PerformanceLogger.gd"
 FlameGraphProfiler="*res://core/singletons/FlameGraphProfiler.gd"
+AzgaarIntegrator="*res://scripts/managers/AzgaarIntegrator.gd"
 
 [debug]
 
