@@ -143,11 +143,34 @@ func _run() -> void:
 		
 		if method_info:
 			print("create_browser found:")
-			print("  Arguments: %d" % method_info.args.size())
-			for i in range(method_info.args.size()):
-				var arg = method_info.args[i]
-				print("    arg[%d]: %s (type: %s)" % [i, arg.name, arg.type])
-			print("  Return type: %s" % method_info.return_val.type)
+			print("  Method info keys: %s" % str(method_info.keys()))
+			
+			if method_info.has("args"):
+				var args = method_info.args
+				print("  Arguments: %d" % args.size())
+				for i in range(args.size()):
+					var arg = args[i]
+					if arg is Dictionary:
+						print("    arg[%d]: name=%s, type=%s" % [i, arg.get("name", "unknown"), arg.get("type", -1)])
+					else:
+						print("    arg[%d]: %s" % [i, str(arg)])
+			else:
+				print("  Arguments: (not found in method info)")
+			
+			if method_info.has("return"):
+				var return_info = method_info.return
+				if return_info is Dictionary:
+					print("  Return type: %s" % return_info.get("type", -1))
+				else:
+					print("  Return: %s" % str(return_info))
+			elif method_info.has("return_val"):
+				var return_info = method_info.return_val
+				if return_info is Dictionary:
+					print("  Return type: %s" % return_info.get("type", -1))
+				else:
+					print("  Return: %s" % str(return_info))
+			else:
+				print("  Return type: (not specified)")
 			
 			# Try to call it (if it doesn't require arguments or we can provide defaults)
 			print("\n  Attempting to inspect return value...")
