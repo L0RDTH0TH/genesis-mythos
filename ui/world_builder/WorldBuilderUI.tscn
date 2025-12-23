@@ -1,11 +1,8 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://ui/world_builder/WorldBuilderUI.gd" id="1_worldbuilder"]
 [ext_resource type="Theme" path="res://themes/bg3_theme.tres" id="2_theme"]
-[ext_resource type="Script" path="res://scripts/ui/WorldBuilderAzgaar.gd" id="6_azgaar"]
-[ext_resource type="Shader" path="res://shaders/overlay_vignette.gdshader" id="3_vignette"]
-[ext_resource type="Environment" path="res://assets/environments/eryndor_base.tres" id="4_environment"]
-[ext_resource type="Script" path="res://addons/procedural_world_map/worldmap.gd" id="5_proceduralworldmap"]
+[ext_resource type="Script" path="res://scripts/ui/WorldBuilderAzgaar.gd" id="3_azgaar"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_center"]
 bg_color = Color(0.25, 0.2, 0.15, 1)
@@ -18,9 +15,6 @@ corner_radius_top_left = 4
 corner_radius_top_right = 4
 corner_radius_bottom_right = 4
 corner_radius_bottom_left = 4
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bg"]
-bg_color = Color(0.1, 0.1, 0.1, 1)
 
 [node name="WorldBuilderUI" type="Control"]
 layout_mode = 3
@@ -41,76 +35,83 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.1, 0.1, 0.1, 1)
 
-[node name="Overlay" type="ColorRect" parent="."]
+[node name="MainSplit" type="HSplitContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-mouse_filter = 2
-shader = ExtResource("3_vignette")
-
-[node name="BackgroundPanel" type="Panel" parent="."]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-
-[node name="TitleLabel" type="Label" parent="BackgroundPanel"]
-layout_mode = 1
-anchors_preset = 6
-anchor_left = 0.0
-anchor_top = 0.0
-anchor_right = 1.0
-anchor_bottom = 0.0
 offset_left = 0.0
 offset_top = 0.0
 offset_right = 0.0
 offset_bottom = 0.0
-grow_horizontal = 2
-grow_vertical = 0
+split_offset = 400
+
+[node name="LeftPanel" type="MarginContainer" parent="MainSplit"]
+layout_mode = 2
+size_flags_horizontal = 0
+theme_override_constants/margin_left = 40
+theme_override_constants/margin_top = 40
+theme_override_constants/margin_right = 40
+theme_override_constants/margin_bottom = 40
+
+[node name="LeftVBox" type="VBoxContainer" parent="MainSplit/LeftPanel"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="TitleLabel" type="Label" parent="MainSplit/LeftPanel/LeftVBox"]
+layout_mode = 2
 theme_override_font_sizes/font_size = 32
 theme_override_colors/font_color = Color(1, 0.843137, 0, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.5)
 theme_override_constants/shadow_offset_x = 2
 theme_override_constants/shadow_offset_y = 2
-text = "World Builder - Forging the World"
+text = "Azgaar World Builder"
 horizontal_alignment = 1
-vertical_alignment = 1
 
-[node name="MainContainer" type="HSplitContainer" parent="BackgroundPanel"]
+[node name="ArchetypeLabel" type="Label" parent="MainSplit/LeftPanel/LeftVBox"]
+layout_mode = 2
+text = "Archetype Preset"
+
+[node name="ArchetypeOptionButton" type="OptionButton" parent="MainSplit/LeftPanel/LeftVBox"]
+layout_mode = 2
+
+[node name="AzgaarParamsTabContainer" type="TabContainer" parent="MainSplit/LeftPanel/LeftVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="TopMargin" type="MarginContainer" parent="MainSplit/LeftPanel/LeftVBox"]
+layout_mode = 2
+size_flags_vertical = 0
+theme_override_constants/margin_top = 20
+
+[node name="GenerateButton" type="Button" parent="MainSplit/LeftPanel/LeftVBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 120)
+text = "Generate with Azgaar"
+
+[node name="StatusLabel" type="Label" parent="MainSplit/LeftPanel/LeftVBox"]
+layout_mode = 2
+text = "Ready"
+horizontal_alignment = 1
+
+[node name="RightPanel" type="Panel" parent="MainSplit"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_center")
+
+[node name="AzgaarContainer" type="Control" parent="MainSplit/RightPanel"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-offset_left = 0.0
-offset_top = 0.0
-offset_right = 0.0
-offset_bottom = 0.0
-split_offset = 250
+script = ExtResource("3_azgaar")
 
-[node name="LeftNav" type="Panel" parent="BackgroundPanel/MainContainer"]
-layout_mode = 2
-size_flags_horizontal = 0
-
-[node name="RightSplit" type="HSplitContainer" parent="BackgroundPanel/MainContainer"]
-layout_mode = 2
-size_flags_horizontal = 3
-split_offset = 60
-
-[node name="CenterPanel" type="Panel" parent="BackgroundPanel/MainContainer/RightSplit"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_styles/panel = SubResource("StyleBoxFlat_center")
-script = ExtResource("6_azgaar")
-
-[node name="AzgaarWebView" type="GDCef" parent="BackgroundPanel/MainContainer/RightSplit/CenterPanel"]
+[node name="AzgaarWebView" type="GDCef" parent="MainSplit/RightPanel/AzgaarContainer"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -119,67 +120,7 @@ grow_horizontal = 2
 grow_vertical = 2
 visible = true
 
-[node name="Map2DScrollContainer" type="ScrollContainer" parent="BackgroundPanel/MainContainer/RightSplit/CenterPanel"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="ProceduralWorldMap" type="ColorRect" parent="BackgroundPanel/MainContainer/RightSplit/CenterPanel/Map2DScrollContainer"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-color = Color(0.1, 0.1, 0.1, 1)
-script = ExtResource("5_proceduralworldmap")
-incremental_quality = false
-camera_size = Vector2i(1024, 1024)
-zoom = 1.0
-
-[node name="Terrain3DView" type="SubViewportContainer" parent="BackgroundPanel/MainContainer/RightSplit/CenterPanel"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-stretch = true
-visible = false
-
-[node name="PreviewViewport" type="SubViewport" parent="BackgroundPanel/MainContainer/RightSplit/CenterPanel/Terrain3DView"]
-size = Vector2(512, 512)
-transparent_bg = false
-handle_input_locally = false
-render_target_update_mode = 0
-
-[node name="PreviewWorld" type="Node3D" parent="BackgroundPanel/MainContainer/RightSplit/CenterPanel/Terrain3DView/PreviewViewport"]
-
-[node name="WorldEnvironment" type="WorldEnvironment" parent="BackgroundPanel/MainContainer/RightSplit/CenterPanel/Terrain3DView/PreviewViewport/PreviewWorld"]
-environment = ExtResource("4_environment")
-
-[node name="PreviewCamera" type="Camera3D" parent="BackgroundPanel/MainContainer/RightSplit/CenterPanel/Terrain3DView/PreviewViewport/PreviewWorld"]
-transform = Transform3D(1, 0, 0, 0, -0.707107, 0.707107, 0, -0.707107, -0.707107, 0, 100, 0)
-projection = 1
-size = 200.0
-
-[node name="PreviewLight" type="DirectionalLight3D" parent="BackgroundPanel/MainContainer/RightSplit/CenterPanel/Terrain3DView/PreviewViewport/PreviewWorld"]
-transform = Transform3D(0.707107, -0.5, 0.5, 0, 0.707107, 0.707107, -0.707107, -0.5, 0.5, 0, 50, 0)
-light_color = Color(1, 0.863, 0.706, 1)
-light_energy = 1.5
-shadow_enabled = true
-
-[node name="Map2DLayer" type="Node2D" parent="BackgroundPanel/MainContainer/RightSplit/CenterPanel/Terrain3DView/PreviewViewport/PreviewWorld"]
-visible = false
-
-[node name="RightContent" type="PanelContainer" parent="BackgroundPanel/MainContainer/RightSplit"]
-layout_mode = 2
-size_flags_horizontal = 0
-
-[node name="ButtonContainer" type="HBoxContainer" parent="BackgroundPanel"]
+[node name="BottomButtons" type="HBoxContainer" parent="."]
 layout_mode = 1
 anchors_preset = 7
 anchor_left = 0.5
@@ -194,16 +135,16 @@ grow_horizontal = 2
 grow_vertical = 0
 alignment = 1
 
-[node name="BackButton" type="Button" parent="BackgroundPanel/ButtonContainer"]
+[node name="BakeButton" type="Button" parent="BottomButtons"]
 layout_mode = 2
 size_flags_horizontal = 0
-text = "Back"
+text = "Bake to 3D"
 
-[node name="Spacer" type="Control" parent="BackgroundPanel/ButtonContainer"]
+[node name="Spacer" type="Control" parent="BottomButtons"]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="NextButton" type="Button" parent="BackgroundPanel/ButtonContainer"]
+[node name="BackButton" type="Button" parent="BottomButtons"]
 layout_mode = 2
 size_flags_horizontal = 0
-text = "Next"
+text = "Back to Menu"
