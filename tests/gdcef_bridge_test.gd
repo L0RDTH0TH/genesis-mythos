@@ -172,10 +172,91 @@ func _run() -> void:
 			else:
 				print("  Return type: (not specified)")
 			
-			# Try to call it (if it doesn't require arguments or we can provide defaults)
-			print("\n  Attempting to inspect return value...")
-			# Note: We can't actually call it in EditorScript without proper setup
-			# But we can check if there are getter methods for browser objects
+			# Try to call it and inspect the returned object
+			print("\n  Attempting to call create_browser()...")
+			print("  Type 24 = Variant.Type.OBJECT (likely)")
+			print("  Type 4 = Variant.Type.INT (likely)")
+			print("  Type 27 = Variant.Type.STRING (likely)")
+			print("  Note: Browser is created as a child node (typically 'browser_0')")
+			
+			# Check current children before creating browser
+			var children_before: Array[String] = []
+			for child in web_view.get_children():
+				children_before.append(child.name)
+			print("\n  Current children before create_browser: %s" % str(children_before))
+			
+			# Try calling with reasonable defaults
+			# Based on gdCEF API, might be: url, texture_rect, options_dict
+			if web_view.has_method("create_browser"):
+				print("  Attempting create_browser('about:blank', null, {})...")
+				
+				# Try calling - might need a TextureRect, but let's try with null first
+				var call_result = web_view.call("create_browser", "about:blank", null, {})
+				print("  create_browser() returned: %s (type: %s)" % [str(call_result), typeof(call_result)])
+				
+				# Check children after creating browser
+				var children_after = web_view.get_children()
+				var children_after_names: Array[String] = []
+				for child in children_after:
+					children_after_names.append(child.name)
+				print("  Children after create_browser: %s" % str(children_after_names))
+				
+				# Look for browser child nodes
+				var browser_nodes: Array[Node] = []
+				for child in children_after:
+					if "browser" in child.name.to_lower():
+						browser_nodes.append(child)
+				
+				if browser_nodes.is_empty():
+					print("  No browser child nodes found. Checking all children...")
+					for child in children_after:
+						print("    Child: %s (%s)" % [child.name, child.get_class()])
+				else:
+					print("  ✓ Found %d browser child node(s)" % browser_nodes.size())
+					
+					# Inspect the first browser node
+					var browser_node = browser_nodes[0]
+					print("\n  === INSPECTING BROWSER CHILD NODE: %s ===" % browser_node.name)
+					print("  Class: %s" % browser_node.get_class())
+					
+					# Get methods on the browser node
+					var browser_methods = browser_node.get_method_list()
+					print("  Browser node methods count: %d" % browser_methods.size())
+					
+					# Search for JS-related methods on browser node
+					var browser_js_methods: Array[String] = []
+					var browser_interesting_methods: Array[String] = []
+					for method in browser_methods:
+						var method_name: String = method.name
+						var method_name_lower: String = method_name.to_lower()
+						if "js" in method_name_lower or "javascript" in method_name_lower:
+							browser_js_methods.append(method_name)
+						if "script" in method_name_lower or "execute" in method_name_lower or "eval" in method_name_lower or "run" in method_name_lower:
+							browser_interesting_methods.append(method_name)
+					
+					if browser_js_methods.is_empty():
+						print("  No JS-related methods found on browser node.")
+						if browser_interesting_methods.is_empty():
+							print("  No script/execute/eval methods found either.")
+							var first_methods: Array[String] = []
+							for i in range(min(30, browser_methods.size())):
+								first_methods.append(browser_methods[i].name)
+							print("  First 30 methods: %s" % str(first_methods))
+						else:
+							print("  Script/execute/eval methods: %s" % str(browser_interesting_methods))
+					else:
+						print("  ✓✓✓ JS-RELATED METHODS ON BROWSER NODE: %s" % str(browser_js_methods))
+					
+					# Check properties on browser node
+					var browser_props = browser_node.get_property_list()
+					var browser_js_props: Array[String] = []
+					for prop in browser_props:
+						var prop_name: String = prop.name
+						if "js" in prop_name.to_lower() or "javascript" in prop_name.to_lower():
+							browser_js_props.append(prop_name)
+					
+					if not browser_js_props.is_empty():
+						print("  JS-related properties: %s" % str(browser_js_props))
 	
 	# Look for getter methods that might return browser objects
 	print("\n=== BROWSER GETTER METHODS ===")
