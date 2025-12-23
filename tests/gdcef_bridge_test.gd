@@ -227,7 +227,7 @@ func _run() -> void:
 					var browser_js_methods: Array[String] = []
 					var browser_interesting_methods: Array[String] = []
 					for method in browser_node_methods:
-						var method_name: String = method.name
+						var method_name: String = method.get("name", "") if method is Dictionary else str(method)
 						var method_name_lower: String = method_name.to_lower()
 						if "js" in method_name_lower or "javascript" in method_name_lower:
 							browser_js_methods.append(method_name)
@@ -238,12 +238,13 @@ func _run() -> void:
 						print("  No JS-related methods found on browser node.")
 						if browser_interesting_methods.is_empty():
 							print("  No script/execute/eval methods found either.")
-							var first_methods: Array[String] = []
-							for i in range(min(30, browser_methods.size())):
-								first_methods.append(browser_methods[i].name)
 							var first_browser_methods: Array[String] = []
 							for i in range(min(30, browser_node_methods.size())):
-								first_browser_methods.append(browser_node_methods[i].name)
+								var method_info = browser_node_methods[i]
+								if method_info is Dictionary:
+									first_browser_methods.append(method_info.get("name", "unknown"))
+								else:
+									first_browser_methods.append(str(method_info))
 							print("  First 30 methods: %s" % str(first_browser_methods))
 						else:
 							print("  Script/execute/eval methods: %s" % str(browser_interesting_methods))
