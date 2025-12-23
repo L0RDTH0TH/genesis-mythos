@@ -6,8 +6,16 @@
 
 extends Control
 
-var web_view = null  # GDCef - will be set in _ready() to handle GDExtension loading
+var web_view: Node = null  # GDCef - will be set in _ready() to handle GDExtension loading
 @onready var azgaar_integrator: Node = get_node("/root/AzgaarIntegrator")
+
+var poll_timer: Timer = null
+var generation_timeout_timer: Timer = null
+var current_generation_options: Dictionary = {}
+
+signal generation_started
+signal generation_complete
+signal generation_failed(reason: String)
 
 func _ready() -> void:
 	"""Initialize Azgaar WebView on ready."""
@@ -140,4 +148,56 @@ func reload_azgaar() -> void:
 	if web_view and web_view.has_method("reload"):
 		web_view.reload()
 		MythosLogger.debug("WorldBuilderAzgaar", "Azgaar WebView reloaded")
+	else:
+		MythosLogger.warn("WorldBuilderAzgaar", "WebView reload method not available")
+
+func trigger_generation_with_options(options: Dictionary, auto_generate: bool = true) -> void:
+	"""Trigger Azgaar generation by writing options and reloading the WebView."""
+	if auto_generate:
+		options["autoGenerate"] = true  # Custom flag we'll handle in bundled Azgaar if needed; otherwise just reload
+	
+	if not AzgaarIntegrator.write_options(options):
+		emit_signal("generation_failed", "Failed to write options.json")
+		return
+	
+	current_generation_options = options
+	emit_signal("generation_started")
+	
+	reload_azgaar()
+	
+	# Start polling timer (every 2 seconds)
+	if poll_timer == null:
+		poll_timer = Timer.new()
+		poll_timer.wait_time = 2.0
+		poll_timer.one_shot = false
+		poll_timer.autostart = false
+		add_child(poll_timer)
+		poll_timer.timeout.connect(_on_poll_timeout)
+	
+	poll_timer.start()
+	
+	# Start timeout timer (60 seconds default)
+	if generation_timeout_timer == null:
+		generation_timeout_timer = Timer.new()
+		generation_timeout_timer.one_shot = true
+		add_child(generation_timeout_timer)
+		generation_timeout_timer.timeout.connect(_on_generation_timeout)
+	
+	generation_timeout_timer.wait_time = 60.0
+	generation_timeout_timer.start()
+	MythosLogger.info("WorldBuilderAzgaar", "Generation triggered with options", {"auto_generate": auto_generate})
+
+func _on_poll_timeout() -> void:
+	"""Poll for generation completion (simple heuristic: check if URL hash changed or page title contains 'Azgaar' + something indicating ready)."""
+	# Simple heuristic: check if URL hash changed or page title contains "Azgaar" + something indicating ready
+	# For now, just rely on timeout – we can improve later
+	# TODO: Implement actual completion detection when we have better WebView API access
+	pass
+
+func _on_generation_timeout() -> void:
+	"""Handle generation timeout."""
+	if poll_timer:
+		poll_timer.stop()
+	emit_signal("generation_failed", "Generation timed out after 60 seconds")
+	MythosLogger.warn("WorldBuilderAzgaar", "Generation timed out", {"timeout_seconds": 60.0})
 

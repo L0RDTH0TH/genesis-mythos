@@ -29,6 +29,10 @@ const STEPS: Array[String] = [
 ## Step data storage
 var step_data: Dictionary = {}
 
+## Azgaar parameter mapping and archetype presets
+var azgaar_mapping: Dictionary = {}
+var archetype_presets: Dictionary = {}
+
 ## Map icons data
 var map_icons_data: Dictionary = {}
 
@@ -137,6 +141,7 @@ func _ready() -> void:
 	_load_civilizations()
 	_load_fantasy_archetypes()
 	_load_landmass_types()
+	_load_azgaar_configs()
 	_apply_theme()
 	_apply_ui_constants_to_scene()
 	_ensure_visibility()
@@ -477,6 +482,51 @@ func _load_landmass_types() -> void:
 		available_landmass_types.append(str(key))
 	available_landmass_types.sort()
 	MythosLogger.info("UI/WorldBuilder", "Loaded landmass type configurations", {"count": available_landmass_types.size()})
+
+
+func _load_azgaar_configs() -> void:
+	"""Load Azgaar parameter mapping and archetype presets from JSON configs."""
+	var mapping_path: String = "res://data/config/azgaar_parameter_mapping.json"
+	var presets_path: String = "res://data/config/archetype_azgaar_presets.json"
+	
+	MythosLogger.verbose("UI/WorldBuilder", "_load_azgaar_configs() called", {"mapping_path": mapping_path, "presets_path": presets_path})
+	
+	# Load parameter mapping
+	if FileAccess.file_exists(mapping_path):
+		var file: FileAccess = FileAccess.open(mapping_path, FileAccess.READ)
+		if file:
+			var json_string: String = file.get_as_text()
+			file.close()
+			var parsed: Variant = JSON.parse_string(json_string)
+			if parsed is Dictionary:
+				azgaar_mapping = parsed.get("parameters", {})
+				MythosLogger.info("UI/WorldBuilder", "Loaded Azgaar parameter mapping", {"count": azgaar_mapping.size()})
+			else:
+				MythosLogger.error("UI/WorldBuilder", "Failed to parse Azgaar parameter mapping JSON")
+		else:
+			MythosLogger.warn("UI/WorldBuilder", "Failed to open Azgaar parameter mapping file", {"path": mapping_path})
+	else:
+		MythosLogger.warn("UI/WorldBuilder", "Azgaar parameter mapping file not found", {"path": mapping_path})
+	
+	# Load archetype presets
+	if FileAccess.file_exists(presets_path):
+		var file: FileAccess = FileAccess.open(presets_path, FileAccess.READ)
+		if file:
+			var json_string: String = file.get_as_text()
+			file.close()
+			var parsed: Variant = JSON.parse_string(json_string)
+			if parsed is Dictionary:
+				archetype_presets = parsed
+				MythosLogger.info("UI/WorldBuilder", "Loaded archetype Azgaar presets", {"count": archetype_presets.size()})
+			else:
+				MythosLogger.error("UI/WorldBuilder", "Failed to parse archetype Azgaar presets JSON")
+		else:
+			MythosLogger.warn("UI/WorldBuilder", "Failed to open archetype Azgaar presets file", {"path": presets_path})
+	else:
+		MythosLogger.warn("UI/WorldBuilder", "Archetype Azgaar presets file not found", {"path": presets_path})
+	
+	# Initialize step_data for Azgaar
+	step_data["Azgaar"] = {}
 
 
 func _load_archetype_file(file_path: String) -> Dictionary:
@@ -2578,6 +2628,10 @@ func _create_biome_image_from_heightmap(height_img: Image, map_width: int, map_h
 
 func _on_bake_to_3d_pressed() -> void:
 	"""Bake generated map to Terrain3D."""
+	# TODO: DEFER INITIALIZATION - Currently Terrain3D is already initialized when world_root scene loads.
+	# Should be changed to lazy initialization: check if terrain_manager.terrain is null, and if so,
+	# call terrain_manager.create_terrain() and terrain_manager.configure_terrain() here BEFORE generating.
+	# This ensures Terrain3D only initializes when user actually clicks "Bake to 3D", not on scene load.
 	var height_img: Image = step_data.get("Map Gen", {}).get("heightmap_image", null)
 	var biome_img: Image = step_data.get("Map Gen", {}).get("biome_image", null)
 	

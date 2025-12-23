@@ -88,18 +88,19 @@ func _copy_directory_recursive(source_dir: DirAccess, target_dir: DirAccess, sou
 	
 	source_dir.list_dir_end()
 
-func write_options(config: Dictionary) -> bool:
-	"""Write options.json to user://azgaar/options.json."""
-	var full_path := AZGAAR_USER_PATH.path_join(OPTIONS_FILE)
-	var file := FileAccess.open(full_path, FileAccess.WRITE)
-	if file:
-		var json_string := JSON.stringify(config, "  ", false)
-		file.store_string(json_string)
-		file.close()
-		print("options.json written to ", full_path)
-		return true
-	push_error("Failed to write options.json to " + full_path)
-	return false
+func write_options(options: Dictionary) -> bool:
+	"""Write Azgaar options to user://azgaar/options.json."""
+	var file_path: String = AZGAAR_USER_PATH.path_join(OPTIONS_FILE)
+	var file := FileAccess.open(file_path, FileAccess.WRITE)
+	if file == null:
+		MythosLogger.error("AzgaarIntegrator", "Failed to open options.json for writing", {"error": FileAccess.get_open_error(), "path": file_path})
+		return false
+	
+	var json_string := JSON.stringify(options, "  ", false)
+	file.store_string(json_string)
+	file.close()
+	MythosLogger.info("AzgaarIntegrator", "Wrote options.json", {"path": file_path})
+	return true
 
 func get_azgaar_url() -> String:
 	"""Get the file:// URL path to Azgaar index.html in user:// directory."""
