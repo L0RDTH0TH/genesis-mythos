@@ -178,44 +178,90 @@ func _run() -> void:
 			print("  Type 4 = Variant.Type.INT (likely)")
 			print("  Type 27 = Variant.Type.STRING (likely)")
 			print("  Note: Browser is created as a child node (typically 'browser_0')")
+			print("  WARNING: CEF must be initialized before creating browsers")
+			
+			# Check if initialize() needs to be called first
+			if web_view.has_method("initialize"):
+				print("  Found initialize() method - checking if CEF is initialized...")
+				if web_view.has_method("is_alive"):
+					var is_alive = web_view.call("is_alive")
+					print("  is_alive() = %s" % str(is_alive))
+					if not is_alive:
+						print("  CEF not initialized. Attempting initialize()...")
+						# Note: initialize() might require arguments, but let's try
+						web_view.call("initialize")
+						print("  initialize() called")
 			
 			# Check current children before creating browser
 			var children_before: Array[String] = []
+			var existing_browser_nodes: Array[Node] = []
 			for child in web_view.get_children():
 				children_before.append(child.name)
+				if "browser" in child.name.to_lower():
+					existing_browser_nodes.append(child)
 			print("\n  Current children before create_browser: %s" % str(children_before))
+			
+			# If browser nodes already exist, inspect them instead of creating new ones
+			if not existing_browser_nodes.is_empty():
+				var existing_names: Array[String] = []
+				for n in existing_browser_nodes:
+					existing_names.append(n.name)
+				print("  ✓ Found existing browser node(s): %s" % str(existing_names))
+				print("  Will inspect existing browser nodes instead of creating new ones...")
+				# Skip to browser inspection
+			else:
 			
 			# Try calling with reasonable defaults
 			# Based on gdCEF API, might be: url, texture_rect, options_dict
+			# NOTE: In EditorScript context, CEF may not be fully initialized
+			# We'll try but expect it might fail
 			if web_view.has_method("create_browser"):
 				print("  Attempting create_browser('about:blank', null, {})...")
+				print("  (This may fail in EditorScript context - CEF needs proper scene tree)")
 				
 				# Try calling - might need a TextureRect, but let's try with null first
-				var call_result = web_view.call("create_browser", "about:blank", null, {})
+				var call_result = null
+				var call_error = false
+				# Wrap in error handling since it might fail
+				call_result = web_view.call("create_browser", "about:blank", null, {})
 				print("  create_browser() returned: %s (type: %s)" % [str(call_result), typeof(call_result)])
 				
-				# Check children after creating browser
-				var children_after = web_view.get_children()
-				var children_after_names: Array[String] = []
-				for child in children_after:
-					children_after_names.append(child.name)
-				print("  Children after create_browser: %s" % str(children_after_names))
+				# If call failed, note that browser creation requires proper CEF initialization
+				# which may not work in EditorScript context
+				if call_result == null:
+					print("  NOTE: create_browser() returned null - CEF may not be initialized in EditorScript")
+					print("  To properly test browser creation, run this in a real scene with CEF initialized")
+					if existing_browser_nodes.is_empty():
+						print("  Skipping browser child node inspection...")
+						scene.queue_free()
+						print("=== GDCef Bridge Test End (Early - CEF not initialized) ===")
+						return
+					else:
+						print("  But we have existing browser nodes, so continuing with inspection...")
 				
-				# Look for browser child nodes
-				var browser_nodes: Array[Node] = []
-				for child in children_after:
-					if "browser" in child.name.to_lower():
-						browser_nodes.append(child)
-				
-				if browser_nodes.is_empty():
-					print("  No browser child nodes found. Checking all children...")
+				# Check children after creating browser (if we tried to create)
+				if call_result != null:
+					var children_after = web_view.get_children()
+					var children_after_names: Array[String] = []
 					for child in children_after:
+						children_after_names.append(child.name)
+					print("  Children after create_browser: %s" % str(children_after_names))
+					
+					# Look for browser child nodes
+					for child in children_after:
+						if "browser" in child.name.to_lower() and not child in existing_browser_nodes:
+							existing_browser_nodes.append(child)
+				
+				# Inspect browser nodes (either existing or newly created)
+				if existing_browser_nodes.is_empty():
+					print("  No browser child nodes found. Checking all children...")
+					for child in web_view.get_children():
 						print("    Child: %s (%s)" % [child.name, child.get_class()])
 				else:
-					print("  ✓ Found %d browser child node(s)" % browser_nodes.size())
+					print("  ✓ Found %d browser child node(s) to inspect" % existing_browser_nodes.size())
 					
 					# Inspect the first browser node
-					var browser_node = browser_nodes[0]
+					var browser_node = existing_browser_nodes[0]
 					print("\n  === INSPECTING BROWSER CHILD NODE: %s ===" % browser_node.name)
 					print("  Class: %s" % browser_node.get_class())
 					
