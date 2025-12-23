@@ -253,11 +253,11 @@ func _run() -> void:
 			
 			# Inspect browser nodes (either existing or newly created)
 			if existing_browser_nodes.is_empty():
-					print("  No browser child nodes found. Checking all children...")
-					for child in web_view.get_children():
-						print("    Child: %s (%s)" % [child.name, child.get_class()])
-				else:
-					print("  ✓ Found %d browser child node(s) to inspect" % existing_browser_nodes.size())
+				print("  No browser child nodes found. Checking all children...")
+				for child in web_view.get_children():
+					print("    Child: %s (%s)" % [child.name, child.get_class()])
+			else:
+				print("  ✓ Found %d browser child node(s) to inspect" % existing_browser_nodes.size())
 					
 					# Inspect the first browser node
 					var browser_node = existing_browser_nodes[0]
