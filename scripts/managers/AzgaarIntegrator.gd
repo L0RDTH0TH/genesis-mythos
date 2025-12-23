@@ -102,6 +102,9 @@ func write_options(config: Dictionary) -> bool:
 	return false
 
 func get_azgaar_url() -> String:
-	"""Get the URL path to Azgaar index.html in user:// directory."""
-	return AZGAAR_USER_PATH.path_join("index.html")
+	"""Get the file:// URL path to Azgaar index.html in user:// directory."""
+	var user_path := OS.get_user_data_dir()
+	var azgaar_path := user_path.path_join("azgaar").path_join("index.html")
+	# Convert to file:// URL format
+	return "file://" + azgaar_path
 
