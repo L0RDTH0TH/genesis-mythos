@@ -181,16 +181,17 @@ func _run() -> void:
 			print("  WARNING: CEF must be initialized before creating browsers")
 			
 			# Check if initialize() needs to be called first
+			# NOTE: initialize() requires a Dictionary argument and crashes if called incorrectly
+			# In EditorScript context, we skip initialization and look for existing browsers
 			if web_view.has_method("initialize"):
 				print("  Found initialize() method - checking if CEF is initialized...")
 				if web_view.has_method("is_alive"):
 					var is_alive = web_view.call("is_alive")
 					print("  is_alive() = %s" % str(is_alive))
 					if not is_alive:
-						print("  CEF not initialized. Attempting initialize()...")
-						# Note: initialize() might require arguments, but let's try
-						web_view.call("initialize")
-						print("  initialize() called")
+						print("  CEF not initialized.")
+						print("  WARNING: initialize() requires a Dictionary argument and cannot be safely called in EditorScript")
+						print("  Skipping initialization - will only inspect existing browser nodes if any exist")
 			
 			# Check current children before creating browser
 			var children_before: Array[String] = []
@@ -210,11 +211,20 @@ func _run() -> void:
 				print("  Will inspect existing browser nodes instead of creating new ones...")
 				# Skip to browser inspection (will happen after this if/else)
 			else:
+				# Check if CEF is alive before trying to create browser
+				var can_create_browser = false
+				if web_view.has_method("is_alive"):
+					var is_alive = web_view.call("is_alive")
+					can_create_browser = is_alive
+					if not is_alive:
+						print("  CEF not initialized - cannot create browser in EditorScript context")
+						print("  Skipping browser creation - test will only work with existing browsers")
+				
 				# Try calling with reasonable defaults
 				# Based on gdCEF API, might be: url, texture_rect, options_dict
 				# NOTE: In EditorScript context, CEF may not be fully initialized
 				# We'll try but expect it might fail
-				if web_view.has_method("create_browser"):
+				if can_create_browser and web_view.has_method("create_browser"):
 					print("  Attempting create_browser('about:blank', null, {})...")
 					print("  (This may fail in EditorScript context - CEF needs proper scene tree)")
 					
