@@ -561,15 +561,19 @@ func _setup_azgaar_ui() -> void:
 		MythosLogger.warn("UI/WorldBuilder", "WorldBuilderAzgaar script methods not available on CenterPanel")
 		return
 	
-	# Populate archetype dropdown
+	# Populate archetype dropdown (sorted alphabetically)
 	archetype_option_button.clear()
+	var preset_names: Array[String] = []
 	for preset_name: String in archetype_presets.keys():
+		preset_names.append(preset_name)
+	preset_names.sort()
+	for preset_name: String in preset_names:
 		archetype_option_button.add_item(preset_name)
 	
-	if archetype_presets.size() > 0:
+	if preset_names.size() > 0:
 		archetype_option_button.selected = 0
 		# Apply first preset
-		call_deferred("_apply_archetype_preset", archetype_presets.keys()[0])
+		call_deferred("_apply_archetype_preset", preset_names[0])
 	
 	# Build parameter UI from mapping
 	_build_azgaar_parameter_ui()
@@ -588,66 +592,87 @@ func _setup_azgaar_ui() -> void:
 	})
 
 
-func _create_slider(param: Dictionary, param_name: String) -> HSlider:
+func _create_control_for_param(param_name: String, param_data: Dictionary) -> Control:
+	"""Create the appropriate control for a parameter based on its ui_type."""
+	var ui_type: String = param_data.get("ui_type", "SpinBox")
+	
+	match ui_type:
+		"HSlider":
+			return _create_slider(param_data, param_name)
+		"SpinBox":
+			return _create_spinbox(param_data, param_name)
+		"CheckBox":
+			return _create_checkbox(param_data, param_name)
+		"OptionButton":
+			return _create_option_button(param_data, param_name)
+		_:
+			MythosLogger.warn("UI/WorldBuilder", "Unknown UI type for parameter", {"param": param_name, "ui_type": ui_type})
+			return _create_spinbox(param_data, param_name)  # Fallback to SpinBox
+
+
+func _create_slider(param_data: Dictionary, param_name: String) -> HSlider:
 	"""Create an HSlider control for a parameter."""
 	var slider: HSlider = HSlider.new()
 	slider.name = param_name
-	slider.min_value = param.get("min", 0.0)
-	slider.max_value = param.get("max", 100.0)
-	slider.step = param.get("step", 0.01)
-	slider.value = param.get("default", slider.min_value)
+	slider.min_value = param_data.get("min", 0.0)
+	slider.max_value = param_data.get("max", 100.0)
+	slider.step = param_data.get("step", 0.01)
+	slider.value = param_data.get("default", slider.min_value)
 	slider.custom_minimum_size = Vector2(200, 0)
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	
 	# Store param_name in metadata
 	slider.set_meta("param_name", param_name)
 	
 	# Connect value changed
-	slider.value_changed.connect(func(v): _on_param_changed(param_name, v))
+	slider.value_changed.connect(func(v): _on_param_value_changed(param_name, v))
 	
 	return slider
 
 
-func _create_spinbox(param: Dictionary, param_name: String) -> SpinBox:
+func _create_spinbox(param_data: Dictionary, param_name: String) -> SpinBox:
 	"""Create a SpinBox control for a parameter."""
 	var spinbox: SpinBox = SpinBox.new()
 	spinbox.name = param_name
-	spinbox.min_value = param.get("min", 0.0)
-	spinbox.max_value = param.get("max", 100.0)
-	spinbox.step = param.get("step", 1.0) if param.has("step") else 1.0
-	spinbox.value = param.get("default", spinbox.min_value)
+	spinbox.min_value = param_data.get("min", 0.0)
+	spinbox.max_value = param_data.get("max", 100.0)
+	spinbox.step = param_data.get("step", 1.0) if param_data.has("step") else 1.0
+	spinbox.value = param_data.get("default", spinbox.min_value)
 	spinbox.custom_minimum_size = Vector2(100, 0)
+	spinbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	
 	# Store param_name in metadata
 	spinbox.set_meta("param_name", param_name)
 	
 	# Connect value changed
-	spinbox.value_changed.connect(func(v): _on_param_changed(param_name, v))
+	spinbox.value_changed.connect(func(v): _on_param_value_changed(param_name, v))
 	
 	return spinbox
 
 
-func _create_checkbox(param: Dictionary, param_name: String) -> CheckBox:
+func _create_checkbox(param_data: Dictionary, param_name: String) -> CheckBox:
 	"""Create a CheckBox control for a parameter."""
 	var checkbox: CheckBox = CheckBox.new()
 	checkbox.name = param_name
-	checkbox.button_pressed = param.get("default", false)
+	checkbox.button_pressed = param_data.get("default", false)
 	
 	# Store param_name in metadata
 	checkbox.set_meta("param_name", param_name)
 	
 	# Connect toggled
-	checkbox.toggled.connect(func(pressed): _on_param_changed(param_name, pressed))
+	checkbox.toggled.connect(func(pressed): _on_param_value_changed(param_name, pressed))
 	
 	return checkbox
 
 
-func _create_option_button(param: Dictionary, param_name: String) -> OptionButton:
+func _create_option_button(param_data: Dictionary, param_name: String) -> OptionButton:
 	"""Create an OptionButton control for a parameter."""
 	var option_button: OptionButton = OptionButton.new()
 	option_button.name = param_name
+	option_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	
 	# Add options
-	var options: Array = param.get("options", [])
+	var options: Array = param_data.get("options", [])
 	if options.is_empty():
 		# For templateInput, add common templates from AZGAAR_PARAMETERS.md
 		if param_name == "templateInput":
@@ -669,7 +694,7 @@ func _create_option_button(param: Dictionary, param_name: String) -> OptionButto
 		option_button.add_item(option)
 	
 	# Set default
-	var default_value: String = param.get("default", "")
+	var default_value: String = param_data.get("default", "")
 	if default_value != "":
 		var default_idx: int = options.find(default_value)
 		if default_idx >= 0:
@@ -681,7 +706,7 @@ func _create_option_button(param: Dictionary, param_name: String) -> OptionButto
 	option_button.set_meta("param_name", param_name)
 	
 	# Connect item selected - pass the selected text value
-	option_button.item_selected.connect(func(idx): _on_param_changed(param_name, option_button.get_item_text(idx)))
+	option_button.item_selected.connect(func(idx): _on_param_value_changed(param_name, option_button.get_item_text(idx)))
 	
 	return option_button
 
@@ -698,10 +723,11 @@ func _build_azgaar_parameter_ui() -> void:
 	
 	azgaar_parameter_controls.clear()
 	
-	# Group parameters by category
+	# Group parameters by category (azgaar_mapping contains "parameters" key)
+	var parameters: Dictionary = azgaar_mapping.get("parameters", azgaar_mapping)
 	var category_params: Dictionary = {}
-	for param_name: String in azgaar_mapping.keys():
-		var param: Dictionary = azgaar_mapping[param_name]
+	for param_name: String in parameters.keys():
+		var param: Dictionary = parameters[param_name]
 		var category: String = param.get("category", "Other")
 		if not category_params.has(category):
 			category_params[category] = []
@@ -737,8 +763,7 @@ func _build_azgaar_parameter_ui() -> void:
 		
 		# Add parameters for this category
 		for param_name: String in category_params[category]:
-			var param: Dictionary = azgaar_mapping[param_name]
-			var ui_type: String = param.get("ui_type", "SpinBox")
+			var param: Dictionary = parameters[param_name]
 			
 			# Create parameter row
 			var param_row: HBoxContainer = HBoxContainer.new()
@@ -750,50 +775,40 @@ func _build_azgaar_parameter_ui() -> void:
 			label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_STANDARD, 0)
 			param_row.add_child(label)
 			
-			# Control based on ui_type
-			var control: Control = null
-			if ui_type == "HSlider":
-				control = _create_slider(param, param_name)
-				# Add value label for slider
+			# Create control using helper
+			var control: Control = _create_control_for_param(param_name, param)
+			if control == null:
+				continue
+			
+			# Add value label for sliders
+			if control is HSlider:
 				var value_label: Label = Label.new()
 				value_label.name = param_name + "_value"
 				value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
-				value_label.text = str(control.value)
+				value_label.text = str((control as HSlider).value)
 				param_row.add_child(control)
 				param_row.add_child(value_label)
 				# Update value label when slider changes
 				control.value_changed.connect(func(v): value_label.text = str(v))
-			elif ui_type == "SpinBox":
-				control = _create_spinbox(param, param_name)
-				param_row.add_child(control)
-			elif ui_type == "CheckBox":
-				control = _create_checkbox(param, param_name)
-				param_row.add_child(control)
-			elif ui_type == "OptionButton":
-				control = _create_option_button(param, param_name)
-				param_row.add_child(control)
 			else:
-				MythosLogger.warn("UI/WorldBuilder", "Unknown UI type for parameter", {"param": param_name, "ui_type": ui_type})
-				continue
+				param_row.add_child(control)
 			
-			if control != null:
-				azgaar_parameter_controls[param_name] = control
-				control.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-				vbox.add_child(param_row)
-				
-				# Store initial value in step_data
-				var initial_value: Variant = ""
-				if control is HSlider:
-					initial_value = (control as HSlider).value
-				elif control is SpinBox:
-					initial_value = (control as SpinBox).value
-				elif control is CheckBox:
-					initial_value = (control as CheckBox).button_pressed
-				elif control is OptionButton:
-					var option_button: OptionButton = control as OptionButton
-					if option_button.get_item_count() > 0:
-						initial_value = option_button.get_item_text(option_button.selected)
-				step_data["Azgaar"][param_name] = initial_value
+			azgaar_parameter_controls[param_name] = control
+			vbox.add_child(param_row)
+			
+			# Store initial value in step_data
+			var initial_value: Variant = ""
+			if control is HSlider:
+				initial_value = (control as HSlider).value
+			elif control is SpinBox:
+				initial_value = (control as SpinBox).value
+			elif control is CheckBox:
+				initial_value = (control as CheckBox).button_pressed
+			elif control is OptionButton:
+				var option_button: OptionButton = control as OptionButton
+				if option_button.get_item_count() > 0:
+					initial_value = option_button.get_item_text(option_button.selected)
+			step_data["Azgaar"][param_name] = initial_value
 	
 	MythosLogger.info("UI/WorldBuilder", "Azgaar parameter UI built", {
 		"tabs": azgaar_tab_container.get_tab_count(),
@@ -851,7 +866,9 @@ func _clamp_parameter(param_name: String, value: Variant) -> Variant:
 	if param_name != "pointsInput":
 		return value
 	
-	var param: Dictionary = azgaar_mapping.get(param_name, {})
+	# Get parameters from mapping (handle both direct dict and nested "parameters" key)
+	var parameters: Dictionary = azgaar_mapping.get("parameters", azgaar_mapping)
+	var param: Dictionary = parameters.get(param_name, {})
 	if param.get("performance_impact", "") != "high":
 		return value
 	
@@ -869,23 +886,31 @@ func _clamp_parameter(param_name: String, value: Variant) -> Variant:
 	
 	var int_value: int = int(value)
 	if int_value > max_points:
-		# Show warning
+		# Show ConfirmationDialog warning
 		var quality_name: String = ["LOW", "MEDIUM", "HIGH"][quality_level]
 		MythosLogger.warn("UI/WorldBuilder", "Clamped pointsInput for hardware", {
 			"requested": int_value,
 			"clamped": max_points,
 			"quality": quality_name
 		})
-		if azgaar_status_label != null:
-			azgaar_status_label.text = "Warning: pointsInput clamped to %d for %s hardware" % [max_points, quality_name]
+		
+		var dialog: ConfirmationDialog = ConfirmationDialog.new()
+		dialog.dialog_text = "Parameter clamped for performance on your hardware.\n\npointsInput was reduced from %d to %d for %s hardware quality." % [int_value, max_points, quality_name]
+		dialog.title = "Parameter Clamped"
+		add_child(dialog)
+		dialog.popup_centered()
+		dialog.confirmed.connect(func(): dialog.queue_free())
+		dialog.canceled.connect(func(): dialog.queue_free())
+		
 		return max_points
 	
 	return int_value
 
 
-func _on_param_changed(param_name: String, value: Variant) -> void:
+func _on_param_value_changed(param_name: String, value: Variant) -> void:
 	"""Handle parameter value change."""
 	# Clamp if needed
+	var original_value: Variant = value
 	value = _clamp_parameter(param_name, value)
 	
 	# Store in step_data
@@ -927,27 +952,28 @@ func _on_generate_azgaar_pressed() -> void:
 		if value != null:
 			options[param_name] = value
 	
-	# Also include seed from Step 1
+	# Also include seed from Step 1 (use default if not set)
 	var seed_value: int = step_data.get("Map Gen", {}).get("seed", 12345)
 	options["optionsSeed"] = seed_value
 	
 	MythosLogger.info("UI/WorldBuilder", "Triggering Azgaar generation", {"options_count": options.size()})
 	
-	# Disable button and show status
+	# Disable button and change text
 	if generate_azgaar_button != null:
 		generate_azgaar_button.disabled = true
+		generate_azgaar_button.text = "Generating..."
 	if azgaar_status_label != null:
-		azgaar_status_label.text = "Generating..."
+		azgaar_status_label.text = "Generating world..."
 	
-	# Trigger generation
-	world_builder_azgaar.trigger_generation_with_options(options)
+	# Trigger generation with auto_generate=true
+	world_builder_azgaar.trigger_generation_with_options(options, true)
 
 
 func _on_azgaar_generation_started() -> void:
 	"""Handle Azgaar generation started signal."""
 	MythosLogger.info("UI/WorldBuilder", "Azgaar generation started")
 	if azgaar_status_label != null:
-		azgaar_status_label.text = "Generation in progress..."
+		azgaar_status_label.text = "Generating world..."
 
 
 func _on_azgaar_generation_complete() -> void:
@@ -955,6 +981,7 @@ func _on_azgaar_generation_complete() -> void:
 	MythosLogger.info("UI/WorldBuilder", "Azgaar generation complete")
 	if generate_azgaar_button != null:
 		generate_azgaar_button.disabled = false
+		generate_azgaar_button.text = "Generate with Azgaar"
 	if azgaar_status_label != null:
 		azgaar_status_label.text = "Generation complete!"
 
@@ -964,6 +991,7 @@ func _on_azgaar_generation_failed(reason: String) -> void:
 	MythosLogger.error("UI/WorldBuilder", "Azgaar generation failed", {"reason": reason})
 	if generate_azgaar_button != null:
 		generate_azgaar_button.disabled = false
+		generate_azgaar_button.text = "Generate with Azgaar"
 	if azgaar_status_label != null:
 		azgaar_status_label.text = "Generation failed: " + reason
 	
@@ -1541,7 +1569,7 @@ func _ensure_terrain_in_preview() -> void:
 
 
 func _create_step_map_gen_editor(parent: VBoxContainer) -> void:
-	"""Create Step 1: Map Generation & Editing (merged Map Gen + 2D Map Maker)."""
+	"""Create Step 1: Map Generation & Editing - Azgaar Fantasy Map Generator only."""
 	var step_panel: Panel = Panel.new()
 	step_panel.name = "StepMapGenEditor"
 	step_panel.visible = (current_step == 0)
@@ -1549,298 +1577,37 @@ func _create_step_map_gen_editor(parent: VBoxContainer) -> void:
 	
 	var container: VBoxContainer = VBoxContainer.new()
 	container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	container.add_theme_constant_override("separation", UIConstants.SPACING_SMALL)
+	container.add_theme_constant_override("separation", UIConstants.SPACING_MEDIUM)
 	step_panel.add_child(container)
 	
 	# Info label
 	var info_label: Label = Label.new()
-	info_label.text = "Procedural Map Generation & Editing - Configure parameters and generate your world map.\nLeft-click to paint terrain, scroll to zoom, drag to pan."
+	info_label.text = "Azgaar Fantasy Map Generator - Configure parameters and generate your world map using the Azgaar Fantasy Map Generator."
 	info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	container.add_child(info_label)
 	
-	# Seed input with random button
-	var seed_container: HBoxContainer = HBoxContainer.new()
-	var seed_label: Label = Label.new()
-	seed_label.text = "Seed:"
-	seed_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_STANDARD, 0)
-	seed_container.add_child(seed_label)
-	
-	var seed_input: LineEdit = LineEdit.new()
-	seed_input.name = "seed"
-	seed_input.text = "12345"
-	seed_input.text_submitted.connect(_on_seed_text_submitted)
-	seed_input.text_changed.connect(_on_seed_text_changed)
-	seed_container.add_child(seed_input)
-	
-	var random_seed_button: Button = Button.new()
-	random_seed_button.text = "Random"
-	random_seed_button.pressed.connect(_on_random_seed_pressed)
-	seed_container.add_child(random_seed_button)
-	container.add_child(seed_container)
-	control_references["Map Gen/seed"] = seed_input
-	step_data["Map Gen"]["seed"] = 12345
-	
-	# Fantasy Style dropdown
-	var style_label: Label = Label.new()
-	style_label.text = "Fantasy Style:"
-	container.add_child(style_label)
-	
-	var style_dropdown: OptionButton = OptionButton.new()
-	style_dropdown.name = "style"
-	for style_name: String in available_archetypes:
-		style_dropdown.add_item(style_name)
-	style_dropdown.selected = 0
-	style_dropdown.item_selected.connect(_on_fantasy_style_selected)
-	container.add_child(style_dropdown)
-	control_references["Map Gen/style"] = style_dropdown
-	step_data["Map Gen"]["style"] = available_archetypes[0] if available_archetypes.size() > 0 else ""
-	
-	# Initialize with first style's recommendations
-	if available_archetypes.size() > 0:
-		_on_fantasy_style_selected(0)
-	
-	# Size dropdown
-	var size_label: Label = Label.new()
-	size_label.text = "World Size:"
-	container.add_child(size_label)
-	
-	var size_dropdown: OptionButton = OptionButton.new()
-	size_dropdown.name = "size"
-	var size_map: Dictionary = {"Tiny": 512, "Small": 1024, "Medium": 2048, "Large": 4096, "Extra Large": 8192}
-	for size_name: String in size_map.keys():
-		size_dropdown.add_item(size_name)
-	size_dropdown.selected = 1  # Default to Small
-	size_dropdown.item_selected.connect(_on_size_selected)
-	container.add_child(size_dropdown)
-	control_references["Map Gen/size"] = size_dropdown
-	step_data["Map Gen"]["size"] = "Small"
-	step_data["Map Gen"]["width"] = size_map["Small"]
-	step_data["Map Gen"]["height"] = size_map["Small"]
-	
-	# ProceduralWorldMap will handle display automatically - no placeholder needed
-	
-	# Landmass dropdown (dynamically loaded from JSON)
-	var landmass_label: Label = Label.new()
-	landmass_label.text = "Landmass Type:"
-	container.add_child(landmass_label)
-	
-	var landmass_dropdown: OptionButton = OptionButton.new()
-	landmass_dropdown.name = "landmass"
-	# Load from JSON config (fallback to hard-coded if not loaded)
-	if available_landmass_types.is_empty():
-		var default_types: Array[String] = ["Continents", "Island Chain", "Single Island", "Archipelago", "Pangea", "Coastal"]
-		for landmass: String in default_types:
-			landmass_dropdown.add_item(landmass)
-	else:
-		for landmass: String in available_landmass_types:
-			landmass_dropdown.add_item(landmass)
-	landmass_dropdown.selected = 0
-	landmass_dropdown.item_selected.connect(_on_landmass_selected)
-	container.add_child(landmass_dropdown)
-	control_references["Map Gen/landmass"] = landmass_dropdown
-	step_data["Map Gen"]["landmass"] = available_landmass_types[0] if not available_landmass_types.is_empty() else "Continents"
-	
-	# Container for landmass-specific sub-controls (will be populated dynamically)
-	var landmass_params_container: VBoxContainer = VBoxContainer.new()
-	landmass_params_container.name = "LandmassParamsContainer"
-	landmass_params_container.visible = false
-	container.add_child(landmass_params_container)
-	control_references["Map Gen/landmass_params"] = landmass_params_container
-	
-	# Initialize sub-controls for default landmass
-	_update_landmass_sub_controls("Continents")
-	
-	# Generate button
-	var generate_button: Button = Button.new()
-	generate_button.text = "Generate Map"
-	generate_button.pressed.connect(_on_generate_map_pressed)
-	container.add_child(generate_button)
-	control_references["Map Gen/generate"] = generate_button
-	
-	# Bake to 3D button
-	var bake_button: Button = Button.new()
-	bake_button.text = "Bake to 3D"
-	bake_button.pressed.connect(_on_bake_to_3d_pressed)
-	container.add_child(bake_button)
-	control_references["Map Gen/bake"] = bake_button
-	
-	# Separator
-	var separator1: HSeparator = HSeparator.new()
-	container.add_child(separator1)
-	
-	# Noise Parameters Section
-	var noise_header: Label = Label.new()
-	noise_header.text = "Noise Parameters"
-	noise_header.add_theme_font_size_override("font_size", 16)
-	noise_header.add_theme_color_override("font_color", Color(1, 0.843137, 0, 1))
-	container.add_child(noise_header)
-	
-	# Noise Frequency
-	var noise_freq_container: HBoxContainer = HBoxContainer.new()
-	var noise_freq_label: Label = Label.new()
-	noise_freq_label.text = "Noise Frequency:"
-	noise_freq_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_STANDARD, 0)
-	noise_freq_container.add_child(noise_freq_label)
-	
-	var noise_freq_slider: HSlider = HSlider.new()
-	noise_freq_slider.name = "noise_frequency"
-	noise_freq_slider.min_value = 0.001
-	noise_freq_slider.max_value = 0.1
-	noise_freq_slider.step = 0.0001
-	noise_freq_slider.value = 0.0005
-	noise_freq_slider.value_changed.connect(func(v): _on_map_gen_param_changed("noise_frequency", v))
-	noise_freq_container.add_child(noise_freq_slider)
-	
-	var noise_freq_value_label: Label = Label.new()
-	noise_freq_value_label.name = "noise_frequency_value"
-	noise_freq_value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
-	noise_freq_value_label.text = "0.0005"
-	noise_freq_container.add_child(noise_freq_value_label)
-	container.add_child(noise_freq_container)
-	control_references["Map Gen/noise_frequency"] = noise_freq_slider
-	control_references["Map Gen/noise_frequency_value"] = noise_freq_value_label
-	step_data["Map Gen"]["noise_frequency"] = 0.0005
-	
-	# Octaves
-	var octaves_container: HBoxContainer = HBoxContainer.new()
-	var octaves_label: Label = Label.new()
-	octaves_label.text = "Octaves:"
-	octaves_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_STANDARD, 0)
-	octaves_container.add_child(octaves_label)
-	
-	var octaves_spinbox: SpinBox = SpinBox.new()
-	octaves_spinbox.name = "noise_octaves"
-	octaves_spinbox.min_value = 1
-	octaves_spinbox.max_value = 8
-	octaves_spinbox.value = 4
-	octaves_spinbox.value_changed.connect(func(v): _on_map_gen_param_changed("noise_octaves", v))
-	octaves_container.add_child(octaves_spinbox)
-	container.add_child(octaves_container)
-	control_references["Map Gen/noise_octaves"] = octaves_spinbox
-	step_data["Map Gen"]["noise_octaves"] = 4
-	
-	# Persistence
-	var persistence_container: HBoxContainer = HBoxContainer.new()
-	var persistence_label: Label = Label.new()
-	persistence_label.text = "Persistence:"
-	persistence_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_STANDARD, 0)
-	persistence_container.add_child(persistence_label)
-	
-	var persistence_slider: HSlider = HSlider.new()
-	persistence_slider.name = "noise_persistence"
-	persistence_slider.min_value = 0.0
-	persistence_slider.max_value = 1.0
-	persistence_slider.step = 0.01
-	persistence_slider.value = 0.5
-	persistence_slider.value_changed.connect(func(v): _on_map_gen_param_changed("noise_persistence", v))
-	persistence_container.add_child(persistence_slider)
-	
-	var persistence_value_label: Label = Label.new()
-	persistence_value_label.name = "noise_persistence_value"
-	persistence_value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
-	persistence_value_label.text = "0.50"
-	persistence_container.add_child(persistence_value_label)
-	container.add_child(persistence_container)
-	control_references["Map Gen/noise_persistence"] = persistence_slider
-	control_references["Map Gen/noise_persistence_value"] = persistence_value_label
-	step_data["Map Gen"]["noise_persistence"] = 0.5
-	
-	# Lacunarity
-	var lacunarity_container: HBoxContainer = HBoxContainer.new()
-	var lacunarity_label: Label = Label.new()
-	lacunarity_label.text = "Lacunarity:"
-	lacunarity_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_STANDARD, 0)
-	lacunarity_container.add_child(lacunarity_label)
-	
-	var lacunarity_slider: HSlider = HSlider.new()
-	lacunarity_slider.name = "noise_lacunarity"
-	lacunarity_slider.min_value = 1.0
-	lacunarity_slider.max_value = 4.0
-	lacunarity_slider.step = 0.1
-	lacunarity_slider.value = 2.0
-	lacunarity_slider.value_changed.connect(func(v): _on_map_gen_param_changed("noise_lacunarity", v))
-	lacunarity_container.add_child(lacunarity_slider)
-	
-	var lacunarity_value_label: Label = Label.new()
-	lacunarity_value_label.name = "noise_lacunarity_value"
-	lacunarity_value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
-	lacunarity_value_label.text = "2.00"
-	lacunarity_container.add_child(lacunarity_value_label)
-	container.add_child(lacunarity_container)
-	control_references["Map Gen/noise_lacunarity"] = lacunarity_slider
-	control_references["Map Gen/noise_lacunarity_value"] = lacunarity_value_label
-	step_data["Map Gen"]["noise_lacunarity"] = 2.0
-	
-	# Separator
-	var separator2: HSeparator = HSeparator.new()
-	container.add_child(separator2)
-	
-	# World Parameters Section
-	var world_header: Label = Label.new()
-	world_header.text = "World Parameters"
-	world_header.add_theme_font_size_override("font_size", 16)
-	world_header.add_theme_color_override("font_color", Color(1, 0.843137, 0, 1))
-	container.add_child(world_header)
-	
-	# Sea Level
-	var sea_level_container: HBoxContainer = HBoxContainer.new()
-	var sea_level_label: Label = Label.new()
-	sea_level_label.text = "Sea Level:"
-	sea_level_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_STANDARD, 0)
-	sea_level_container.add_child(sea_level_label)
-	
-	var sea_level_slider: HSlider = HSlider.new()
-	sea_level_slider.name = "sea_level"
-	sea_level_slider.min_value = 0.0
-	sea_level_slider.max_value = 1.0
-	sea_level_slider.step = 0.01
-	sea_level_slider.value = 0.4
-	sea_level_slider.value_changed.connect(func(v): _on_map_gen_param_changed("sea_level", v))
-	sea_level_container.add_child(sea_level_slider)
-	
-	var sea_level_value_label: Label = Label.new()
-	sea_level_value_label.name = "sea_level_value"
-	sea_level_value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
-	sea_level_value_label.text = "0.40"
-	sea_level_container.add_child(sea_level_value_label)
-	container.add_child(sea_level_container)
-	control_references["Map Gen/sea_level"] = sea_level_slider
-	control_references["Map Gen/sea_level_value"] = sea_level_value_label
-	step_data["Map Gen"]["sea_level"] = 0.4
-	
-	# Enable Erosion
-	var erosion_container: HBoxContainer = HBoxContainer.new()
-	var erosion_label: Label = Label.new()
-	erosion_label.text = "Enable Erosion:"
-	erosion_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_STANDARD, 0)
-	erosion_container.add_child(erosion_label)
-	
-	var erosion_check: CheckBox = CheckBox.new()
-	erosion_check.name = "erosion_enabled"
-	erosion_check.button_pressed = true
-	erosion_check.toggled.connect(func(pressed): _on_map_gen_param_changed("erosion_enabled", pressed))
-	erosion_container.add_child(erosion_check)
-	container.add_child(erosion_container)
-	control_references["Map Gen/erosion_enabled"] = erosion_check
-	step_data["Map Gen"]["erosion_enabled"] = true
-	
-	# MapMakerModule will be added to center panel when step is shown
-	# Store reference for later initialization
-	control_references["Map Gen/step_panel"] = step_panel
-	
-	# Separator for Azgaar section
-	var azgaar_separator: HSeparator = HSeparator.new()
-	container.add_child(azgaar_separator)
-	
 	# Azgaar Map Generator Section
 	var azgaar_title: Label = Label.new()
-	azgaar_title.text = "Azgaar Map Generator"
-	azgaar_title.add_theme_font_size_override("font_size", 18)
+	azgaar_title.text = "Azgaar Fantasy Map Generator"
+	azgaar_title.add_theme_font_size_override("font_size", 20)
 	azgaar_title.add_theme_color_override("font_color", Color(1, 0.843137, 0, 1))
 	container.add_child(azgaar_title)
 	
+	# Margin container for spacing
+	var margin_container: MarginContainer = MarginContainer.new()
+	margin_container.add_theme_constant_override("margin_left", UIConstants.SPACING_MEDIUM)
+	margin_container.add_theme_constant_override("margin_right", UIConstants.SPACING_MEDIUM)
+	margin_container.add_theme_constant_override("margin_top", UIConstants.SPACING_SMALL)
+	margin_container.add_theme_constant_override("margin_bottom", UIConstants.SPACING_SMALL)
+	container.add_child(margin_container)
+	
+	var inner_container: VBoxContainer = VBoxContainer.new()
+	inner_container.add_theme_constant_override("separation", UIConstants.SPACING_MEDIUM)
+	margin_container.add_child(inner_container)
+	
 	# Archetype preset selector
 	var archetype_container: HBoxContainer = HBoxContainer.new()
+	archetype_container.add_theme_constant_override("separation", UIConstants.SPACING_SMALL)
 	var archetype_label: Label = Label.new()
 	archetype_label.text = "Archetype Preset:"
 	archetype_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_STANDARD, 0)
@@ -1848,9 +1615,10 @@ func _create_step_map_gen_editor(parent: VBoxContainer) -> void:
 	
 	archetype_option_button = OptionButton.new()
 	archetype_option_button.name = "ArchetypeOptionButton"
+	archetype_option_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	archetype_option_button.item_selected.connect(_on_archetype_selected)
 	archetype_container.add_child(archetype_option_button)
-	container.add_child(archetype_container)
+	inner_container.add_child(archetype_container)
 	
 	# TabContainer for categorized parameters
 	azgaar_tab_container = TabContainer.new()
@@ -1858,7 +1626,7 @@ func _create_step_map_gen_editor(parent: VBoxContainer) -> void:
 	azgaar_tab_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	azgaar_tab_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	azgaar_tab_container.custom_minimum_size = Vector2(0, 400)  # Minimum height for visibility
-	container.add_child(azgaar_tab_container)
+	inner_container.add_child(azgaar_tab_container)
 	
 	# Generate with Azgaar button
 	generate_azgaar_button = Button.new()
@@ -1866,7 +1634,7 @@ func _create_step_map_gen_editor(parent: VBoxContainer) -> void:
 	generate_azgaar_button.text = "Generate with Azgaar"
 	generate_azgaar_button.custom_minimum_size = Vector2(0, UIConstants.BUTTON_HEIGHT_MEDIUM)
 	generate_azgaar_button.pressed.connect(_on_generate_azgaar_pressed)
-	container.add_child(generate_azgaar_button)
+	inner_container.add_child(generate_azgaar_button)
 	
 	# Status label for generation feedback
 	azgaar_status_label = Label.new()
@@ -1874,13 +1642,23 @@ func _create_step_map_gen_editor(parent: VBoxContainer) -> void:
 	azgaar_status_label.text = ""
 	azgaar_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	azgaar_status_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8, 1))
-	container.add_child(azgaar_status_label)
+	inner_container.add_child(azgaar_status_label)
+	
+	# Bake to 3D button (kept for future use after Azgaar generation)
+	var bake_button: Button = Button.new()
+	bake_button.name = "BakeTo3DButton"
+	bake_button.text = "Bake to 3D"
+	bake_button.custom_minimum_size = Vector2(0, UIConstants.BUTTON_HEIGHT_MEDIUM)
+	bake_button.pressed.connect(_on_bake_to_3d_pressed)
+	inner_container.add_child(bake_button)
+	control_references["Map Gen/bake"] = bake_button
 	
 	# Store references for later setup
 	control_references["Azgaar/archetype_option_button"] = archetype_option_button
 	control_references["Azgaar/azgaar_tab_container"] = azgaar_tab_container
 	control_references["Azgaar/generate_azgaar_button"] = generate_azgaar_button
 	control_references["Azgaar/azgaar_status_label"] = azgaar_status_label
+	control_references["Map Gen/step_panel"] = step_panel
 
 
 func _create_step_terrain(parent: VBoxContainer) -> void:
