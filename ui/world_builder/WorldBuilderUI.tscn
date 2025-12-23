@@ -165,7 +165,7 @@ shadow_enabled = true
 [node name="Map2DLayer" type="Node2D" parent="BackgroundPanel/MainContainer/RightSplit/CenterPanel/Terrain3DView/PreviewViewport/PreviewWorld"]
 visible = false
 
-[node name="AzgaarWebView" type="Control" parent="BackgroundPanel/MainContainer/RightSplit/CenterPanel"]
+[node name="AzgaarContainer" type="Control" parent="BackgroundPanel/MainContainer/RightSplit/CenterPanel"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -174,9 +174,14 @@ grow_horizontal = 2
 grow_vertical = 2
 visible = false
 script = ExtResource("6_azgaar")
-meta/_edit_use_anchors_ = true
-meta/_edit_lock_ = true
-meta/_comment_ = "NOTE: Once gdCEF addon is installed, change node type from 'Control' to 'WebView' (gdCEF node type)"
+
+[node name="AzgaarWebView" type="GDCef" parent="BackgroundPanel/MainContainer/RightSplit/CenterPanel/AzgaarContainer"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 
 [node name="RightContent" type="PanelContainer" parent="BackgroundPanel/MainContainer/RightSplit"]
 layout_mode = 2
