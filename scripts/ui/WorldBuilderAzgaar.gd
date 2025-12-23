@@ -122,7 +122,12 @@ func _initialize_webview() -> void:
 				
 				MythosLogger.error("WorldBuilderAzgaar", "AzgaarWebView found but no URL loading method available")
 				MythosLogger.error("WorldBuilderAzgaar", "Node class: %s" % web_view.get_class())
-				MythosLogger.error("WorldBuilderAzgaar", "URL-related methods: %s" % str([m for m in all_methods if "url" in m.to_lower() or "navigate" in m.to_lower() or "load" in m.to_lower()]))
+				var url_methods: Array[String] = []
+				for m in all_methods:
+					var method_name_lower := m.to_lower()
+					if "url" in method_name_lower or "navigate" in method_name_lower or "load" in method_name_lower:
+						url_methods.append(m)
+				MythosLogger.error("WorldBuilderAzgaar", "URL-related methods: %s" % str(url_methods))
 				MythosLogger.error("WorldBuilderAzgaar", "URL-related properties: %s" % str(all_properties))
 				MythosLogger.debug("WorldBuilderAzgaar", "All methods (first 20): %s" % str(all_methods.slice(0, 20)))
 		else:

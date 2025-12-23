@@ -15,7 +15,7 @@ func _run() -> void:
 		print("ERROR: WorldBuilderUI.tscn not found at %s" % scene_path)
 		return
 	
-	var scene := load(scene_path).instantiate()
+	var scene: Node = load(scene_path).instantiate()
 	# Find the AzgaarWebView node (GDCef WebView)
 	var web_view: Node = scene.find_child("AzgaarWebView", true, false)
 	if not web_view:
