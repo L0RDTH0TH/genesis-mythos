@@ -33,11 +33,20 @@ func _initialize_webview() -> void:
 	var node_class = web_view_node.get_class()
 	var has_load_url = web_view_node.has_method("load_url") if web_view_node else false
 	
+	# List all available methods for debugging
+	var methods = []
+	if web_view_node:
+		var method_list = web_view_node.get_method_list()
+		for method_info in method_list:
+			if method_info.name.begins_with("load") or method_info.name.begins_with("navigate") or method_info.name.begins_with("url"):
+				methods.append(method_info.name)
+	
 	MythosLogger.debug("WorldBuilderAzgaar", "Found AzgaarWebView node", {
 		"class": node_class,
 		"has_load_url": has_load_url,
 		"node_type": typeof(web_view_node),
-		"is_inside_tree": web_view_node.is_inside_tree() if web_view_node else false
+		"is_inside_tree": web_view_node.is_inside_tree() if web_view_node else false,
+		"relevant_methods": methods
 	})
 	
 	# Check if it's a valid GDCef instance
@@ -52,19 +61,72 @@ func _initialize_webview() -> void:
 	else:
 		MythosLogger.warn("WorldBuilderAzgaar", "AzgaarWebView appears to be a placeholder")
 		MythosLogger.warn("WorldBuilderAzgaar", "Node class: %s, has load_url: %s" % [node_class, has_load_url])
-		MythosLogger.warn("WorldBuilderAzgaar", "This usually means the scene was saved before gdCEF was installed")
-		MythosLogger.warn("WorldBuilderAzgaar", "Try removing and re-adding the GDCef node in the editor")
-		return
+		
+		# Try to create a new GDCef node programmatically if ClassDB knows about it
+		if ClassDB.class_exists("GDCef"):
+			MythosLogger.info("WorldBuilderAzgaar", "GDCef class exists in ClassDB, attempting to create new node")
+			# Remove the placeholder
+			web_view_node.queue_free()
+			# Wait a frame for the node to be removed
+			await get_tree().process_frame
+			# Create a new GDCef node
+			var new_web_view = ClassDB.instantiate("GDCef")
+			if new_web_view:
+				new_web_view.name = "AzgaarWebView"
+				add_child(new_web_view)
+				new_web_view.set_anchors_preset(Control.PRESET_FULL_RECT)
+				new_web_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				new_web_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+				new_web_view.visible = true
+				web_view = new_web_view
+				MythosLogger.info("WorldBuilderAzgaar", "Created new GDCef node programmatically")
+			else:
+				MythosLogger.error("WorldBuilderAzgaar", "Failed to instantiate GDCef via ClassDB")
+				return
+		else:
+			MythosLogger.error("WorldBuilderAzgaar", "GDCef class not found in ClassDB")
+			MythosLogger.error("WorldBuilderAzgaar", "Please ensure gdCEF extension is properly installed and Godot is restarted")
+			return
 	
 	# Initialize Azgaar
 	if azgaar_integrator:
 		azgaar_integrator.copy_azgaar_to_user()
-		if web_view and web_view.has_method("load_url"):
-			var url: String = azgaar_integrator.get_azgaar_url()
-			web_view.load_url(url)
-			MythosLogger.info("WorldBuilderAzgaar", "Azgaar WebView loaded successfully", {"url": url})
+		var url: String = azgaar_integrator.get_azgaar_url()
+		
+		# Try different method names that gdCEF might use
+		if web_view:
+			if web_view.has_method("load_url"):
+				web_view.load_url(url)
+				MythosLogger.info("WorldBuilderAzgaar", "Azgaar WebView loaded via load_url()", {"url": url})
+			elif web_view.has_method("navigate_to_url"):
+				web_view.navigate_to_url(url)
+				MythosLogger.info("WorldBuilderAzgaar", "Azgaar WebView loaded via navigate_to_url()", {"url": url})
+			elif web_view.has_method("set_url"):
+				web_view.set_url(url)
+				MythosLogger.info("WorldBuilderAzgaar", "Azgaar WebView loaded via set_url()", {"url": url})
+			elif web_view.has_method("url"):
+				web_view.url = url
+				MythosLogger.info("WorldBuilderAzgaar", "Azgaar WebView loaded via url property", {"url": url})
+			else:
+				# List all methods and properties for debugging
+				var all_methods = []
+				var method_list = web_view.get_method_list()
+				for method_info in method_list:
+					all_methods.append(method_info.name)
+				
+				var all_properties = []
+				var property_list = web_view.get_property_list()
+				for prop_info in property_list:
+					if "url" in prop_info.name.to_lower() or "address" in prop_info.name.to_lower():
+						all_properties.append(prop_info.name)
+				
+				MythosLogger.error("WorldBuilderAzgaar", "AzgaarWebView found but no URL loading method available")
+				MythosLogger.error("WorldBuilderAzgaar", "Node class: %s" % web_view.get_class())
+				MythosLogger.error("WorldBuilderAzgaar", "URL-related methods: %s" % str([m for m in all_methods if "url" in m.to_lower() or "navigate" in m.to_lower() or "load" in m.to_lower()]))
+				MythosLogger.error("WorldBuilderAzgaar", "URL-related properties: %s" % str(all_properties))
+				MythosLogger.debug("WorldBuilderAzgaar", "All methods (first 20): %s" % str(all_methods.slice(0, 20)))
 		else:
-			MythosLogger.error("WorldBuilderAzgaar", "AzgaarWebView found but load_url method not available")
+			MythosLogger.error("WorldBuilderAzgaar", "web_view is null after initialization")
 	else:
 		MythosLogger.error("WorldBuilderAzgaar", "AzgaarIntegrator singleton not found")
 
