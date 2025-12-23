@@ -27,16 +27,39 @@ func _run() -> void:
 	
 	# Inspect ALL available methods
 	var method_list := web_view.get_method_list()
-	print("\n=== ALL METHODS (first 50) ===")
-	var all_method_names: Array[String] = []
-	for i in range(min(50, method_list.size())):
-		all_method_names.append(method_list[i].name)
-	print(str(all_method_names))
+	print("\n=== TOTAL METHODS COUNT: %d ===" % method_list.size())
+	
+	# Filter out standard Node methods to find GDCef-specific ones
+	var standard_node_methods: Array[String] = [
+		"_process", "_physics_process", "_enter_tree", "_exit_tree", "_ready",
+		"_get_configuration_warnings", "_input", "_shortcut_input", "_unhandled_input",
+		"_unhandled_key_input", "print_orphan_nodes", "get_orphan_node_ids",
+		"add_sibling", "set_name", "get_name", "add_child", "remove_child", "reparent",
+		"get_child_count", "get_children", "get_child", "has_node", "get_node",
+		"get_node_or_null", "get_parent", "find_child", "find_children", "find_parent",
+		"has_node_and_resource", "get_node_and_resource", "is_inside_tree",
+		"is_part_of_edited_scene", "is_ancestor_of", "is_greater_than", "get_path",
+		"get_path_to", "add_to_group", "remove_from_group", "is_in_group", "move_child",
+		"get_groups", "set_editor_description", "get_editor_description", "set_script", "get_script"
+	]
+	
+	var gdcef_methods: Array[String] = []
+	for method in method_list:
+		var name: String = method.name
+		if not name in standard_node_methods and not name.begins_with("_"):
+			gdcef_methods.append(name)
+	
+	print("\n=== GDCef-SPECIFIC METHODS (%d found) ===" % gdcef_methods.size())
+	if gdcef_methods.is_empty():
+		print("No GDCef-specific methods found (all are standard Node methods).")
+	else:
+		print("GDCef methods: %s" % str(gdcef_methods))
 	
 	# Search for JavaScript-related methods with broader patterns
 	var js_methods: Array[String] = []
 	var script_methods: Array[String] = []
 	var browser_methods: Array[String] = []
+	var interesting_methods: Array[String] = []
 	
 	for method in method_list:
 		var name: String = method.name
@@ -45,12 +68,15 @@ func _run() -> void:
 		# JavaScript execution patterns
 		if "js" in name_lower or "javascript" in name_lower:
 			js_methods.append(name)
-		# Script execution patterns
-		if "script" in name_lower or "run" in name_lower or "execute" in name_lower or "eval" in name_lower:
+		# Script execution patterns (excluding standard set_script/get_script)
+		if ("script" in name_lower or "run" in name_lower or "execute" in name_lower or "eval" in name_lower) and not name in ["set_script", "get_script"]:
 			script_methods.append(name)
 		# Browser/WebView specific patterns
-		if "browser" in name_lower or "webview" in name_lower or "page" in name_lower:
+		if "browser" in name_lower or "webview" in name_lower or "page" in name_lower or "frame" in name_lower:
 			browser_methods.append(name)
+		# Other interesting patterns
+		if "load" in name_lower or "navigate" in name_lower or "url" in name_lower or "html" in name_lower or "dom" in name_lower:
+			interesting_methods.append(name)
 	
 	print("\n=== JAVASCRIPT-RELATED METHODS ===")
 	if js_methods.is_empty():
@@ -58,9 +84,9 @@ func _run() -> void:
 	else:
 		print("JS methods: %s" % str(js_methods))
 	
-	print("\n=== SCRIPT EXECUTION METHODS ===")
+	print("\n=== SCRIPT EXECUTION METHODS (non-standard) ===")
 	if script_methods.is_empty():
-		print("No methods containing 'script', 'run', 'execute', or 'eval' found.")
+		print("No non-standard script execution methods found.")
 	else:
 		print("Script methods: %s" % str(script_methods))
 	
@@ -69,6 +95,27 @@ func _run() -> void:
 		print("No browser/webview-specific methods found.")
 	else:
 		print("Browser methods: %s" % str(browser_methods))
+	
+	print("\n=== OTHER INTERESTING METHODS (load/navigate/url/html/dom) ===")
+	if interesting_methods.is_empty():
+		print("No other interesting methods found.")
+	else:
+		print("Interesting methods: %s" % str(interesting_methods))
+	
+	# Check properties
+	print("\n=== PROPERTIES ===")
+	var property_list := web_view.get_property_list()
+	var interesting_properties: Array[String] = []
+	for prop in property_list:
+		var name: String = prop.name
+		var name_lower: String = name.to_lower()
+		if "browser" in name_lower or "webview" in name_lower or "page" in name_lower or "frame" in name_lower or "js" in name_lower or "javascript" in name_lower:
+			interesting_properties.append(name)
+	
+	if interesting_properties.is_empty():
+		print("No interesting properties found.")
+	else:
+		print("Interesting properties: %s" % str(interesting_properties))
 	
 	# Test common method name variations
 	print("\n=== TESTING COMMON METHOD NAMES ===")
@@ -79,13 +126,15 @@ func _run() -> void:
 		"call_js", "call_javascript", "call_script"
 	]
 	
+	var found_methods: Array[String] = []
 	for method_name in test_methods:
 		if web_view.has_method(method_name):
-			print("✓ Found method: %s" % method_name)
-			# Try to call it with a simple test
-			print("  Attempting to call %s('return 42;')..." % method_name)
-			# Note: We can't actually call it in EditorScript without proper setup
-			# This is just to confirm the method exists
+			found_methods.append(method_name)
+	
+	if found_methods.is_empty():
+		print("No common JS execution method names found.")
+	else:
+		print("Found methods: %s" % str(found_methods))
 	
 	print("=== GDCef Bridge Test End ===")
 	
