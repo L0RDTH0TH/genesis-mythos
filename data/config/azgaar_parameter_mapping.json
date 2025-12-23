@@ -1,0 +1,107 @@
+{
+  "parameters": {
+    "templateInput": {
+      "ui_type": "OptionButton",
+      "category": "Terrain & Heightmap",
+      "performance_impact": "low",
+      "description": "Heightmap template (procedural or regional preset)"
+    },
+    "pointsInput": {
+      "ui_type": "HSlider",
+      "min": 1,
+      "max": 13,
+      "step": 1,
+      "default": 5,
+      "category": "Terrain & Heightmap",
+      "performance_impact": "high",
+      "description": "Cell density (1=1K cells, 13=100K cells)"
+    },
+    "statesNumber": {
+      "ui_type": "SpinBox",
+      "min": 0,
+      "max": 100,
+      "default": 20,
+      "category": "Societies & Politics",
+      "performance_impact": "low"
+    },
+    "culturesInput": {
+      "ui_type": "SpinBox",
+      "min": 1,
+      "max": 32,
+      "default": 15,
+      "category": "Societies & Politics",
+      "performance_impact": "low"
+    },
+    "culturesSet": {
+      "ui_type": "OptionButton",
+      "options": ["world", "european", "oriental", "highFantasy", "darkFantasy"],
+      "default": "world",
+      "category": "Societies & Politics",
+      "performance_impact": "low"
+    },
+    "religionsNumber": {
+      "ui_type": "SpinBox",
+      "min": 0,
+      "max": 50,
+      "default": 8,
+      "category": "Societies & Politics",
+      "performance_impact": "low"
+    },
+    "manorsInput": {
+      "ui_type": "SpinBox",
+      "min": 0,
+      "max": 1000,
+      "default": 700,
+      "category": "Settlements & Scale",
+      "performance_impact": "medium"
+    },
+    "precInput": {
+      "ui_type": "HSlider",
+      "min": 0,
+      "max": 500,
+      "default": 100,
+      "category": "Climate & Environment",
+      "performance_impact": "low"
+    },
+    "temperatureEquator": {
+      "ui_type": "HSlider",
+      "min": -50,
+      "max": 50,
+      "default": 28,
+      "category": "Climate & Environment",
+      "performance_impact": "low"
+    },
+    "temperatureNorthPole": {
+      "ui_type": "HSlider",
+      "min": -50,
+      "max": 50,
+      "default": -25,
+      "category": "Climate & Environment",
+      "performance_impact": "low"
+    },
+    "temperatureSouthPole": {
+      "ui_type": "HSlider",
+      "min": -50,
+      "max": 50,
+      "default": -20,
+      "category": "Climate & Environment",
+      "performance_impact": "low"
+    },
+    "heightExponentInput": {
+      "ui_type": "HSlider",
+      "min": 1.5,
+      "max": 2.2,
+      "step": 0.1,
+      "default": 1.8,
+      "category": "Terrain & Heightmap",
+      "performance_impact": "low"
+    },
+    "allowErosion": {
+      "ui_type": "CheckBox",
+      "default": true,
+      "category": "Terrain & Heightmap",
+      "performance_impact": "medium"
+    }
+  }
+}
+

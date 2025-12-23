@@ -1,0 +1,63 @@
+{
+  "High Fantasy": {
+    "templateInput": "continents",
+    "pointsInput": 6,
+    "statesNumber": 25,
+    "culturesInput": 18,
+    "culturesSet": "highFantasy",
+    "religionsNumber": 10,
+    "manorsInput": 900,
+    "precInput": 130,
+    "temperatureEquator": 28,
+    "temperatureNorthPole": -25,
+    "temperatureSouthPole": -20,
+    "heightExponentInput": 1.8,
+    "allowErosion": true
+  },
+  "Dark Fantasy": {
+    "templateInput": "shattered",
+    "pointsInput": 4,
+    "statesNumber": 10,
+    "culturesInput": 10,
+    "culturesSet": "darkFantasy",
+    "religionsNumber": 6,
+    "manorsInput": 500,
+    "precInput": 75,
+    "temperatureEquator": 22,
+    "temperatureNorthPole": -30,
+    "temperatureSouthPole": -25,
+    "heightExponentInput": 2.0,
+    "allowErosion": true
+  },
+  "Low Fantasy / Historical": {
+    "templateInput": "europe",
+    "pointsInput": 5,
+    "statesNumber": 16,
+    "culturesInput": 12,
+    "culturesSet": "european",
+    "religionsNumber": 6,
+    "manorsInput": 700,
+    "precInput": 100,
+    "temperatureEquator": 25,
+    "temperatureNorthPole": -28,
+    "temperatureSouthPole": -22,
+    "heightExponentInput": 1.7,
+    "allowErosion": true
+  },
+  "Archipelago": {
+    "templateInput": "archipelago",
+    "pointsInput": 5,
+    "statesNumber": 8,
+    "culturesInput": 10,
+    "culturesSet": "world",
+    "religionsNumber": 5,
+    "manorsInput": 600,
+    "precInput": 125,
+    "temperatureEquator": 27,
+    "temperatureNorthPole": -25,
+    "temperatureSouthPole": -20,
+    "heightExponentInput": 1.6,
+    "allowErosion": false
+  }
+}
+
