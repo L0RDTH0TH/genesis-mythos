@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Godot WRY Test</title>
+</head>
+<body>
+    <h1>Godot WRY Test Page</h1>
+    <p id="result">Waiting for JS call...</p>
+    <script>
+        function testFunc() {
+            return 'Hello from JS';
+        }
+        
+        // Listen for messages from Godot
+        if (window.godot) {
+            window.godot.onMessage = function(message) {
+                document.getElementById('result').textContent = 'Received: ' + message;
+            };
+        }
+    </script>
+</body>
+</html>
+

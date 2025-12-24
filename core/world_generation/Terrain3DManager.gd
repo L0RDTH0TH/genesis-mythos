@@ -17,9 +17,9 @@ var terrain = null  # Intentionally untyped – required for parser compatibilit
 func _ready() -> void:
 	MythosLogger.verbose("World/Terrain", "_ready() called")
 	load_config()
-	create_terrain()
-	configure_terrain()
-	MythosLogger.info("World/Terrain", "Terrain3DManager initialized")
+	# Terrain3D initialization is deferred until "Bake to 3D" button is clicked.
+	# This improves performance by avoiding unnecessary Terrain3D setup until user actually needs 3D terrain.
+	MythosLogger.info("World/Terrain", "Terrain3DManager ready (terrain will initialize on demand)")
 
 func load_config() -> void:
 	MythosLogger.verbose("World/Terrain", "load_config() called", {"path": TERRAIN_CONFIG_PATH})
@@ -171,8 +171,9 @@ func generate_from_heightmap(heightmap_image: Image, min_height: float = -50.0, 
 		"position": terrain_position
 	})
 	if terrain == null:
-		MythosLogger.debug("World/Terrain", "Terrain instance not found, creating new one")
+		MythosLogger.debug("World/Terrain", "Terrain instance not found, creating and configuring new one")
 		create_terrain()
+		configure_terrain()
 	
 	if heightmap_image == null:
 		MythosLogger.error("World/Terrain", "generate_from_heightmap() - heightmap_image is null")

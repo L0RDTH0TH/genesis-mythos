@@ -29,6 +29,7 @@ const TOTAL_STEPS: int = 8
 @onready var progress_bar: ProgressBar = $BottomHBox/BottomContent/ProgressBar
 @onready var status_label: Label = $BottomHBox/BottomContent/StatusLabel
 @onready var azgaar_webview: Node = $MainHSplit/CenterPanel/CenterContent/AzgaarWebView
+@onready var world_builder_azgaar: Node = $MainHSplit/CenterPanel/CenterContent  # WorldBuilderAzgaar script
 @onready var overlay_placeholder: TextureRect = $MainHSplit/CenterPanel/CenterContent/OverlayPlaceholder
 
 var current_params: Dictionary = {}
@@ -114,9 +115,28 @@ func _ready() -> void:
 
 func _initialize_azgaar_default() -> void:
 	"""Load default Azgaar map on startup."""
-	if azgaar_webview and azgaar_webview.has_method("load_url"):
-		azgaar_webview.load_url(UIConstants.AZGAAR_BASE_URL)
-		MythosLogger.debug("UI/WorldBuilder", "Loading default Azgaar map")
+	# Azgaar is initialized by WorldBuilderAzgaar._initialize_webview()
+	# This method is kept for compatibility but may not be needed
+	MythosLogger.debug("UI/WorldBuilder", "Azgaar initialization handled by WorldBuilderAzgaar")
+
+func _on_azgaar_generation_complete() -> void:
+	"""Handle Azgaar generation completion signal."""
+	_update_status("Generation complete!", 80)
+	set_process(false)
+	
+	# Wait a moment for final rendering
+	await get_tree().create_timer(1.0).timeout
+	_update_status("Ready for export", 100)
+	
+	# Navigate to bake step
+	current_step = 7
+	_update_step_ui()
+
+func _on_azgaar_generation_failed(reason: String) -> void:
+	"""Handle Azgaar generation failure signal."""
+	_update_status("Generation failed: %s" % reason, 0)
+	set_process(false)
+	MythosLogger.error("UI/WorldBuilder", "Azgaar generation failed", {"reason": reason})
 
 
 func _update_step_ui() -> void:
@@ -261,50 +281,49 @@ func _randomize_seed() -> void:
 
 
 func _generate_azgaar() -> void:
-	"""Generate world with Azgaar."""
-	_update_status("Writing params...", 10)
-	var file: FileAccess = FileAccess.open("user://azgaar/options.json", FileAccess.WRITE)
-	if file:
-		file.store_string(JSON.stringify(current_params))
-		file.close()
+	"""Generate world with Azgaar using JS injection."""
+	_update_status("Syncing parameters...", 10)
 	
-	_update_status("Loading Azgaar...", 30)
-	if azgaar_webview and azgaar_webview.has_method("load_url"):
-		azgaar_webview.load_url(UIConstants.AZGAAR_JSON_URL)
+	# Get WorldBuilderAzgaar script reference (it's attached to CenterContent)
+	var azgaar_controller: Node = world_builder_azgaar
+	if not azgaar_controller or not azgaar_controller.has_method("trigger_generation_with_options"):
+		_update_status("Error: Azgaar controller not found", 0)
+		MythosLogger.error("UI/WorldBuilder", "Cannot find WorldBuilderAzgaar controller on CenterContent")
+		return
 	
+	# Connect to generation signals if not already connected
+	if not azgaar_controller.generation_complete.is_connected(_on_azgaar_generation_complete):
+		azgaar_controller.generation_complete.connect(_on_azgaar_generation_complete)
+	if not azgaar_controller.generation_failed.is_connected(_on_azgaar_generation_failed):
+		azgaar_controller.generation_failed.connect(_on_azgaar_generation_failed)
+	
+	# Trigger generation with current parameters
+	_update_status("Injecting parameters...", 20)
+	azgaar_controller.trigger_generation_with_options(current_params, true)
+	
+	_update_status("Generating map...", 40)
 	gen_timer = 0.0
 	gen_elapsed_time = 0.0
 	set_process(true)
 
 
 func _process(delta: float) -> void:
-	"""Process generation status updates."""
+	"""Process generation status updates (fallback polling if signals don't work)."""
 	gen_elapsed_time += delta
 	gen_timer += delta
 	
-	# Check timeout first
-	if gen_elapsed_time > 35.0:
+	# Check timeout first (increased to 60s to match timeout timer)
+	if gen_elapsed_time > 60.0:
 		_update_status("Timeout - reduce points?", 0)
 		set_process(false)
 		return
 	
-	# Poll every 0.5 seconds for completion
-	if gen_timer > 0.5:
+	# Poll every 2 seconds for completion (reduced frequency)
+	if gen_timer > 2.0:
 		gen_timer = 0.0
-		if azgaar_webview and azgaar_webview.has_method("get_title"):
-			var title: String = azgaar_webview.get_title()
-			if title.contains("[") and title.contains("x"):  # e.g., "Fantasy Map Generator [seed] [width]x[height]"
-				_update_status("Generation complete!", 80)
-				set_process(false)
-				if azgaar_webview.has_method("load_url"):
-					azgaar_webview.load_url(UIConstants.AZGAAR_BASE_URL + "#export=png&export=height&export=biomes")
-				await get_tree().create_timer(5.0).timeout
-				_update_status("Exporting maps...", 90)
-				_update_status("Ready for bake", 100)
-				# Navigate to bake step
-				current_step = 7
-				_update_step_ui()
-				return
+		# Update progress based on elapsed time
+		var progress = min(40 + (gen_elapsed_time / 60.0 * 40.0), 80.0)
+		_update_status("Generating map... (%d%%)" % int(progress), progress)
 
 
 func _bake_to_3d() -> void:

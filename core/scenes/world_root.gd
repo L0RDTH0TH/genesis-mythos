@@ -82,8 +82,9 @@ func _ready() -> void:
 	MythosLogger.verbose("World", "_ready() called")
 	_remove_splash_screen()
 	_ensure_lighting_and_camera()
-	# Terrain3DManager now creates and configures the terrain itself in its own _ready()
-	# Nothing else needed here unless you want to trigger procedural generation later
+	# Terrain3D initialization is now deferred - Terrain3DManager only loads config in _ready().
+	# Terrain3D will be created and configured only when "Bake to 3D" button is clicked in WorldBuilderUI.
+	# This improves performance by avoiding unnecessary Terrain3D setup until user actually needs 3D terrain.
 	_setup_world_builder_ui()
 	MythosLogger.info("World", "Setup complete - splash removed, terrain visible, UI added")
 

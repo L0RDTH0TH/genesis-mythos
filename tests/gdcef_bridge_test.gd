@@ -373,4 +373,3 @@ func _run() -> void:
 	print("=== GDCef Bridge Test End ===")
 	
 	scene.queue_free()
-
