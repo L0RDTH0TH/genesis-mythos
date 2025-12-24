@@ -80,8 +80,18 @@ const WATERFALL_TOOLTIP_DELAY_MS: int = 200  ## Tooltip display delay in millise
 
 # World Builder UI Constants
 const LEFT_PANEL_WIDTH: int = 220  ## Left panel width for category tabs
+const LEFT_PANEL_WIDTH_MIN: int = 180  ## Minimum left panel width
+const LEFT_PANEL_WIDTH_MAX: int = 300  ## Maximum left panel width
 const RIGHT_PANEL_WIDTH: int = 240  ## Right panel width for parameter controls
+const RIGHT_PANEL_WIDTH_MIN: int = 200  ## Minimum right panel width
+const RIGHT_PANEL_WIDTH_MAX: int = 350  ## Maximum right panel width
 const BOTTOM_BAR_HEIGHT: int = 50  ## Bottom bar height for buttons and status
+const STEP_BUTTON_HEIGHT: int = 40  ## Height for step navigation buttons
+const BUTTON_WIDTH_SMALL: int = 120  ## Small button width (Back/Next)
+const BUTTON_WIDTH_MEDIUM: int = 180  ## Medium button width (Bake to 3D)
+const BUTTON_WIDTH_LARGE: int = 250  ## Large button width (Generate)
+const SEED_SPIN_WIDTH: int = 200  ## Seed spinbox width
+const RANDOMIZE_BTN_SIZE: Vector2 = Vector2(64, 50)  ## Randomize button size
 
 # Azgaar Integration Constants
 const MAX_POINTS_LOW_HW: int = 500000  ## Maximum points for low-end hardware

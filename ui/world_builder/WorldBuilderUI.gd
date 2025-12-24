@@ -15,19 +15,18 @@ var current_step: int = 0
 const TOTAL_STEPS: int = 8
 
 # UI References
-@onready var step_tabs: TabContainer = $MainHSplit/LeftPanel/LeftContent/StepTabs
-@onready var view_menu: OptionButton = $TopToolbar/ToolbarContent/ViewMenu
+@onready var step_buttons: Array[Button] = []
 @onready var archetype_option: OptionButton = $MainHSplit/RightPanel/RightVBox/GlobalControls/ArchetypeOption
 @onready var seed_spin: SpinBox = $MainHSplit/RightPanel/RightVBox/GlobalControls/SeedHBox/SeedSpin
 @onready var randomize_btn: Button = $MainHSplit/RightPanel/RightVBox/GlobalControls/SeedHBox/RandomizeBtn
 @onready var step_title: Label = $MainHSplit/RightPanel/RightVBox/StepTitle
 @onready var active_params: VBoxContainer = $MainHSplit/RightPanel/RightVBox/ActiveParams
-@onready var back_btn: Button = $BottomHBox/BottomContent/BackBtn
-@onready var next_btn: Button = $BottomHBox/BottomContent/NextBtn
-@onready var gen_btn: Button = $BottomHBox/BottomContent/GenBtn
-@onready var generate_3d_btn: Button = $TopToolbar/ToolbarContent/Generate3DBtn
-@onready var progress_bar: ProgressBar = $BottomHBox/BottomContent/ProgressBar
-@onready var status_label: Label = $BottomHBox/BottomContent/StatusLabel
+@onready var back_btn: Button = $MainHSplit/CenterPanel/BottomHBox/BottomContent/BackBtn
+@onready var next_btn: Button = $MainHSplit/CenterPanel/BottomHBox/BottomContent/NextBtn
+@onready var gen_btn: Button = $MainHSplit/CenterPanel/BottomHBox/BottomContent/GenBtn
+@onready var bake_to_3d_btn: Button = $MainHSplit/CenterPanel/BottomHBox/BottomContent/BakeTo3DBtn
+@onready var progress_bar: ProgressBar = $MainHSplit/CenterPanel/BottomHBox/BottomContent/ProgressBar
+@onready var status_label: Label = $MainHSplit/CenterPanel/BottomHBox/BottomContent/StatusLabel
 @onready var azgaar_webview: Node = $MainHSplit/CenterPanel/CenterContent/AzgaarWebView
 @onready var world_builder_azgaar: Node = $MainHSplit/CenterPanel/CenterContent  # WorldBuilderAzgaar script
 @onready var overlay_placeholder: TextureRect = $MainHSplit/CenterPanel/CenterContent/OverlayPlaceholder
@@ -45,31 +44,9 @@ const ARCHETYPES: Dictionary = {
 	"Custom": {}
 }
 
-# Step definitions with parameters
-const STEP_DEFINITIONS: Dictionary = {
-	0: {"title": "Step 1: Terrain & Heightmap", "params": [
-		{"name": "template", "type": "OptionButton", "options": ["default", "fractal", "islands"], "default": "default"},
-		{"name": "points", "type": "HSlider", "min": 100000, "max": 2000000, "step": 50000, "default": 600000},
-		{"name": "heightExponent", "type": "HSlider", "min": 0.1, "max": 2.0, "step": 0.05, "default": 1.0},
-		{"name": "allowErosion", "type": "CheckBox", "default": true},
-		{"name": "plateCount", "type": "SpinBox", "min": 3, "max": 15, "default": 7}
-	]},
-	1: {"title": "Step 2: Climate & Environment", "params": [
-		{"name": "precip", "type": "HSlider", "min": 0.0, "max": 1.0, "default": 0.5},
-		{"name": "temperatureEquator", "type": "HSlider", "min": 20.0, "max": 40.0, "step": 1.0, "default": 30.0},
-		{"name": "temperatureNorthPole", "type": "HSlider", "min": -40.0, "max": 0.0, "step": 1.0, "default": -20.0}
-	]},
-	2: {"title": "Step 3: Biomes & Ecosystems", "params": []},
-	3: {"title": "Step 4: Structures & Civilizations", "params": [
-		{"name": "statesNumber", "type": "SpinBox", "min": 1, "max": 100, "default": 20},
-		{"name": "culturesSet", "type": "OptionButton", "options": ["random", "realistic", "fantasy"], "default": "random"},
-		{"name": "religionsNumber", "type": "SpinBox", "min": 1, "max": 50, "default": 10}
-	]},
-	4: {"title": "Step 5: Environment & Atmosphere", "params": []},
-	5: {"title": "Step 6: Resources & Magic", "params": []},
-	6: {"title": "Step 7: Export & Preview", "params": []},
-	7: {"title": "Step 8: Bake to 3D", "params": []}
-}
+# Step definitions loaded from JSON
+var STEP_DEFINITIONS: Dictionary = {}
+const STEP_PARAMETERS_PATH: String = "res://data/config/azgaar_step_parameters.json"
 
 
 func _ready() -> void:
@@ -77,31 +54,32 @@ func _ready() -> void:
 	DirAccess.make_dir_recursive_absolute("user://azgaar/")
 	DirAccess.make_dir_recursive_absolute(UIConstants.DOWNLOADS_DIR)
 	
-	# Populate view menu
-	view_menu.add_item("Heightmap")
-	view_menu.add_item("Biomes")
-	view_menu.add_item("Cultures")
-	view_menu.add_item("Religions")
+	# Load step definitions from JSON
+	_load_step_definitions()
+	
+	# Apply UIConstants to UI elements
+	_apply_ui_constants()
 	
 	# Populate archetype option button
 	for archetype_name in ARCHETYPES.keys():
 		archetype_option.add_item(archetype_name)
 	
-	# Set step tab titles
+	# Collect step buttons and connect signals
+	var step_sidebar: VBoxContainer = $MainHSplit/LeftPanel/LeftContent/StepSidebar
 	for i in range(TOTAL_STEPS):
-		var step_def: Dictionary = STEP_DEFINITIONS.get(i, {})
-		var title: String = step_def.get("title", "Step %d" % (i + 1))
-		step_tabs.set_tab_title(i, title.split(":")[0])  # Just "Step N"
+		var btn: Button = step_sidebar.get_child(i) as Button
+		if btn:
+			step_buttons.append(btn)
+			btn.pressed.connect(func(): _on_step_button_pressed(i))
 	
 	# Connect signals
-	step_tabs.tab_changed.connect(_on_step_changed)
 	archetype_option.item_selected.connect(_load_archetype_params)
 	seed_spin.value_changed.connect(_on_seed_changed)
 	randomize_btn.pressed.connect(_randomize_seed)
 	back_btn.pressed.connect(_on_back_pressed)
 	next_btn.pressed.connect(_on_next_pressed)
 	gen_btn.pressed.connect(_generate_azgaar)
-	generate_3d_btn.pressed.connect(_bake_to_3d)
+	bake_to_3d_btn.pressed.connect(_bake_to_3d)
 	
 	# Initialize with first step
 	_load_archetype_params(0)
@@ -111,6 +89,151 @@ func _ready() -> void:
 	_initialize_azgaar_default()
 	
 	set_process(false)
+
+
+func _apply_ui_constants() -> void:
+	"""Apply UIConstants to UI elements for responsive sizing."""
+	# Left panel
+	var left_panel: VBoxContainer = $MainHSplit/LeftPanel
+	left_panel.custom_minimum_size = Vector2(UIConstants.LEFT_PANEL_WIDTH, 0)
+	
+	# Step buttons
+	var step_sidebar: VBoxContainer = $MainHSplit/LeftPanel/LeftContent/StepSidebar
+	for btn in step_sidebar.get_children():
+		if btn is Button:
+			btn.custom_minimum_size = Vector2(0, UIConstants.STEP_BUTTON_HEIGHT)
+	
+	# Right panel
+	var right_panel: ScrollContainer = $MainHSplit/RightPanel
+	right_panel.custom_minimum_size = Vector2(UIConstants.RIGHT_PANEL_WIDTH, 0)
+	
+	# Bottom bar
+	var bottom_hbox: HBoxContainer = $MainHSplit/CenterPanel/BottomHBox
+	bottom_hbox.custom_minimum_size = Vector2(0, UIConstants.BOTTOM_BAR_HEIGHT)
+	bottom_hbox.offset_top = -UIConstants.BOTTOM_BAR_HEIGHT
+	
+	# Buttons
+	back_btn.custom_minimum_size = Vector2(UIConstants.BUTTON_WIDTH_SMALL, 0)
+	next_btn.custom_minimum_size = Vector2(UIConstants.BUTTON_WIDTH_SMALL, 0)
+	gen_btn.custom_minimum_size = Vector2(UIConstants.BUTTON_WIDTH_LARGE, 0)
+	bake_to_3d_btn.custom_minimum_size = Vector2(UIConstants.BUTTON_WIDTH_MEDIUM, 0)
+	
+	# Seed controls
+	seed_spin.custom_minimum_size = Vector2(UIConstants.SEED_SPIN_WIDTH, 0)
+	randomize_btn.custom_minimum_size = UIConstants.RANDOMIZE_BTN_SIZE
+	
+	# Progress bar and status
+	progress_bar.custom_minimum_size = Vector2(UIConstants.PROGRESS_BAR_WIDTH, 0)
+	status_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_STANDARD, 0)
+	
+	# Set initial split offset
+	var main_hsplit: HSplitContainer = $MainHSplit
+	main_hsplit.split_offset = UIConstants.LEFT_PANEL_WIDTH
+
+
+func _notification(what: int) -> void:
+	"""Handle window resize for responsive layout."""
+	if what == NOTIFICATION_RESIZED:
+		_update_responsive_layout()
+
+
+func _update_responsive_layout() -> void:
+	"""Update layout based on viewport size."""
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	if viewport_size.x <= 0 or viewport_size.y <= 0:
+		return
+	
+	# Calculate panel widths as percentages, clamped to min/max
+	var left_panel: VBoxContainer = $MainHSplit/LeftPanel
+	var right_panel: ScrollContainer = $MainHSplit/RightPanel
+	var main_hsplit: HSplitContainer = $MainHSplit
+	
+	# Left panel: 15-20% of width, clamped
+	var left_width_percent: float = 0.175  # 17.5% default
+	var left_width: int = int(viewport_size.x * left_width_percent)
+	left_width = clamp(left_width, UIConstants.LEFT_PANEL_WIDTH_MIN, UIConstants.LEFT_PANEL_WIDTH_MAX)
+	left_panel.custom_minimum_size = Vector2(left_width, 0)
+	
+	# Right panel: 20-25% of width, clamped
+	var right_width_percent: float = 0.225  # 22.5% default
+	var right_width: int = int(viewport_size.x * right_width_percent)
+	right_width = clamp(right_width, UIConstants.RIGHT_PANEL_WIDTH_MIN, UIConstants.RIGHT_PANEL_WIDTH_MAX)
+	right_panel.custom_minimum_size = Vector2(right_width, 0)
+	
+	# Update split offset to match left panel width
+	main_hsplit.split_offset = left_width
+	
+	MythosLogger.debug("UI/WorldBuilder", "Layout updated for resize", {
+		"viewport": viewport_size,
+		"left_width": left_width,
+		"right_width": right_width
+	})
+
+
+func _load_step_definitions() -> void:
+	"""Load step definitions from JSON file."""
+	var file: FileAccess = FileAccess.open(STEP_PARAMETERS_PATH, FileAccess.READ)
+	if not file:
+		MythosLogger.error("UI/WorldBuilder", "Failed to load step parameters", {"path": STEP_PARAMETERS_PATH})
+		# Fallback to empty definitions
+		for i in range(TOTAL_STEPS):
+			STEP_DEFINITIONS[i] = {"title": "Step %d" % (i + 1), "params": []}
+		return
+	
+	var json_string: String = file.get_as_text()
+	file.close()
+	
+	var json: JSON = JSON.new()
+	var parse_result: Error = json.parse(json_string)
+	if parse_result != OK:
+		MythosLogger.error("UI/WorldBuilder", "Failed to parse step parameters JSON", {"error": parse_result})
+		# Fallback to empty definitions
+		for i in range(TOTAL_STEPS):
+			STEP_DEFINITIONS[i] = {"title": "Step %d" % (i + 1), "params": []}
+		return
+	
+	var data: Dictionary = json.data
+	if not data.has("steps") or not data.steps is Array:
+		MythosLogger.error("UI/WorldBuilder", "Invalid step parameters JSON structure")
+		return
+	
+	# Convert JSON array to dictionary indexed by step index
+	for step_data in data.steps:
+		if not step_data is Dictionary or not step_data.has("index"):
+			continue
+		var step_idx: int = step_data.index
+		var params_list: Array = []
+		
+		# Convert parameter definitions to format expected by _populate_params()
+		if step_data.has("parameters") and step_data.parameters is Array:
+			for param_data in step_data.parameters:
+				if not param_data is Dictionary:
+					continue
+				var param: Dictionary = {}
+				param.name = param_data.get("name", "")
+				param.type = param_data.get("ui_type", "HSlider")
+				param.azgaar_key = param_data.get("azgaar_key", param.name)
+				
+				# Copy type-specific properties
+				if param_data.has("options"):
+					param.options = param_data.options
+				if param_data.has("min"):
+					param.min = param_data.min
+				if param_data.has("max"):
+					param.max = param_data.max
+				if param_data.has("step"):
+					param.step = param_data.step
+				if param_data.has("default"):
+					param.default = param_data.default
+				
+				params_list.append(param)
+		
+		STEP_DEFINITIONS[step_idx] = {
+			"title": step_data.get("title", "Step %d" % (step_idx + 1)),
+			"params": params_list
+		}
+	
+	MythosLogger.info("UI/WorldBuilder", "Loaded step definitions", {"count": STEP_DEFINITIONS.size()})
 
 
 func _initialize_azgaar_default() -> void:
@@ -141,7 +264,19 @@ func _on_azgaar_generation_failed(reason: String) -> void:
 
 func _update_step_ui() -> void:
 	"""Update UI for current step."""
-	step_tabs.current_tab = current_step
+	# Update step button highlights
+	for i in range(step_buttons.size()):
+		var btn: Button = step_buttons[i]
+		if i == current_step:
+			# Active step - orange highlight
+			btn.modulate = Color(1.0, 0.7, 0.3, 1.0)  # Orange tint
+			btn.add_theme_color_override("font_color", Color(1.0, 0.843, 0.0, 1.0))
+			btn.add_theme_color_override("font_hover_color", Color(1.0, 0.9, 0.4, 1.0))
+		else:
+			# Inactive step - dim
+			btn.modulate = Color(0.6, 0.6, 0.6, 1.0)  # Dimmed
+			btn.remove_theme_color_override("font_color")
+			btn.remove_theme_color_override("font_hover_color")
 	
 	var step_def: Dictionary = STEP_DEFINITIONS.get(current_step, {})
 	step_title.text = step_def.get("title", "Step %d" % (current_step + 1))
@@ -150,20 +285,22 @@ func _update_step_ui() -> void:
 	back_btn.disabled = (current_step == 0)
 	next_btn.disabled = (current_step == TOTAL_STEPS - 1)
 	
-	# Show/hide generate button based on step
+	# Show/hide buttons based on step
 	if current_step == 6:  # Export step
 		gen_btn.visible = true
 		next_btn.visible = false
-		generate_3d_btn.disabled = true
+		bake_to_3d_btn.visible = false
+		bake_to_3d_btn.disabled = true
 	elif current_step == 7:  # Bake step
 		gen_btn.visible = false
 		next_btn.visible = false
-		generate_3d_btn.disabled = false
-		generate_3d_btn.text = "🎨 Bake to 3D World"
+		bake_to_3d_btn.visible = true
+		bake_to_3d_btn.disabled = false
 	else:
 		gen_btn.visible = false
 		next_btn.visible = true
-		generate_3d_btn.disabled = true
+		bake_to_3d_btn.visible = false
+		bake_to_3d_btn.disabled = true
 	
 	# Populate parameters for current step
 	_populate_params()
@@ -185,31 +322,42 @@ func _populate_params() -> void:
 		active_params.add_child(empty_label)
 		return
 	
-	for param in params_list:
+		for param in params_list:
 		var row: HBoxContainer = HBoxContainer.new()
 		row.add_theme_constant_override("separation", UIConstants.SPACING_SMALL)
 		
+		var param_name: String = param.get("name", "")
+		var azgaar_key: String = param.get("azgaar_key", param_name)
+		var param_type: String = param.get("type", "HSlider")
+		
 		var label: Label = Label.new()
-		label.text = param.name.capitalize() + ":"
+		label.text = param_name.capitalize() + ":"
 		label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_STANDARD, 0)
 		row.add_child(label)
 		
 		var control: Control
-		match param.type:
+		match param_type:
 			"OptionButton":
 				control = OptionButton.new()
-				for opt in param.options:
-					control.add_item(opt)
-				var default_idx: int = param.options.find(param.default)
-				if default_idx >= 0:
-					control.selected = default_idx
-				control.item_selected.connect(func(idx: int): current_params[param.name] = control.get_item_text(idx))
+				if param.has("options"):
+					for opt in param.options:
+						control.add_item(opt)
+					var default_val = param.get("default", "")
+					var default_idx: int = param.options.find(default_val)
+					if default_idx >= 0:
+						control.selected = default_idx
+				control.item_selected.connect(func(idx: int): 
+					current_params[azgaar_key] = control.get_item_text(idx)
+				)
 			"HSlider":
 				control = HSlider.new()
-				control.min_value = param.min
-				control.max_value = param.max
-				control.step = param.step
-				control.value = current_params.get(param.name, param.default)
+				if param.has("min"):
+					control.min_value = param.min
+				if param.has("max"):
+					control.max_value = param.max
+				if param.has("step"):
+					control.step = param.step
+				control.value = current_params.get(azgaar_key, param.get("default", 0.0))
 				control.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 				
 				var value_label: Label = Label.new()
@@ -217,7 +365,7 @@ func _populate_params() -> void:
 				value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
 				control.value_changed.connect(func(val: float): 
 					value_label.text = str(val)
-					current_params[param.name] = val
+					current_params[azgaar_key] = val
 				)
 				row.add_child(control)
 				row.add_child(value_label)
@@ -225,24 +373,28 @@ func _populate_params() -> void:
 				continue
 			"CheckBox":
 				control = CheckBox.new()
-				control.button_pressed = current_params.get(param.name, param.default)
-				control.toggled.connect(func(on: bool): current_params[param.name] = on)
+				control.button_pressed = current_params.get(azgaar_key, param.get("default", false))
+				control.toggled.connect(func(on: bool): current_params[azgaar_key] = on)
 			"SpinBox":
 				control = SpinBox.new()
-				control.min_value = param.min
-				control.max_value = param.max
-				control.value = current_params.get(param.name, param.default)
-				control.value_changed.connect(func(val: float): current_params[param.name] = int(val))
+				if param.has("min"):
+					control.min_value = param.min
+				if param.has("max"):
+					control.max_value = param.max
+				if param.has("step"):
+					control.step = param.step
+				control.value = current_params.get(azgaar_key, param.get("default", 0))
+				control.value_changed.connect(func(val: float): current_params[azgaar_key] = int(val))
 		
 		control.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, UIConstants.BUTTON_HEIGHT_SMALL)
-		control.tooltip_text = "Controls " + param.name
+		control.tooltip_text = "Controls " + param_name
 		row.add_child(control)
 		active_params.add_child(row)
 
 
-func _on_step_changed(tab_idx: int) -> void:
-	"""Handle step tab change."""
-	current_step = tab_idx
+func _on_step_button_pressed(step_idx: int) -> void:
+	"""Handle step button press."""
+	current_step = step_idx
 	_update_step_ui()
 
 
@@ -327,19 +479,47 @@ func _process(delta: float) -> void:
 
 
 func _bake_to_3d() -> void:
-	"""Bake to 3D - lazy load Terrain3D only now."""
-	_update_status("Initializing Terrain3D...", 10)
+	"""Bake to 3D - export heightmap from Azgaar and feed to Terrain3D."""
+	_update_status("Exporting heightmap from Azgaar...", 10)
 	
-	if terrain_manager != null and terrain_manager.has_method("create_terrain"):
-		terrain_manager.create_terrain()
-		_update_status("Configuring terrain...", 30)
+	# Get WorldBuilderAzgaar script reference
+	var azgaar_controller: Node = world_builder_azgaar
+	if not azgaar_controller or not azgaar_controller.has_method("export_heightmap"):
+		_update_status("Error: Azgaar controller not found", 0)
+		MythosLogger.error("UI/WorldBuilder", "Cannot find WorldBuilderAzgaar controller")
+		return
+	
+	# Export heightmap
+	var heightmap_image: Image = azgaar_controller.export_heightmap()
+	if not heightmap_image:
+		_update_status("Failed to export heightmap", 0)
+		MythosLogger.error("UI/WorldBuilder", "Heightmap export failed")
+		return
+	
+	_update_status("Heightmap exported, initializing Terrain3D...", 30)
+	
+	# Feed to terrain manager if available
+	if terrain_manager != null:
+		# Ensure terrain is created and configured
+		if terrain_manager.has_method("create_terrain"):
+			terrain_manager.create_terrain()
+		_update_status("Configuring terrain...", 50)
 		if terrain_manager.has_method("configure_terrain"):
 			terrain_manager.configure_terrain()
 		
-		_update_status("Baking heightmap to 3D...", 60)
-		# TODO: Parse exported PNGs and apply to Terrain3D
-		_update_status("Baked successfully!", 100)
-		MythosLogger.info("UI/WorldBuilder", "Terrain3D baked from Azgaar maps")
+		_update_status("Baking heightmap to 3D...", 70)
+		# Use Terrain3DManager.generate_from_heightmap()
+		if terrain_manager.has_method("generate_from_heightmap"):
+			# Default height range: -50 to 300 (meters)
+			terrain_manager.generate_from_heightmap(heightmap_image, -50.0, 300.0, Vector3.ZERO)
+			_update_status("Baked successfully!", 100)
+			MythosLogger.info("UI/WorldBuilder", "Terrain3D baked from Azgaar heightmap", {
+				"size": heightmap_image.get_size(),
+				"height_range": [-50.0, 300.0]
+			})
+		else:
+			_update_status("Terrain manager missing generate_from_heightmap method", 0)
+			MythosLogger.error("UI/WorldBuilder", "Terrain3DManager.generate_from_heightmap() not found")
 	else:
 		_update_status("Terrain manager not available", 0)
 		MythosLogger.warn("UI/WorldBuilder", "Cannot bake - terrain manager missing")

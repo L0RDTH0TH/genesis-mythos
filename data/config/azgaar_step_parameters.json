@@ -1,0 +1,302 @@
+{
+  "steps": [
+    {
+      "index": 0,
+      "title": "1. Map Generation & Editing",
+      "description": "Core map generation parameters - template, size, seed",
+      "parameters": [
+        {
+          "name": "templateInput",
+          "azgaar_key": "templateInput",
+          "ui_type": "OptionButton",
+          "options": ["pangea", "continents", "archipelago", "highIsland", "lowIsland", "mediterranean", "peninsula", "isthmus", "atoll", "volcano", "shattered", "world", "europe", "africa-centric", "arabia", "atlantics", "britain", "caribbean", "east-asia", "eurasia", "europe-accented", "europe-and-central-asia", "europe-central", "europe-north", "greenland", "hellenica", "iceland", "indian-ocean", "mediterranean-sea", "middle-east", "north-america", "us-centric", "us-mainland", "world-from-pacific"],
+          "default": "continents",
+          "category": "Terrain & Heightmap"
+        },
+        {
+          "name": "pointsInput",
+          "azgaar_key": "pointsInput",
+          "ui_type": "HSlider",
+          "min": 1,
+          "max": 13,
+          "step": 1,
+          "default": 5,
+          "category": "Terrain & Heightmap",
+          "description": "Cell density (1=1K cells, 13=100K cells)"
+        },
+        {
+          "name": "optionsSeed",
+          "azgaar_key": "optionsSeed",
+          "ui_type": "SpinBox",
+          "min": 1,
+          "max": 999999999,
+          "default": 12345,
+          "category": "General",
+          "description": "Map seed number"
+        },
+        {
+          "name": "mapWidthInput",
+          "azgaar_key": "mapWidthInput",
+          "ui_type": "SpinBox",
+          "min": 240,
+          "max": 3840,
+          "step": 10,
+          "default": 960,
+          "category": "General",
+          "description": "Canvas width in pixels"
+        },
+        {
+          "name": "mapHeightInput",
+          "azgaar_key": "mapHeightInput",
+          "ui_type": "SpinBox",
+          "min": 135,
+          "max": 2160,
+          "step": 10,
+          "default": 540,
+          "category": "General",
+          "description": "Canvas height in pixels"
+        },
+        {
+          "name": "mapSizeInput",
+          "azgaar_key": "mapSizeInput",
+          "ui_type": "HSlider",
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "default": 50,
+          "category": "General",
+          "description": "Map size relative to world (1-100%)"
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "title": "2. Terrain",
+      "description": "Terrain generation and heightmap settings",
+      "parameters": [
+        {
+          "name": "heightExponentInput",
+          "azgaar_key": "heightExponentInput",
+          "ui_type": "HSlider",
+          "min": 1.5,
+          "max": 2.2,
+          "step": 0.1,
+          "default": 1.8,
+          "category": "Terrain & Heightmap",
+          "description": "Height exponent for altitude sharpness"
+        },
+        {
+          "name": "allowErosion",
+          "azgaar_key": "allowErosion",
+          "ui_type": "CheckBox",
+          "default": true,
+          "category": "Terrain & Heightmap",
+          "description": "Allow water erosion"
+        },
+        {
+          "name": "resolveDepressionsStepsInput",
+          "azgaar_key": "resolveDepressionsStepsInput",
+          "ui_type": "SpinBox",
+          "min": 0,
+          "max": 500,
+          "step": 10,
+          "default": 250,
+          "category": "Terrain & Heightmap",
+          "description": "Max iterations for depression filling"
+        },
+        {
+          "name": "lakeElevationLimitInput",
+          "azgaar_key": "lakeElevationLimitInput",
+          "ui_type": "SpinBox",
+          "min": 0,
+          "max": 80,
+          "step": 1,
+          "default": 20,
+          "category": "Terrain & Heightmap",
+          "description": "Depression depth threshold for lakes"
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "title": "3. Climate",
+      "description": "Climate and temperature settings",
+      "parameters": [
+        {
+          "name": "precInput",
+          "azgaar_key": "precInput",
+          "ui_type": "HSlider",
+          "min": 0,
+          "max": 500,
+          "step": 10,
+          "default": 100,
+          "category": "Climate & Environment",
+          "description": "Precipitation percentage (0-500%)"
+        },
+        {
+          "name": "temperatureEquator",
+          "azgaar_key": "temperatureEquator",
+          "ui_type": "HSlider",
+          "min": -50,
+          "max": 50,
+          "step": 1,
+          "default": 28,
+          "category": "Climate & Environment",
+          "description": "Temperature at equator (°C)"
+        },
+        {
+          "name": "temperatureNorthPole",
+          "azgaar_key": "temperatureNorthPole",
+          "ui_type": "HSlider",
+          "min": -50,
+          "max": 50,
+          "step": 1,
+          "default": -25,
+          "category": "Climate & Environment",
+          "description": "Temperature at North Pole (°C)"
+        },
+        {
+          "name": "temperatureSouthPole",
+          "azgaar_key": "temperatureSouthPole",
+          "ui_type": "HSlider",
+          "min": -50,
+          "max": 50,
+          "step": 1,
+          "default": -20,
+          "category": "Climate & Environment",
+          "description": "Temperature at South Pole (°C)"
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "title": "4. Biomes",
+      "description": "Biome distribution (automatically generated from climate and terrain)",
+      "parameters": []
+    },
+    {
+      "index": 4,
+      "title": "5. Structures & Civilizations",
+      "description": "States, cultures, religions, and settlements",
+      "parameters": [
+        {
+          "name": "statesNumber",
+          "azgaar_key": "statesNumber",
+          "ui_type": "SpinBox",
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "default": 18,
+          "category": "Societies & Politics",
+          "description": "Number of states/countries"
+        },
+        {
+          "name": "culturesInput",
+          "azgaar_key": "culturesInput",
+          "ui_type": "SpinBox",
+          "min": 1,
+          "max": 32,
+          "step": 1,
+          "default": 12,
+          "category": "Societies & Politics",
+          "description": "Number of cultures"
+        },
+        {
+          "name": "culturesSet",
+          "azgaar_key": "culturesSet",
+          "ui_type": "OptionButton",
+          "options": ["world", "european", "oriental", "english", "antique", "highFantasy", "darkFantasy", "random"],
+          "default": "world",
+          "category": "Societies & Politics",
+          "description": "Culture set for names"
+        },
+        {
+          "name": "religionsNumber",
+          "azgaar_key": "religionsNumber",
+          "ui_type": "SpinBox",
+          "min": 0,
+          "max": 50,
+          "step": 1,
+          "default": 6,
+          "category": "Societies & Politics",
+          "description": "Number of organized religions"
+        },
+        {
+          "name": "manorsInput",
+          "azgaar_key": "manorsInput",
+          "ui_type": "SpinBox",
+          "min": 0,
+          "max": 1000,
+          "step": 10,
+          "default": 1000,
+          "category": "Settlements & Scale",
+          "description": "Number of towns to place (0-1000, 1000=auto)"
+        },
+        {
+          "name": "provincesRatio",
+          "azgaar_key": "provincesRatio",
+          "ui_type": "SpinBox",
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "default": 20,
+          "category": "Societies & Politics",
+          "description": "Burgs percentage to form province"
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "title": "6. Environment",
+      "description": "Environmental and atmospheric settings",
+      "parameters": [
+        {
+          "name": "populationRateInput",
+          "azgaar_key": "populationRateInput",
+          "ui_type": "SpinBox",
+          "min": 10,
+          "max": 10000,
+          "step": 10,
+          "default": 1000,
+          "category": "Population",
+          "description": "People per population point"
+        },
+        {
+          "name": "urbanizationInput",
+          "azgaar_key": "urbanizationInput",
+          "ui_type": "HSlider",
+          "min": 0.01,
+          "max": 5.0,
+          "step": 0.01,
+          "default": 1.0,
+          "category": "Population",
+          "description": "Urbanization rate"
+        },
+        {
+          "name": "urbanDensityInput",
+          "azgaar_key": "urbanDensityInput",
+          "ui_type": "SpinBox",
+          "min": 1,
+          "max": 200,
+          "step": 1,
+          "default": 10,
+          "category": "Population",
+          "description": "Urban density (average population per building)"
+        }
+      ]
+    },
+    {
+      "index": 6,
+      "title": "7. Resources & Magic",
+      "description": "Resource distribution and magical elements (future expansion)",
+      "parameters": []
+    },
+    {
+      "index": 7,
+      "title": "8. Export",
+      "description": "Export and bake settings",
+      "parameters": []
+    }
+  ]
+}
+

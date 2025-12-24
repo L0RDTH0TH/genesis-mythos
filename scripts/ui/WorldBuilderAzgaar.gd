@@ -152,40 +152,34 @@ func trigger_generation_with_options(options: Dictionary, auto_generate: bool = 
 
 func _sync_parameters_to_azgaar(params: Dictionary) -> void:
 	"""Sync parameters to Azgaar via JavaScript injection."""
-	# Map Godot parameter names to Azgaar parameter names
-	# Based on AZGAAR_PARAMETERS.md and azgaar_parameter_mapping.json
-	
-	var param_mapping: Dictionary = {
-		"template": "templateInput",
-		"points": "pointsInput",
-		"heightExponent": "heightExponent",
-		"allowErosion": "allowErosion",
-		"plateCount": "plateCount",
-		"precip": "precip",
-		"temperatureEquator": "temperatureEquator",
-		"temperatureNorthPole": "temperatureNorthPole",
-		"statesNumber": "statesNumber",
-		"culturesSet": "culturesSet",
-		"religionsNumber": "religionsNumber",
-		"seed": "optionsSeed"
-	}
+	# Parameters are already in Azgaar key format from JSON config
+	# Direct mapping: param keys are Azgaar option keys
 	
 	# Inject each parameter
-	for godot_key in params:
-		var azgaar_key = param_mapping.get(godot_key, godot_key)
-		var value = params[godot_key]
+	for azgaar_key in params:
+		var value = params[azgaar_key]
 		
 		# Format value based on type
 		var js_value: String
 		if value is String:
-			js_value = '"%s"' % value
+			js_value = '"%s"' % value.replace('"', '\\"')
 		elif value is bool:
 			js_value = "true" if value else "false"
+		elif value is int or value is float:
+			js_value = str(value)
 		else:
 			js_value = str(value)
 		
 		# Execute JS to set parameter
-		var js_code = "if (typeof azgaar !== 'undefined') { azgaar.options.%s = %s; }" % [azgaar_key, js_value]
+		# Handle nested options (e.g., options.temperatureEquator)
+		var js_code: String
+		if azgaar_key.begins_with("options"):
+			# Already has "options" prefix
+			js_code = "if (typeof azgaar !== 'undefined' && azgaar.options) { azgaar.%s = %s; }" % [azgaar_key, js_value]
+		else:
+			# Standard option path
+			js_code = "if (typeof azgaar !== 'undefined' && azgaar.options) { azgaar.options.%s = %s; }" % [azgaar_key, js_value]
+		
 		_execute_azgaar_js(js_code)
 	
 	MythosLogger.debug("WorldBuilderAzgaar", "Synced parameters to Azgaar", {"param_count": params.size()})
@@ -202,14 +196,87 @@ func export_heightmap() -> Image:
 		MythosLogger.error("WorldBuilderAzgaar", "WebView is null, cannot export heightmap")
 		return null
 	
-	# Execute JS to trigger heightmap export
-	# Azgaar may save to a file or return data via callback
-	_execute_azgaar_js("if (typeof azgaar !== 'undefined' && azgaar.exportMap) { azgaar.exportMap('heightmap'); }")
+	# Get map dimensions from Azgaar
+	var width_js: String = """
+		(function() {
+			if (typeof graphWidth !== 'undefined') return graphWidth;
+			if (typeof pack !== 'undefined' && pack.cells) return pack.cells.x.length || 1000;
+			return 1000;
+		})();
+	"""
+	var height_js: String = """
+		(function() {
+			if (typeof graphHeight !== 'undefined') return graphHeight;
+			if (typeof pack !== 'undefined' && pack.cells) return pack.cells.y.length || 500;
+			return 500;
+		})();
+	"""
 	
-	# Wait for export to complete (via IPC message or file system check)
-	# For now, return null - this will be implemented when we have the export callback
-	MythosLogger.info("WorldBuilderAzgaar", "Heightmap export triggered")
-	return null
+	var width_result = _execute_azgaar_js(width_js)
+	var height_result = _execute_azgaar_js(height_js)
+	
+	var width: int = int(width_result) if width_result != null else 1000
+	var height: int = int(height_result) if height_result != null else 500
+	
+	MythosLogger.debug("WorldBuilderAzgaar", "Map dimensions", {"width": width, "height": height})
+	
+	# Extract heightmap data from Azgaar's internal structures
+	var heightmap_js: String = """
+		(function() {
+			if (!pack || !pack.cells || !pack.cells.h || !pack.cells.i) {
+				console.error('Azgaar data not available');
+				return null;
+			}
+			var width = %d;
+			var height = %d;
+			var heightmap = new Array(width * height);
+			
+			// Initialize with zeros
+			for (var i = 0; i < heightmap.length; i++) {
+				heightmap[i] = 0.0;
+			}
+			
+			// Fill from pack.cells.h (height values) and pack.cells.i (cell indices)
+			for (var i = 0; i < pack.cells.h.length; i++) {
+				var cellIndex = pack.cells.i[i];
+				var x = cellIndex %% width;
+				var y = Math.floor(cellIndex / width);
+				if (x >= 0 && x < width && y >= 0 && y < height) {
+					// Normalize height from 0-100 to 0-1
+					var normalizedHeight = pack.cells.h[i] / 100.0;
+					heightmap[y * width + x] = normalizedHeight;
+				}
+			}
+			
+			return heightmap;
+		})();
+	""" % [width, height]
+	
+	var heightmap_data = _execute_azgaar_js(heightmap_js)
+	
+	if heightmap_data == null:
+		MythosLogger.error("WorldBuilderAzgaar", "Failed to extract heightmap data from Azgaar")
+		return null
+	
+	# Convert to Godot Image
+	var image: Image = Image.create(width, height, false, Image.FORMAT_RF)
+	
+	if heightmap_data is Array:
+		# Data is array of floats
+		for y in range(height):
+			for x in range(width):
+				var idx: int = y * width + x
+				if idx < heightmap_data.size():
+					var height_value: float = float(heightmap_data[idx])
+					# Clamp to 0-1 range
+					height_value = clamp(height_value, 0.0, 1.0)
+					image.set_pixel(x, y, Color(height_value, 0.0, 0.0, 1.0))
+	else:
+		MythosLogger.error("WorldBuilderAzgaar", "Heightmap data is not an array", {"type": typeof(heightmap_data)})
+		return null
+	
+	MythosLogger.info("WorldBuilderAzgaar", "Heightmap exported", {"size": image.get_size()})
+	return image
 
 func _inject_azgaar_bridge() -> void:
 	"""Inject bridge script into Azgaar for bidirectional communication."""
