@@ -77,3 +77,24 @@ const WATERFALL_TARGET_FRAME_MS: float = 16.67  ## Target frame time (60 FPS)
 const WATERFALL_DRAW_CALLS_MAX: int = 2000  ## Maximum draw calls for scaling
 const WATERFALL_BUFFER_MAX: int = 10  ## Maximum size for metric buffers
 const WATERFALL_TOOLTIP_DELAY_MS: int = 200  ## Tooltip display delay in milliseconds
+
+# World Builder UI Constants
+const LEFT_PANEL_WIDTH: int = 220  ## Left panel width for category tabs
+const RIGHT_PANEL_WIDTH: int = 240  ## Right panel width for parameter controls
+const BOTTOM_BAR_HEIGHT: int = 50  ## Bottom bar height for buttons and status
+
+# Azgaar Integration Constants
+const MAX_POINTS_LOW_HW: int = 500000  ## Maximum points for low-end hardware
+const MAX_POINTS_HIGH_HW: int = 2000000  ## Maximum points for high-end hardware
+const AZGAAR_BASE_URL: String = "https://azgaar.github.io/Fantasy-Map-Generator/"
+const AZGAAR_JSON_URL: String = AZGAAR_BASE_URL + "?json=user://azgaar/options.json#"
+const DOWNLOADS_DIR: String = "user://azgaar/downloads/"
+
+## Get clamped value based on hardware capabilities.
+static func get_clamped_points(base_points: int) -> int:
+	var ram_bytes: int = OS.get_static_memory_usage()
+	var ram_gb: int = ram_bytes / (1024 * 1024 * 1024)
+	var cores: int = OS.get_processor_count()
+	if ram_gb < 8 or cores < 8:
+		return min(base_points, MAX_POINTS_LOW_HW)
+	return min(base_points, MAX_POINTS_HIGH_HW)
