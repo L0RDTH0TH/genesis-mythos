@@ -322,7 +322,7 @@ func _populate_params() -> void:
 		active_params.add_child(empty_label)
 		return
 	
-		for param in params_list:
+	for param in params_list:
 		var row: HBoxContainer = HBoxContainer.new()
 		row.add_theme_constant_override("separation", UIConstants.SPACING_SMALL)
 		
