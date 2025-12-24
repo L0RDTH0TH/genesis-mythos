@@ -142,37 +142,50 @@ theme_override_constants/separation = 20
 [node name="BottomHBox" type="HBoxContainer" parent="."]
 layout_mode = 1
 anchors_preset = 12
-anchor_left = 0.5
+anchor_left = 0.0
 anchor_top = 1.0
-anchor_right = 0.5
+anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -400.0
-offset_top = -50.0
-offset_right = 400.0
-offset_bottom = 0.0
 grow_horizontal = 2
 grow_vertical = 0
 custom_minimum_size = Vector2(0, 50)
+size_flags_vertical = 3
 alignment = 1
+theme_override_constants/separation = 20
+
+[node name="SpacerLeft" type="Control" parent="BottomHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
 
 [node name="GenBtn" type="Button" parent="BottomHBox"]
 layout_mode = 2
 custom_minimum_size = Vector2(200, 120)
+size_flags_horizontal = 1
 text = "✨ Generate with Azgaar"
 
 [node name="BakeBtn" type="Button" parent="BottomHBox"]
 layout_mode = 2
 custom_minimum_size = Vector2(180, 120)
+size_flags_horizontal = 1
 text = "🎨 Bake to 3D World"
 disabled = true
 
 [node name="ProgressBar" type="ProgressBar" parent="BottomHBox"]
 layout_mode = 2
+custom_minimum_size = Vector2(200, 80)
 size_flags_horizontal = 3
 max_value = 100.0
 visible = false
 
 [node name="StatusLabel" type="Label" parent="BottomHBox"]
 layout_mode = 2
+custom_minimum_size = Vector2(150, 0)
+size_flags_horizontal = 1
 text = "Ready"
 horizontal_alignment = 1
+
+[node name="SpacerRight" type="Control" parent="BottomHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
