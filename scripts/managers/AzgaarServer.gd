@@ -1,0 +1,285 @@
+# ╔═══════════════════════════════════════════════════════════
+# ║ AzgaarServer.gd
+# ║ Desc: Embedded HTTP server to serve Azgaar files from user://azgaar/
+# ║ Author: Lordthoth
+# ╚═══════════════════════════════════════════════════════════
+
+extends Node
+
+const BASE_PORT: int = 8080
+const MAX_PORT_TRIES: int = 10
+const AZGAAR_DIR: String = "user://azgaar"
+const HOST: String = "127.0.0.1"
+
+const MIME_TYPES: Dictionary = {
+	"html": "text/html",
+	"htm": "text/html",
+	"js": "application/javascript",
+	"json": "application/json",
+	"css": "text/css",
+	"png": "image/png",
+	"jpg": "image/jpeg",
+	"jpeg": "image/jpeg",
+	"gif": "image/gif",
+	"svg": "image/svg+xml",
+	"webmanifest": "application/manifest+json",
+	"ico": "image/x-icon",
+	"woff": "font/woff",
+	"woff2": "font/woff2",
+	"ttf": "font/ttf",
+	"otf": "font/otf",
+	"txt": "text/plain",
+	"xml": "application/xml",
+	"pdf": "application/pdf"
+}
+
+var tcp_server: TCPServer = null
+var active_connections: Array[StreamPeerTCP] = []
+var port: int = 0
+var polling_timer: Timer = null
+
+func _ready() -> void:
+	"""Initialize the HTTP server on ready."""
+	start_server()
+	
+	# Use Timer-based polling instead of _process() for better performance
+	polling_timer = Timer.new()
+	polling_timer.name = "PollingTimer"
+	polling_timer.wait_time = 0.1  # Poll every 100ms instead of every frame
+	polling_timer.one_shot = false
+	polling_timer.timeout.connect(_on_polling_timer_timeout)
+	add_child(polling_timer)
+	polling_timer.start()
+	
+	# Disable _process() - use timer instead
+	set_process(false)
+
+func _on_polling_timer_timeout() -> void:
+	"""Handle timer timeout - poll for new connections and handle them."""
+	if not tcp_server:
+		return
+	
+	# Accept new connections
+	if tcp_server.is_connection_available():
+		var peer: StreamPeerTCP = tcp_server.take_connection()
+		if peer:
+			active_connections.append(peer)
+	
+	# Early exit if no connections (performance optimization)
+	if active_connections.size() == 0:
+		return
+	
+	# Process active connections (handle requests)
+	var connections_to_remove: Array[StreamPeerTCP] = []
+	for connection in active_connections:
+		if not connection:
+			connections_to_remove.append(connection)
+			continue
+		
+		# Try to handle the connection (returns true if handled and should be removed)
+		if _handle_connection(connection):
+			connections_to_remove.append(connection)
+	
+	# Remove handled/disconnected connections
+	for connection in connections_to_remove:
+		active_connections.erase(connection)
+
+func start_server() -> bool:
+	"""Start the HTTP server on an available port."""
+	tcp_server = TCPServer.new()
+	
+	# Try ports from BASE_PORT to BASE_PORT + MAX_PORT_TRIES - 1
+	for i in range(MAX_PORT_TRIES):
+		var try_port: int = BASE_PORT + i
+		var err: Error = tcp_server.listen(try_port, HOST)
+		
+		if err == OK:
+			port = try_port
+			MythosLogger.info("AzgaarServer", "HTTP server started", {"port": port, "host": HOST, "dir": AZGAAR_DIR})
+			return true
+		else:
+			MythosLogger.debug("AzgaarServer", "Port %d busy, trying next" % try_port)
+	
+	# All ports failed
+	tcp_server = null
+	port = 0
+	MythosLogger.error("AzgaarServer", "Failed to start HTTP server - all ports busy", {"base_port": BASE_PORT, "max_tries": MAX_PORT_TRIES})
+	return false
+
+func stop_server() -> void:
+	"""Stop the HTTP server and close all connections."""
+	if polling_timer:
+		polling_timer.stop()
+		polling_timer.queue_free()
+		polling_timer = null
+	
+	if tcp_server:
+		tcp_server.stop()
+		tcp_server = null
+	
+	# Close all active connections
+	for connection in active_connections:
+		if connection:
+			connection.disconnect_from_host()
+	active_connections.clear()
+	
+	if port > 0:
+		MythosLogger.info("AzgaarServer", "HTTP server stopped", {"port": port})
+		port = 0
+
+func _handle_connection(peer: StreamPeerTCP) -> bool:
+	"""Handle an incoming HTTP connection. Returns true if connection should be removed."""
+	if not peer:
+		return true  # Remove null peer
+	
+	# Read available bytes
+	var bytes_available: int = peer.get_available_bytes()
+	if bytes_available == 0:
+		# No data yet, keep connection for next frame
+		return false  # Don't remove, wait for data
+	
+	# Read request data in chunks (up to 8KB for headers)
+	var max_header_size: int = 8192
+	var read_size: int = min(bytes_available, max_header_size)
+	var result: Array = peer.get_data(read_size)
+	var error_code: Error = result[0]
+	var request_data: PackedByteArray = result[1]
+	
+	if error_code != OK or request_data.is_empty():
+		peer.disconnect_from_host()
+		return true  # Remove on error
+	
+	# Convert to string and parse
+	var request_text: String = request_data.get_string_from_utf8()
+	if request_text.is_empty():
+		_send_error_response(peer, 400, "Bad Request")
+		peer.disconnect_from_host()
+		return true  # Remove on error
+	
+	# Split into lines
+	var request_lines: PackedStringArray = request_text.split("\n", false)
+	if request_lines.is_empty():
+		_send_error_response(peer, 400, "Bad Request")
+		peer.disconnect_from_host()
+		return true  # Remove on error
+	
+	# Parse request line (first line)
+	var request_line: String = request_lines[0].strip_edges()
+	if request_line.ends_with("\r"):
+		request_line = request_line.substr(0, request_line.length() - 1)
+	
+	var parts: PackedStringArray = request_line.split(" ", false)
+	
+	if parts.size() < 2:
+		_send_error_response(peer, 400, "Bad Request")
+		peer.disconnect_from_host()
+		return true  # Remove on error
+	
+	var method: String = parts[0]
+	var path: String = parts[1]
+	
+	if method != "GET":
+		_send_error_response(peer, 405, "Method Not Allowed")
+		peer.disconnect_from_host()
+		return true  # Remove on error
+	
+	# Decode URI and sanitize path
+	path = path.uri_decode()
+	
+	# Remove query string if present
+	if path.contains("?"):
+		path = path.split("?")[0]
+	
+	# Sanitize path (prevent directory traversal)
+	if path.contains(".."):
+		_send_error_response(peer, 403, "Forbidden")
+		peer.disconnect_from_host()
+		return true  # Remove on error
+	
+	# Default to index.html for root
+	if path == "/" or path.is_empty():
+		path = "/index.html"
+	
+	# Remove leading slash
+	if path.begins_with("/"):
+		path = path.substr(1)
+	
+	# Map to file system path
+	var file_path: String = AZGAAR_DIR.path_join(path)
+	
+	# Check if file exists
+	if not FileAccess.file_exists(file_path):
+		MythosLogger.debug("AzgaarServer", "File not found", {"path": path, "file_path": file_path})
+		_send_error_response(peer, 404, "Not Found")
+		peer.disconnect_from_host()
+		return true  # Remove after response
+	
+	# Read file content
+	var file := FileAccess.open(file_path, FileAccess.READ)
+	if file == null:
+		MythosLogger.error("AzgaarServer", "Failed to open file", {"path": file_path, "error": FileAccess.get_open_error()})
+		_send_error_response(peer, 500, "Internal Server Error")
+		peer.disconnect_from_host()
+		return true  # Remove on error
+	
+	var content: PackedByteArray = file.get_buffer(file.get_length())
+	file.close()
+	
+	# Determine MIME type from extension
+	var extension: String = path.get_extension().to_lower()
+	var mime_type: String = MIME_TYPES.get(extension, "application/octet-stream")
+	
+	# Send response
+	_send_file_response(peer, content, mime_type)
+	
+	# Close connection (HTTP/1.0 style)
+	peer.disconnect_from_host()
+	
+	MythosLogger.debug("AzgaarServer", "Served file", {"path": path, "size": content.size(), "mime": mime_type})
+	return true  # Remove after handling request
+
+func _send_file_response(peer: StreamPeerTCP, content: PackedByteArray, mime_type: String) -> void:
+	"""Send HTTP 200 response with file content."""
+	var response: String = "HTTP/1.1 200 OK\r\n"
+	response += "Content-Type: %s\r\n" % mime_type
+	response += "Content-Length: %d\r\n" % content.size()
+	response += "Connection: close\r\n"
+	response += "\r\n"
+	
+	var response_bytes: PackedByteArray = response.to_utf8_buffer()
+	response_bytes.append_array(content)
+	
+	var err: Error = peer.put_data(response_bytes)
+	if err != OK:
+		MythosLogger.error("AzgaarServer", "Failed to send response", {"error": err})
+
+func _send_error_response(peer: StreamPeerTCP, status_code: int, status_text: String) -> void:
+	"""Send HTTP error response."""
+	var body: String = "<html><head><title>%d %s</title></head><body><h1>%d %s</h1></body></html>" % [status_code, status_text, status_code, status_text]
+	var body_bytes: PackedByteArray = body.to_utf8_buffer()
+	
+	var response: String = "HTTP/1.1 %d %s\r\n" % [status_code, status_text]
+	response += "Content-Type: text/html\r\n"
+	response += "Content-Length: %d\r\n" % body_bytes.size()
+	response += "Connection: close\r\n"
+	response += "\r\n"
+	
+	var response_bytes: PackedByteArray = response.to_utf8_buffer()
+	response_bytes.append_array(body_bytes)
+	
+	var err: Error = peer.put_data(response_bytes)
+	if err != OK:
+		MythosLogger.error("AzgaarServer", "Failed to send error response", {"error": err})
+
+func get_port() -> int:
+	"""Get the port the server is listening on."""
+	return port
+
+func is_running() -> bool:
+	"""Check if the server is running."""
+	return port > 0 and tcp_server != null
+
+func _exit_tree() -> void:
+	"""Cleanup on exit."""
+	stop_server()
+

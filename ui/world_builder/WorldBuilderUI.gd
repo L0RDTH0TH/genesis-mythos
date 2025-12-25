@@ -43,10 +43,6 @@ var gen_elapsed_time: float = 0.0
 # GUI Performance Fix: Throttle resize updates
 var _resize_pending: bool = false
 
-# Emergency Performance Investigation: Frame timing
-var _frame_time_log: Array = []
-var _frame_count: int = 0
-
 # Archetype presets
 const ARCHETYPES: Dictionary = {
 	"High Fantasy": {"points": 800000, "heightExponent": 1.2, "allowErosion": true, "plateCount": 8, "burgs": 500, "precip": 0.6},
@@ -103,8 +99,8 @@ func _ready() -> void:
 	# Apply responsive layout on initial load
 	call_deferred("_update_responsive_layout")
 	
-	# Emergency Performance Investigation: Enable _process for frame timing
-	set_process(true)
+	# Only enable _process when generation is active
+	set_process(false)
 
 
 func _apply_ui_constants() -> void:
@@ -270,6 +266,8 @@ func _initialize_azgaar_default() -> void:
 func _on_azgaar_generation_complete() -> void:
 	"""Handle Azgaar generation completion signal."""
 	_update_status("Generation complete!", 80)
+	gen_timer = 0.0
+	gen_elapsed_time = 0.0
 	set_process(false)
 	
 	# Wait a moment for final rendering
@@ -283,6 +281,8 @@ func _on_azgaar_generation_complete() -> void:
 func _on_azgaar_generation_failed(reason: String) -> void:
 	"""Handle Azgaar generation failure signal."""
 	_update_status("Generation failed: %s" % reason, 0)
+	gen_timer = 0.0
+	gen_elapsed_time = 0.0
 	set_process(false)
 	MythosLogger.error("UI/WorldBuilder", "Azgaar generation failed", {"reason": reason})
 
@@ -486,10 +486,6 @@ func _generate_azgaar() -> void:
 
 func _process(delta: float) -> void:
 	"""Process generation status updates (fallback polling if signals don't work)."""
-	# Emergency Performance Investigation: Frame timing
-	_frame_count += 1
-	var frame_start: int = Time.get_ticks_usec()
-	
 	# Generation logic only runs when generation is active (gen_timer > 0)
 	if gen_timer > 0.0:
 		gen_elapsed_time += delta
@@ -500,6 +496,7 @@ func _process(delta: float) -> void:
 			_update_status("Timeout - reduce points?", 0)
 			gen_timer = 0.0
 			gen_elapsed_time = 0.0
+			set_process(false)  # Disable _process when generation completes
 			return
 		
 		# Poll every 2 seconds for completion (reduced frequency)
@@ -508,25 +505,9 @@ func _process(delta: float) -> void:
 			# Update progress based on elapsed time
 			var progress = min(40 + (gen_elapsed_time / 60.0 * 40.0), 80.0)
 			_update_status("Generating map... (%d%%)" % int(progress), progress)
-	
-	# Emergency Performance Investigation: Measure frame time after rendering
-	# Wait for frame to complete, then measure
-	call_deferred("_measure_frame_time", frame_start)
-
-func _measure_frame_time(frame_start: int) -> void:
-	"""Emergency Performance Investigation: Measure frame time after rendering."""
-	var frame_end: int = Time.get_ticks_usec()
-	var elapsed_ms: float = (frame_end - frame_start) / 1000.0
-	_frame_time_log.append(elapsed_ms)
-	
-	if _frame_time_log.size() >= 60:
-		var total: float = 0.0
-		for time in _frame_time_log:
-			total += time
-		var avg: float = total / 60.0
-		var fps: float = 1000.0 / avg if avg > 0.0 else 0.0
-		print("PERF INVESTIGATION - AVG FRAME TIME: %.2f ms -> FPS: %.1f" % [avg, fps])
-		_frame_time_log.clear()
+	else:
+		# Generation complete - disable _process
+		set_process(false)
 
 func _bake_to_3d() -> void:
 	"""Bake to 3D - export heightmap from Azgaar and feed to Terrain3D."""

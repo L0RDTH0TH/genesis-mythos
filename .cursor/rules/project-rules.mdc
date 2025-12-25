@@ -67,7 +67,7 @@ res://
 └── project.godot
 ```
 
-**Note:** Additional folders (`addons/`, `demo/`, `tests/`, `tools/`, `shaders/`, `materials/`) are explicitly permitted and do not require rule changes. Terrain3D, GUT, and ProceduralWorldMap are explicitly supported addons (core systems for procedural world generation).
+**Note:** Additional folders (`addons/`, `demo/`, `tests/`, `tools/`, `shaders/`, `materials/`) are explicitly permitted and do not require rule changes. Terrain3D, GUT, ProceduralWorldMap, and godot_wry are explicitly supported addons (core systems for procedural world generation and web content embedding).
 
 ## 3. Code Style – MANDATORY FOR BOTH GROK AND CURSOR
 
@@ -157,14 +157,15 @@ Always add the exact script header shown in rule 3.
 - Existing code using `bg3_theme.tres` remains valid and must not be broken without explicit migration plan.
 - Theme rename to `genesis_theme.tres` (or similar) requires full audit and approval.
 - New folders/subsystems may be added only with rule update approval.
-- Existing systems (WorldStreamer, EntitySim, FactionEconomy, Terrain3D integration, procedural world map generator) take precedence.
+- Existing systems (WorldStreamer, EntitySim, FactionEconomy, Terrain3D integration, procedural world map generator, godot_wry WebView integration) take precedence.
 
 ## 10. Current Implementation Status
 
 ### ✅ Implemented
 - Procedural world generation (MapGenerator, MapRenderer, MapEditor) with Terrain3D integration
 - Terrain3D integration and streaming
-- 8-step World Builder UI wizard
+- 8-step World Builder UI wizard with Azgaar Fantasy Map Generator integration
+- Azgaar WebView integration using godot_wry (replaced GDCef) for embedded world generation
 - Core singletons (Eryndor, Logger, WorldStreamer, EntitySim, FactionEconomy)
 - CreativeFlyCamera for 3D exploration
 - Basic save/load foundations
@@ -320,8 +321,12 @@ Our GUI design blends classic tabletop RPG tactility (e.g., character sheets, di
         - `VBoxContainer` with labels, sliders, dropdowns, and toggles.
         - Use `UIConstants` for label widths and spacing.
       - **Right Panel (Preview):**
-        - `TabContainer` or stacked `Control` nodes allowing switching between 2D procedural map preview and 3D Terrain3D preview.
-        - For 2D: `TextureRect` sized via anchors and size flags.
+        - **WebView Integration (godot_wry):** Uses `WebView` node (from godot_wry addon) to embed Azgaar Fantasy Map Generator.
+          - Node type: `WebView` (declared as `type="WebView"` in `.tscn`)
+          - Key methods: `load_url(url: String)`, `execute_js(code: String) -> Variant`, `eval(code: String) -> Variant`, `post_message(message: String)`
+          - Key signals: `ipc_message(message: String)` for bidirectional communication
+          - Sized via anchors and size flags (no fixed viewport sizes)
+        - **Alternative previews:** `TabContainer` or stacked `Control` nodes allowing switching between WebView (Azgaar) and 3D Terrain3D preview.
         - For 3D: `SubViewportContainer` + `SubViewport` sized via anchors and size flags.
 
   - **Progress/Step Indicator:**
@@ -329,6 +334,14 @@ Our GUI design blends classic tabletop RPG tactility (e.g., character sheets, di
 
   - **Bottom Controls:**
     - `HBoxContainer` for Back/Next/Generate buttons, using `UIConstants` for button heights and spacing.
+
+- **WebView Integration (godot_wry):**
+  - **Addon:** `res://addons/godot_wry/` - WebView embedding addon (replaced GDCef)
+  - **Usage:** Azgaar Fantasy Map Generator embedded via `WebView` node
+  - **Communication:** JavaScript execution via `execute_js()`/`eval()`, bidirectional IPC via `ipc_message` signal
+  - **Script:** `res://scripts/ui/WorldBuilderAzgaar.gd` handles WebView initialization, JS execution, and parameter syncing
+  - **Manager:** `res://scripts/managers/AzgaarIntegrator.gd` manages Azgaar asset copying and URL generation
+  - **Assets:** `res://tools/azgaar/` contains full Azgaar bundle (HTML, JS, CSS, images, heightmaps)
 
 - **3D Integration:**
   - After 2D map baking, allow toggling to a 3D view of the same world.
@@ -441,3 +454,5 @@ window/stretch/scale_mode = "fractional" # Enables UI scaling
 **THESE RULES ARE CURRENT AND AUTHORITATIVE AS OF 2025-12-20. MAJOR CHANGES REQUIRE EXPLICIT APPROVAL AND AUDIT.**
 
 **UPDATE 2025-12-20:** Godot version updated to 4.5.1 stable (migration complete). Repository URL added. ProceduralWorldMap upgraded to explicitly supported addon status (core system that generates 2D maps seeding Terrain3D procedural generation).
+
+**UPDATE 2025-12-24:** godot_wry addon integrated for WebView embedding. GDCef fully removed and replaced with godot_wry for Azgaar World Builder UI integration. WebView node type (`type="WebView"`) now used for embedded web content with JavaScript execution and bidirectional IPC communication via `ipc_message` signal. See `res://scripts/ui/WorldBuilderAzgaar.gd` for implementation details.

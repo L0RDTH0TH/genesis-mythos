@@ -6,6 +6,9 @@
 
 extends Control
 
+# TEMPORARY DIAGNOSTIC: Azgaar WebView disabled to test custom GUI layout visibility
+const DEBUG_DISABLE_AZGAAR := true
+
 var web_view: Node = null  # godot_wry WebView node
 @onready var azgaar_integrator: Node = get_node("/root/AzgaarIntegrator")
 
@@ -24,8 +27,22 @@ func _ready() -> void:
 
 func _initialize_webview() -> void:
 	"""Initialize the Azgaar WebView after the node tree is ready."""
+	# TEMPORARY DIAGNOSTIC: Azgaar WebView disabled to test custom GUI layout visibility
+	if DEBUG_DISABLE_AZGAAR:
+		MythosLogger.info("WorldBuilderAzgaar", "DIAGNOSTIC: Azgaar WebView initialization disabled")
+		# Hide the WebView node and its container
+		var web_view_node = get_node_or_null("WebViewMargin/AzgaarWebView")
+		if web_view_node:
+			web_view_node.visible = false
+			# Don't set size to ZERO as it might break layout - just hide it
+		var web_view_margin = get_node_or_null("WebViewMargin")
+		if web_view_margin:
+			web_view_margin.visible = false
+		return
+	
 	# Get the WebView node (godot_wry uses "WebView" type)
-	var web_view_node = get_node_or_null("AzgaarWebView")
+	# WebView is now wrapped in WebViewMargin container
+	var web_view_node = get_node_or_null("WebViewMargin/AzgaarWebView")
 	
 	if not web_view_node:
 		MythosLogger.error("WorldBuilderAzgaar", "AzgaarWebView node not found in scene tree")
@@ -50,7 +67,14 @@ func _initialize_webview() -> void:
 	# Initialize Azgaar
 	if azgaar_integrator:
 		azgaar_integrator.copy_azgaar_to_user()
-		var url: String = azgaar_integrator.get_azgaar_url()
+		
+		# Prefer HTTP URL (embedded server), fallback to file://
+		var url: String = azgaar_integrator.get_azgaar_http_url()
+		if url.is_empty():
+			url = azgaar_integrator.get_azgaar_url()
+			MythosLogger.info("WorldBuilderAzgaar", "Using file:// URL (HTTP server not available)")
+		else:
+			MythosLogger.info("WorldBuilderAzgaar", "Using HTTP URL (embedded server)")
 		
 		# Load Azgaar URL
 		if web_view.has_method("load_url"):
@@ -119,15 +143,22 @@ func reload_azgaar() -> void:
 		web_view.reload()
 		MythosLogger.debug("WorldBuilderAzgaar", "Azgaar WebView reloaded")
 	elif web_view and azgaar_integrator:
-		# Fallback: reload URL
-		var url: String = azgaar_integrator.get_azgaar_url()
+		# Fallback: reload URL (prefer HTTP, fallback to file://)
+		var url: String = azgaar_integrator.get_azgaar_http_url()
+		if url.is_empty():
+			url = azgaar_integrator.get_azgaar_url()
 		web_view.load_url(url)
-		MythosLogger.debug("WorldBuilderAzgaar", "Azgaar WebView reloaded via load_url")
+		MythosLogger.debug("WorldBuilderAzgaar", "Azgaar WebView reloaded via load_url", {"url": url})
 	else:
 		MythosLogger.warn("WorldBuilderAzgaar", "Cannot reload - WebView or URL not available")
 
 func trigger_generation_with_options(options: Dictionary, auto_generate: bool = true) -> void:
 	"""Trigger Azgaar generation by injecting parameters via JS."""
+	# TEMPORARY DIAGNOSTIC: Skip generation if Azgaar is disabled
+	if DEBUG_DISABLE_AZGAAR:
+		MythosLogger.info("WorldBuilderAzgaar", "DIAGNOSTIC: Generation skipped (Azgaar disabled)")
+		return
+	
 	current_generation_options = options
 	is_generation_complete = false
 	emit_signal("generation_started")
@@ -192,6 +223,11 @@ func _on_generation_timeout() -> void:
 
 func export_heightmap() -> Image:
 	"""Export heightmap from Azgaar and return as Godot Image."""
+	# TEMPORARY DIAGNOSTIC: Skip export if Azgaar is disabled
+	if DEBUG_DISABLE_AZGAAR:
+		MythosLogger.info("WorldBuilderAzgaar", "DIAGNOSTIC: Heightmap export skipped (Azgaar disabled)")
+		return null
+	
 	if not web_view:
 		MythosLogger.error("WorldBuilderAzgaar", "WebView is null, cannot export heightmap")
 		return null

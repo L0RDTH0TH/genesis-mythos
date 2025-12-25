@@ -392,6 +392,59 @@ func verbose(system: String, message: String, data: Variant = null) -> void:
 	"""Log a VERBOSE level message."""
 	log_entry(system, LogLevel.VERBOSE, message, data)
 
+## File-only logging methods (bypass console output, still log to file)
+## Useful for flame graph and performance outputs that clutter console
+
+func log_entry_file_only(system: String, level: LogLevel, message: String, data: Variant = null) -> void:
+	"""Log a message to file only, bypassing console output. Still respects level filtering."""
+	log_mutex.lock()
+	
+	# Check if we should log this (level filtering)
+	if not _should_log(system, level):
+		log_mutex.unlock()
+		return
+	
+	# Check rate limiting via DiagnosticDispatcher (PerformanceMonitor)
+	if not PerformanceMonitorSingleton.can_log():
+		log_mutex.unlock()
+		return
+	
+	var formatted: String = _format_message(system, level, message, data)
+	
+	# Wrap actual log operations in a Callable for DiagnosticDispatcher queue
+	var log_callable: Callable = func():
+		# File output only (thread-safe: FileAccess operations work from threads)
+		if log_to_file:
+			_output_to_file(formatted)
+		
+		# Emit signal for UI integration (on main thread via queue)
+		_emit_log_signal(level, system, message, data)
+	
+	log_mutex.unlock()
+	
+	# Queue diagnostic callable (handles main thread vs thread automatically)
+	PerformanceMonitorSingleton.queue_diagnostic(log_callable)
+
+func error_file_only(system: String, message: String, data: Variant = null) -> void:
+	"""Log an ERROR level message to file only."""
+	log_entry_file_only(system, LogLevel.ERROR, message, data)
+
+func warn_file_only(system: String, message: String, data: Variant = null) -> void:
+	"""Log a WARN level message to file only."""
+	log_entry_file_only(system, LogLevel.WARN, message, data)
+
+func info_file_only(system: String, message: String, data: Variant = null) -> void:
+	"""Log an INFO level message to file only."""
+	log_entry_file_only(system, LogLevel.INFO, message, data)
+
+func debug_file_only(system: String, message: String, data: Variant = null) -> void:
+	"""Log a DEBUG level message to file only."""
+	log_entry_file_only(system, LogLevel.DEBUG, message, data)
+
+func verbose_file_only(system: String, message: String, data: Variant = null) -> void:
+	"""Log a VERBOSE level message to file only."""
+	log_entry_file_only(system, LogLevel.VERBOSE, message, data)
+
 ## Development mode runtime overrides
 
 func set_system_level(system: String, level: String) -> void:

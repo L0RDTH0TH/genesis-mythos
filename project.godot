@@ -15,6 +15,8 @@ config/version="1.0.0"
 run/main_scene="res://scenes/MainMenu.tscn"
 config/use_hidden_project_data_directory=false
 config/features=PackedStringArray("4.5", "Forward Plus")
+run/max_fps=65
+run/low_processor_mode=true
 
 [autoload]
 
@@ -31,6 +33,7 @@ AzgaarServer="*res://scripts/managers/AzgaarServer.gd"
 
 [debug]
 
+settings/profiler/max_functions=1000
 settings/show_fps=false
 settings/show_memory=false
 settings/show_collision_shapes=false
@@ -38,7 +41,6 @@ settings/show_navigation=false
 settings/show_paths=false
 settings/show_visibility_rects=false
 settings/profiler/enabled=true
-settings/profiler/max_functions=1000
 
 [display]
 
@@ -50,7 +52,6 @@ window/stretch/mode="viewport"
 window/stretch/aspect="expand"
 window/size/initial_size=1280
 x720window/size/windowed_scale=0.75
-window/vsync/vsync_mode=0
 
 [editor_plugins]
 

@@ -49,11 +49,11 @@ func _ready() -> void:
 	# Always start logging if enabled in config (no hotkey toggle)
 	if is_logging_enabled:
 		start_logging()
-		MythosLogger.info("PerformanceLogger", "Performance logging active (always-on)")
+		MythosLogger.info_file_only("PerformanceLogger", "Performance logging active (always-on)")
 	else:
-		MythosLogger.debug("PerformanceLogger", "Performance logging disabled via config")
+		MythosLogger.debug_file_only("PerformanceLogger", "Performance logging disabled via config")
 	
-	MythosLogger.verbose("PerformanceLogger", "_ready() called")
+	MythosLogger.verbose_file_only("PerformanceLogger", "_ready() called")
 	
 	# Emit signal for initial state
 	logging_state_changed.emit(is_logging_enabled)
@@ -91,7 +91,7 @@ func _load_config() -> void:
 		return
 	
 	config = json.data
-	MythosLogger.debug("PerformanceLogger", "Config loaded successfully")
+	MythosLogger.debug_file_only("PerformanceLogger", "Config loaded successfully")
 
 
 func _ensure_log_directory() -> void:
@@ -106,7 +106,7 @@ func _ensure_log_directory() -> void:
 		if err != OK:
 			MythosLogger.error("PerformanceLogger", "Failed to create perf_logs directory: %d" % err)
 		else:
-			MythosLogger.debug("PerformanceLogger", "Created perf_logs directory")
+			MythosLogger.debug_file_only("PerformanceLogger", "Created perf_logs directory")
 
 
 func _start_log_file() -> void:
@@ -134,7 +134,7 @@ func _start_log_file() -> void:
 	frame_counter = 0
 	last_log_time = Time.get_ticks_msec() / 1000.0
 	
-	MythosLogger.info("PerformanceLogger", "Started logging to: %s" % current_log_path)
+	MythosLogger.info_file_only("PerformanceLogger", "Started logging to: %s" % current_log_path)
 	
 	# Show on-screen notification if possible
 	_show_status_notification("Perf Logging: ON")
@@ -145,7 +145,7 @@ func _close_log_file() -> void:
 	if log_file != null:
 		log_file.close()
 		log_file = null
-		MythosLogger.info("PerformanceLogger", "Closed log file: %s" % current_log_path)
+		MythosLogger.info_file_only("PerformanceLogger", "Closed log file: %s" % current_log_path)
 		current_log_path = ""
 
 
@@ -153,14 +153,14 @@ func start_logging() -> void:
 	"""Start performance logging (public method, called automatically if enabled in config)."""
 	if is_logging_enabled and log_file == null:
 		_start_log_file()
-		MythosLogger.info("PerformanceLogger", "Performance logging started")
+		MythosLogger.info_file_only("PerformanceLogger", "Performance logging started")
 
 
 func stop_logging() -> void:
 	"""Stop performance logging (public method, only used if explicitly disabled in config)."""
 	if log_file != null:
 		_close_log_file()
-		MythosLogger.info("PerformanceLogger", "Performance logging stopped")
+		MythosLogger.info_file_only("PerformanceLogger", "Performance logging stopped")
 
 
 func log_current_frame(custom_data: Dictionary = {}) -> void:
@@ -227,17 +227,12 @@ func log_current_frame(custom_data: Dictionary = {}) -> void:
 		if not thread_metric.is_empty():
 			var breakdown: Dictionary = thread_metric.get("breakdown", {})
 			thread_ms = breakdown.get("total_ms", 0.0)
-			MythosLogger.debug("PerformanceLogger", "Using thread time from breakdown buffer (peek)", {
-				"frame_id": frame_id,
-				"thread_ms": thread_ms
-			})
+			MythosLogger.debug_file_only("PerformanceLogger", "Using thread time from breakdown buffer (peek) - frame_id: %d, thread_ms: %.3f" % [frame_id, thread_ms])
 		elif PerformanceMonitorSingleton.monitor_instance:
 			# Final fallback: PerformanceMonitor's aggregated thread compute time
 			thread_ms = PerformanceMonitorSingleton.monitor_instance.thread_compute_time_ms
 			if thread_ms > 0.0:
-				MythosLogger.debug("PerformanceLogger", "Using thread time from PerformanceMonitor fallback", {
-					"thread_ms": thread_ms
-				})
+				MythosLogger.debug_file_only("PerformanceLogger", "Using thread time from PerformanceMonitor fallback - thread_ms: %.3f" % thread_ms)
 	
 	# Format timestamp
 	var timestamp: String = Time.get_datetime_string_from_system(false, true)
@@ -263,6 +258,6 @@ func log_current_frame(custom_data: Dictionary = {}) -> void:
 
 func _show_status_notification(message: String) -> void:
 	"""Show on-screen notification (optional - can be extended with UI)."""
-	# For now, just log it. Future: could show temporary on-screen label
-	MythosLogger.info("PerformanceLogger", message)
+	# For now, just log it to file. Future: could show temporary on-screen label
+	MythosLogger.info_file_only("PerformanceLogger", message)
 

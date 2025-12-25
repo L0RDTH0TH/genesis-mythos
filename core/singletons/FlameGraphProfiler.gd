@@ -76,15 +76,15 @@ func _ready() -> void:
 		if sampling_mode == "sampling":
 			_setup_sampling_timer()
 		_setup_auto_export_timer()
-		MythosLogger.info("FlameGraphProfiler", "Flame graph profiling initialized and enabled")
+		MythosLogger.info_file_only("FlameGraphProfiler", "Flame graph profiling initialized and enabled")
 	else:
-		MythosLogger.debug("FlameGraphProfiler", "Flame graph profiling initialized (disabled)")
+		MythosLogger.debug_file_only("FlameGraphProfiler", "Flame graph profiling initialized (disabled)")
 
 
 func _exit_tree() -> void:
 	"""Cleanup on exit."""
 	stop_profiling()
-	MythosLogger.info("FlameGraphProfiler", "Flame graph profiler shutting down")
+	MythosLogger.info_file_only("FlameGraphProfiler", "Flame graph profiler shutting down")
 
 
 func _load_config() -> void:
@@ -92,7 +92,7 @@ func _load_config() -> void:
 	var config_file := FileAccess.open(CONFIG_PATH, FileAccess.READ)
 	
 	if not config_file:
-		MythosLogger.warn("FlameGraphProfiler", "Could not load config from %s, using defaults" % CONFIG_PATH)
+		MythosLogger.warn_file_only("FlameGraphProfiler", "Could not load config from %s, using defaults" % CONFIG_PATH)
 		config = _get_default_config()
 		return
 	
@@ -103,7 +103,7 @@ func _load_config() -> void:
 	var parse_result: Error = json.parse(content)
 	
 	if parse_result != OK:
-		MythosLogger.warn("FlameGraphProfiler", "Failed to parse config JSON, using defaults")
+		MythosLogger.warn_file_only("FlameGraphProfiler", "Failed to parse config JSON, using defaults")
 		config = _get_default_config()
 		return
 	
@@ -111,7 +111,7 @@ func _load_config() -> void:
 	if parsed is Dictionary:
 		config = parsed as Dictionary
 	else:
-		MythosLogger.warn("FlameGraphProfiler", "Invalid config format, using defaults")
+		MythosLogger.warn_file_only("FlameGraphProfiler", "Invalid config format, using defaults")
 		config = _get_default_config()
 
 
@@ -142,7 +142,7 @@ func _apply_config() -> void:
 func start_profiling() -> void:
 	"""Start flame graph profiling (safe to call multiple times)."""
 	if is_profiling_enabled:
-		MythosLogger.debug("FlameGraphProfiler", "Profiling already started, skipping")
+		MythosLogger.debug_file_only("FlameGraphProfiler", "Profiling already started, skipping")
 		return
 	
 	is_profiling_enabled = true
@@ -158,13 +158,13 @@ func start_profiling() -> void:
 	# Setup aggregation timer (for periodic call tree updates)
 	_setup_aggregation_timer()
 	
-	MythosLogger.info("FlameGraphProfiler", "Flame graph profiling started")
+	MythosLogger.info_file_only("FlameGraphProfiler", "Flame graph profiling started")
 
 
 func stop_profiling() -> void:
 	"""Stop flame graph profiling and auto-export data (safe to call multiple times)."""
 	if not is_profiling_enabled:
-		MythosLogger.debug("FlameGraphProfiler", "Profiling already stopped, skipping")
+		MythosLogger.debug_file_only("FlameGraphProfiler", "Profiling already stopped, skipping")
 		return
 	
 	is_profiling_enabled = false
@@ -173,9 +173,9 @@ func stop_profiling() -> void:
 	if stack_samples.size() > 0:
 		var export_path: String = export_to_json()
 		if export_path != "":
-			MythosLogger.info("FlameGraphProfiler", "Auto-exported flame graph data to: %s" % export_path)
+			MythosLogger.info_file_only("FlameGraphProfiler", "Auto-exported flame graph data to: %s" % export_path)
 		else:
-			MythosLogger.warn("FlameGraphProfiler", "Failed to auto-export flame graph data")
+			MythosLogger.warn_file_only("FlameGraphProfiler", "Failed to auto-export flame graph data")
 	
 	# Stop timers
 	if sampling_timer:
@@ -193,7 +193,7 @@ func stop_profiling() -> void:
 		aggregation_timer.queue_free()
 		aggregation_timer = null
 	
-	MythosLogger.info("FlameGraphProfiler", "Flame graph profiling stopped")
+	MythosLogger.info_file_only("FlameGraphProfiler", "Flame graph profiling stopped")
 
 
 func _setup_sampling_timer() -> void:
@@ -209,7 +209,7 @@ func _setup_sampling_timer() -> void:
 	add_child(sampling_timer)
 	sampling_timer.start()
 	
-	MythosLogger.debug("FlameGraphProfiler", "Sampling timer setup with interval: %.2f ms" % interval_ms)
+	MythosLogger.debug_file_only("FlameGraphProfiler", "Sampling timer setup with interval: %.2f ms" % interval_ms)
 
 
 func _setup_auto_export_timer() -> void:
@@ -225,7 +225,7 @@ func _setup_auto_export_timer() -> void:
 	add_child(auto_export_timer)
 	auto_export_timer.start()
 	
-	MythosLogger.debug("FlameGraphProfiler", "Auto-export timer setup with interval: %.2f seconds" % interval_seconds)
+	MythosLogger.debug_file_only("FlameGraphProfiler", "Auto-export timer setup with interval: %.2f seconds" % interval_seconds)
 
 
 func _setup_aggregation_timer() -> void:
@@ -240,7 +240,7 @@ func _setup_aggregation_timer() -> void:
 	add_child(aggregation_timer)
 	aggregation_timer.start()
 	
-	MythosLogger.debug("FlameGraphProfiler", "Aggregation timer setup with interval: %.2f seconds" % AGGREGATION_INTERVAL_SECONDS)
+	MythosLogger.debug_file_only("FlameGraphProfiler", "Aggregation timer setup with interval: %.2f seconds" % AGGREGATION_INTERVAL_SECONDS)
 
 
 func _periodic_aggregate() -> void:
@@ -256,7 +256,7 @@ func _periodic_aggregate() -> void:
 	# Aggregate if we have samples
 	if samples_to_aggregate.size() > 0:
 		_aggregate_samples_to_tree(samples_to_aggregate)
-		MythosLogger.debug("FlameGraphProfiler", "Periodic aggregation: %d samples -> call tree" % samples_to_aggregate.size())
+		MythosLogger.debug_file_only("FlameGraphProfiler", "Periodic aggregation: %d samples -> call tree" % samples_to_aggregate.size())
 		
 		# Emit signal when aggregation completes
 		var processed_count: int = samples_to_aggregate.size()
@@ -291,7 +291,7 @@ func _collect_stack_sample() -> void:
 	
 	var stack_elapsed: int = Time.get_ticks_usec() - stack_start
 	if stack_elapsed > 1000:  # Log if > 1ms
-		MythosLogger.warn("FlameGraphProfiler", "get_stack() took %d usec (%.2f ms) - consider increasing sampling_interval_ms" % [stack_elapsed, stack_elapsed / 1000.0])
+		MythosLogger.warn_file_only("FlameGraphProfiler", "get_stack() took %d usec (%.2f ms) - consider increasing sampling_interval_ms" % [stack_elapsed, stack_elapsed / 1000.0])
 	var max_depth: int = config.get("max_stack_depth", 40)
 	
 	# Limit stack depth (keep deepest frames, remove top-level ones)
@@ -333,7 +333,7 @@ func _collect_stack_sample() -> void:
 	}
 	
 	# Diagnostic logging: log stack depth
-	MythosLogger.debug("FlameGraphProfiler", "Collected stack sample: depth=%d" % formatted_stack.size())
+	MythosLogger.debug_file_only("FlameGraphProfiler", "Collected stack sample: depth=%d" % formatted_stack.size())
 	
 	# Push to buffer (thread-safe)
 	_buffer_mutex.lock()
@@ -531,7 +531,7 @@ func export_to_json() -> String:
 	file.store_string(json_string)
 	file.close()
 	
-	MythosLogger.info("FlameGraphProfiler", "Exported %d samples and call tree to: %s" % [samples_to_export.size(), full_path])
+	MythosLogger.info_file_only("FlameGraphProfiler", "Exported %d samples and call tree to: %s" % [samples_to_export.size(), full_path])
 	return full_path
 
 
@@ -549,7 +549,7 @@ func clear_samples() -> void:
 	stack_samples.clear()
 	call_tree.clear()
 	_buffer_mutex.unlock()
-	MythosLogger.debug("FlameGraphProfiler", "Cleared all samples and call tree")
+	MythosLogger.debug_file_only("FlameGraphProfiler", "Cleared all samples and call tree")
 
 
 func _aggregate_samples_to_tree(samples: Array[Dictionary]) -> void:
@@ -617,7 +617,7 @@ func _aggregate_samples_to_tree(samples: Array[Dictionary]) -> void:
 				node_key += "@%s:%s:%d" % [caller_source, caller_function, caller_line]
 				# Diagnostic logging: log distinct call site nodes
 				if caller_function != "unknown" and caller_function != "":
-					MythosLogger.debug("FlameGraphProfiler", "Created distinct call site node: %s" % node_key)
+					MythosLogger.debug_file_only("FlameGraphProfiler", "Created distinct call site node: %s" % node_key)
 			
 			# Get or create child node
 			var children: Dictionary = current_node.get("children", {})
@@ -668,8 +668,8 @@ func _aggregate_samples_to_tree(samples: Array[Dictionary]) -> void:
 	# Diagnostic logging: tree statistics
 	var tree_depth: int = _get_tree_depth(call_tree)
 	var root_children_count: int = call_tree.get("children", {}).size()
-	MythosLogger.debug("FlameGraphProfiler", "Aggregated %d samples into call tree" % samples.size())
-	MythosLogger.debug("FlameGraphProfiler", "Call tree max depth: %d, root children: %d" % [tree_depth, root_children_count])
+	MythosLogger.debug_file_only("FlameGraphProfiler", "Aggregated %d samples into call tree" % samples.size())
+	MythosLogger.debug_file_only("FlameGraphProfiler", "Call tree max depth: %d, root children: %d" % [tree_depth, root_children_count])
 
 
 func _calculate_self_times(node: Dictionary) -> void:

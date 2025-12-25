@@ -109,3 +109,14 @@ func get_azgaar_url() -> String:
 	# Convert to file:// URL format
 	return "file://" + azgaar_path
 
+func get_azgaar_http_url() -> String:
+	"""Get the http:// URL to Azgaar index.html via embedded server."""
+	var azgaar_server: Node = get_node_or_null("/root/AzgaarServer")
+	if azgaar_server and azgaar_server.has_method("is_running") and azgaar_server.has_method("get_port"):
+		if azgaar_server.is_running():
+			var server_port: int = azgaar_server.get_port()
+			return "http://127.0.0.1:%d/index.html" % server_port
+	
+	# Fallback to file:// if server not available
+	return ""
+

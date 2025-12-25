@@ -67,15 +67,6 @@ var is_generating: bool = false
 var generation_thread: Thread = null
 var pending_biome_preview: bool = false
 
-## PROFILING: Data accumulation
-var profiling_process_calls: int = 0
-var profiling_process_over_1ms: int = 0
-var profiling_process_over_10ms: int = 0
-var profiling_input_calls: int = 0
-var profiling_input_over_1ms: int = 0
-var profiling_last_fps: float = 0.0
-var profiling_fps_samples: Array[float] = []
-
 
 func _ready() -> void:
 	"""Initialize MapMakerModule."""
@@ -648,10 +639,6 @@ func _update_viewport_size() -> void:
 
 func _on_viewport_container_input(event: InputEvent) -> void:
 	"""Handle input events from viewport container."""
-	# PROFILING: Time input handling
-	var input_start: int = Time.get_ticks_usec()
-	profiling_input_calls += 1
-	
 	if map_viewport_container == null or not map_viewport_container.is_visible_in_tree():
 		return
 	
@@ -694,22 +681,11 @@ func _on_viewport_container_input(event: InputEvent) -> void:
 				map_camera.position -= mouse_event.relative / map_camera.zoom
 		elif map_editor != null:
 			# Handle painting
-			var paint_start_time: int = Time.get_ticks_msec()
 			map_editor.continue_paint(world_pos)
-			var paint_time: float = (Time.get_ticks_msec() - paint_start_time) / 1000.0
-			if paint_time > 0.016:  # Log if > 16ms (60 FPS threshold)
-				MythosLogger.warn("UI/MapMaker", "Paint operation took %f ms" % (paint_time * 1000.0))
 			
 			# Throttled refresh: mark as pending instead of immediate refresh
 			if map_editor.is_painting and map_renderer != null:
 				pending_refresh = true
-	
-	# PROFILING: Report input handling time if >1ms
-	var input_time: int = Time.get_ticks_usec() - input_start
-	var input_time_ms: float = input_time / 1000.0
-	if input_time > 1000:  # >1ms
-		profiling_input_over_1ms += 1
-		print("PROFILING: MapMakerModule._on_viewport_container_input() took: ", input_time_ms, " ms")
 
 
 func _screen_to_world_position(screen_pos: Vector2) -> Vector2:
@@ -778,16 +754,12 @@ func deactivate() -> void:
 
 
 func _process(delta: float) -> void:
-	"""PROFILING: Per-frame processing - timing instrumentation and thread completion polling."""
-	var frame_start: int = Time.get_ticks_usec()
-	profiling_process_calls += 1
-	
-	# Poll for threaded generation completion
+	"""Per-frame processing - thread completion polling."""
+	# Poll for threaded generation completion only when generating
 	if is_generating and generation_thread != null:
 		if not generation_thread.is_alive():
 			# Thread completed - finalize generation
-			MythosLogger.info("UI/MapMakerModule", "Map generation thread completed")
-			print("PREVIEW: Thread completion detected in _process(), calling _finalize_map_generation()")
+			MythosLogger.info_file_only("UI/MapMakerModule", "Map generation thread completed - calling _finalize_map_generation()")
 			generation_thread.wait_to_finish()
 			generation_thread = null
 			is_generating = false
@@ -799,27 +771,6 @@ func _process(delta: float) -> void:
 				MythosLogger.debug("UI/MapMakerModule", "Heightmap duplicated from thread to main thread")
 			
 			_finalize_map_generation()
-	
-	# PROFILING: Report frame time if >1ms
-	var frame_time: int = Time.get_ticks_usec() - frame_start
-	var frame_time_ms: float = frame_time / 1000.0
-	if frame_time > 1000:  # >1ms
-		profiling_process_over_1ms += 1
-		print("PROFILING: MapMakerModule._process() took: ", frame_time_ms, " ms")
-	if frame_time > 10000:  # >10ms
-		profiling_process_over_10ms += 1
-	
-	# PROFILING: Periodic FPS report every 1 second
-	if Engine.get_process_frames() % 60 == 0:
-		var fps: float = Engine.get_frames_per_second()
-		profiling_last_fps = fps
-		profiling_fps_samples.append(fps)
-		if profiling_fps_samples.size() > 120:  # Keep last 120 samples (2 minutes)
-			profiling_fps_samples.pop_front()
-		var refresh_mode_str: String = "UNKNOWN"
-		if map_renderer != null:
-			refresh_mode_str = map_renderer._refresh_mode_to_string(map_renderer.current_refresh_mode)
-		print("PROFILING: MapMakerModule - Current FPS: ", fps, " is_active=", is_active, " is_processing=", is_processing(), " is_generating=", is_generating, " refresh_mode=", refresh_mode_str)
 
 
 func _setup_keyboard_shortcuts() -> void:
@@ -838,27 +789,6 @@ func _next_power_of_2(value: int) -> int:
 	return power
 
 
-func get_profiling_summary() -> Dictionary:
-	"""Get profiling data summary."""
-	var avg_fps: float = 0.0
-	if profiling_fps_samples.size() > 0:
-		var sum: float = 0.0
-		for fps in profiling_fps_samples:
-			sum += fps
-		avg_fps = sum / profiling_fps_samples.size()
-	
-	return {
-		"process_calls": profiling_process_calls,
-		"process_over_1ms": profiling_process_over_1ms,
-		"process_over_10ms": profiling_process_over_10ms,
-		"input_calls": profiling_input_calls,
-		"input_over_1ms": profiling_input_over_1ms,
-		"last_fps": profiling_last_fps,
-		"avg_fps": avg_fps,
-		"fps_samples_count": profiling_fps_samples.size(),
-		"is_active": is_active,
-		"is_processing": is_processing()
-	}
 
 
 func _unhandled_key_input(event: InputEvent) -> void:

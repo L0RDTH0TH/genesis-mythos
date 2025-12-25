@@ -39,6 +39,17 @@ var system_status: String = "Idle"
 # Frame counter for safe RenderingServer initialization (needs 2+ frames)
 var _frame_count: int = 0
 
+# Cached WorldGenerator reference (performance optimization)
+var _cached_world_generator: Node = null
+
+# Throttling counters for expensive API calls
+var _rendering_server_throttle: int = 0
+var _memory_throttle: int = 0
+
+# Cached RenderingServer values (for throttling)
+var _cached_draw_calls: int = 0
+var _cached_primitives: int = 0
+
 # Category system for metric filtering
 var current_category: int = 0  # 0=All, 1=Time, 2=Memory, 3=Rendering, 4=Objects
 const CATEGORIES: Array[String] = ["All", "Time", "Memory", "Rendering", "Objects"]
@@ -255,6 +266,9 @@ func _ready() -> void:
 	
 	# Set process priority to -1000 for high-priority diagnostic processing
 	set_process_priority(-1000)
+	
+	# Cache WorldGenerator reference for performance
+	_cached_world_generator = _find_world_generator()
 
 func _verify_panel_visibility() -> void:
 	"""Verify panel visibility state after deferred call."""
@@ -393,24 +407,30 @@ func _process(_delta: float) -> void:
 	_frame_count += 1
 	
 	# FIRST: Drain diagnostic queue completely (thread-safe log/UI updates)
-	for i in range(_diagnostic_queue.size()):
-		var callable: Callable = _diagnostic_queue[i]
-		callable.call()
-	_diagnostic_queue.clear()
+	# Skip if queue is empty (performance optimization)
+	if _diagnostic_queue.size() > 0:
+		for i in range(_diagnostic_queue.size()):
+			var callable: Callable = _diagnostic_queue[i]
+			callable.call()
+		_diagnostic_queue.clear()
 	
 	# SECOND: Drain metric ring buffer (thread-safe metric collection)
-	_buffer_mutex.lock()
-	var metrics_to_process: Array[Dictionary] = _metric_ring_buffer.duplicate()
-	_metric_ring_buffer.clear()
-	_buffer_mutex.unlock()
-	
-	# Feed drained metrics into graphs (live updates)
-	for metric: Dictionary in metrics_to_process:
-		var time_ms: float = metric.get("time_ms", 0.0)
+	# Skip if buffer is empty (performance optimization)
+	if _metric_ring_buffer.size() > 0:
+		_buffer_mutex.lock()
+		var metrics_to_process: Array[Dictionary] = _metric_ring_buffer.duplicate()
+		_metric_ring_buffer.clear()
+		_buffer_mutex.unlock()
 		
-		# Update thread graph with metric time (perfectly live)
-		if bottom_thread_graph:
-			bottom_thread_graph.add_value(time_ms)
+		# Feed drained metrics into graphs (live updates)
+		for metric: Dictionary in metrics_to_process:
+			var time_ms: float = metric.get("time_ms", 0.0)
+			
+			# Update thread graph with metric time (perfectly live)
+			if bottom_thread_graph:
+				bottom_thread_graph.add_value(time_ms)
+	else:
+		var metrics_to_process: Array[Dictionary] = []
 	
 	# Rest of existing _process logic (FPS, graphs, etc.)
 	var fps: float = Engine.get_frames_per_second()
@@ -448,8 +468,16 @@ func _process(_delta: float) -> void:
 			var other_process_ms: float = max(0.0, process_ms - refresh_ms - thread_ms)
 			var idle_ms: float = max(0.0, frame_delta_ms - cpu_total_ms)
 			
-			var draw_calls: int = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)
-			var primitives: int = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME)
+			# Throttle RenderingServer calls to every 2-3 frames (performance optimization)
+			_rendering_server_throttle = (_rendering_server_throttle + 1) % 3
+			var draw_calls: int = _cached_draw_calls
+			var primitives: int = _cached_primitives
+			if _rendering_server_throttle == 0:
+				draw_calls = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)
+				primitives = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME)
+				# Cache values for throttled frames
+				_cached_draw_calls = draw_calls
+				_cached_primitives = primitives
 			
 			var primary: Dictionary = {
 				"frame_id": frame_id,
@@ -491,36 +519,53 @@ func _update_detailed_metrics() -> void:
 	if physics_label:
 		physics_label.text = "Physics: %.2f ms" % physics_ms
 	
-	# Memory category metrics
-	var mem_bytes: int = Performance.get_monitor(Performance.MEMORY_STATIC)
-	if memory_label:
-		memory_label.text = "Memory: %s" % _format_memory(mem_bytes)
+	# Memory category metrics - throttle to every 10 frames (changes slowly)
+	_memory_throttle = (_memory_throttle + 1) % 10
+	var mem_bytes: int = 0
+	if _memory_throttle == 0:
+		mem_bytes = Performance.get_monitor(Performance.MEMORY_STATIC)
+		if memory_label:
+			memory_label.text = "Memory: %s" % _format_memory(mem_bytes)
 	
-	# RenderingServer metrics (requires 2+ frames, checked in _process)
-	var draw_calls: int = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)
-	var primitives: int = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME)
-	var objects_drawn: int = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME)
-	var vram_bytes: int = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_VIDEO_MEM_USED)
-	var texture_bytes: int = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TEXTURE_MEM_USED)
+	# RenderingServer metrics - throttle to every 2-3 frames (performance optimization)
+	_rendering_server_throttle = (_rendering_server_throttle + 1) % 3
+	var draw_calls: int = _cached_draw_calls
+	var primitives: int = _cached_primitives
+	var objects_drawn: int = 0
+	var vram_bytes: int = 0
+	var texture_bytes: int = 0
+	if _rendering_server_throttle == 0:
+		draw_calls = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)
+		primitives = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME)
+		objects_drawn = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME)
+		vram_bytes = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_VIDEO_MEM_USED)
+		texture_bytes = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TEXTURE_MEM_USED)
+		# Cache values for throttled frames
+		_cached_draw_calls = draw_calls
+		_cached_primitives = primitives
 	
-	if draw_calls_label:
-		draw_calls_label.text = "Draw Calls: %d" % draw_calls
-	if primitives_label:
-		primitives_label.text = "Primitives: %d" % primitives
-	if objects_drawn_label:
-		objects_drawn_label.text = "Objects Drawn: %d" % objects_drawn
-	if vram_label:
-		vram_label.text = "VRAM: %s" % _format_memory(vram_bytes)
-	if texture_mem_label:
-		texture_mem_label.text = "Texture Mem: %s" % _format_memory(texture_bytes)
+	if _rendering_server_throttle == 0:
+		if draw_calls_label:
+			draw_calls_label.text = "Draw Calls: %d" % draw_calls
+		if primitives_label:
+			primitives_label.text = "Primitives: %d" % primitives
+		if objects_drawn_label:
+			objects_drawn_label.text = "Objects Drawn: %d" % objects_drawn
+		if vram_label:
+			vram_label.text = "VRAM: %s" % _format_memory(vram_bytes)
+		if texture_mem_label:
+			texture_mem_label.text = "Texture Mem: %s" % _format_memory(texture_bytes)
 	
-	# Objects category metrics
-	var obj_count: int = Performance.get_monitor(Performance.OBJECT_COUNT)
-	var node_count: int = Performance.get_monitor(Performance.OBJECT_NODE_COUNT)
-	if object_label:
-		object_label.text = "Objects: %d" % obj_count
-	if node_label:
-		node_label.text = "Nodes: %d" % node_count
+	# Objects category metrics - throttle to every 10 frames (changes slowly)
+	var obj_count: int = 0
+	var node_count: int = 0
+	if _memory_throttle == 0:
+		obj_count = Performance.get_monitor(Performance.OBJECT_COUNT)
+		node_count = Performance.get_monitor(Performance.OBJECT_NODE_COUNT)
+		if object_label:
+			object_label.text = "Objects: %d" % obj_count
+		if node_label:
+			node_label.text = "Nodes: %d" % node_count
 
 func _format_memory(bytes: int) -> String:
 	"""Format memory bytes into human-readable string (B/KB/MB/GB)."""
@@ -753,8 +798,12 @@ func set_refresh_time(time_ms: float) -> void:
 
 func _update_thread_metrics() -> void:
 	"""Update thread metrics from WorldGenerator if available."""
-	# Try to find WorldGenerator in scene tree (using method check to avoid type issues)
-	var world_gen = _find_world_generator()
+	# Use cached WorldGenerator reference (performance optimization)
+	# Re-find if cache is null (e.g., after scene change)
+	if not _cached_world_generator:
+		_cached_world_generator = _find_world_generator()
+	
+	var world_gen = _cached_world_generator
 	if world_gen and world_gen.has_method("is_generating"):
 		# Check if generating
 		if world_gen.is_generating():

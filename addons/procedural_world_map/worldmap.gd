@@ -201,7 +201,8 @@ func _process(delta):
 		profiling_running_while_hidden += 1
 		# Only log once per second to avoid spam
 		if Engine.get_process_frames() % 60 == 0:
-			print("PROFILING: ProceduralWorldMap._process() running while hidden! visible=", visible, " is_processing=", is_processing())
+			if MythosLogger:
+				MythosLogger.debug_file_only("ProceduralWorldMap", "PROFILING: ProceduralWorldMap._process() running while hidden! visible=%s is_processing=%s" % [visible, is_processing()])
 	
 	# start the idling timeout when the map has been fast rendered
 	if incremental_quality and image_changed and incremental_timer.is_stopped():
@@ -213,7 +214,8 @@ func _process(delta):
 	var frame_time_ms: float = frame_time / 1000.0
 	if frame_time > 1000:  # >1ms
 		profiling_process_over_1ms += 1
-		print("PROFILING: ProceduralWorldMap._process() took: ", frame_time_ms, " ms")
+		if MythosLogger:
+			MythosLogger.debug_file_only("ProceduralWorldMap", "PROFILING: ProceduralWorldMap._process() took: %.3f ms" % frame_time_ms)
 	if frame_time > 10000:  # >10ms
 		profiling_process_over_10ms += 1
 	
@@ -224,7 +226,8 @@ func _process(delta):
 		profiling_fps_samples.append(fps)
 		if profiling_fps_samples.size() > 120:  # Keep last 120 samples (2 minutes)
 			profiling_fps_samples.pop_front()
-		print("PROFILING: ProceduralWorldMap - Current FPS: ", fps)
+		if MythosLogger:
+			MythosLogger.debug_file_only("ProceduralWorldMap", "PROFILING: ProceduralWorldMap - Current FPS: %.2f" % fps)
 
 
 func get_profiling_summary() -> Dictionary:

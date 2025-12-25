@@ -26,7 +26,7 @@ var history_frame_ids: PackedInt32Array = PackedInt32Array()
 var history_timestamps_usec: PackedInt64Array = PackedInt64Array()
 
 const HISTORY_SIZE: int = UIConstants.PERF_HISTORY_SIZE
-const VISIBLE_FRAMES: int = 60  # Last 60 frames for wider bars
+const VISIBLE_FRAMES: int = 30  # Last 30 frames (reduced from 60 for performance)
 const LANE_COUNT: int = 8
 
 var history_index: int = 0
@@ -36,6 +36,15 @@ var _last_rendered_index: int = -1
 
 ## GUI Performance Fix: Dirty flag for redraw optimization
 var _needs_redraw: bool = true
+
+# Cached grid texture (performance optimization)
+var _cached_grid_texture: ImageTexture = null
+var _last_grid_size: Vector2 = Vector2.ZERO
+
+# Pre-calculated bar rects (performance optimization)
+var _cached_bar_rects: Array[Rect2] = []
+var _cached_bar_colors: Array[Color] = []
+var _cached_bar_valid: Array[bool] = []
 
 # Tooltip
 @onready var tooltip_panel: Panel = $TooltipPanel
@@ -149,6 +158,9 @@ func add_frame_metrics(primary: Dictionary, sub_metrics: Array[Dictionary] = [])
 	# Metadata
 	history_frame_ids[write_idx] = primary.get("frame_id", -1)
 	history_timestamps_usec[write_idx] = primary.get("timestamp_usec", 0)
+	
+	# Pre-calculate bar rects for all visible frames (performance optimization)
+	_precalculate_bar_rects()
 	
 	# Conditional redraw
 	if history_index != _last_rendered_index:
@@ -323,11 +335,55 @@ func _gui_input(event: InputEvent) -> void:
 func _notification(what: int) -> void:
 	"""Handle resize notifications."""
 	if what == NOTIFICATION_RESIZED:
+		# Invalidate cached grid on resize (performance optimization)
+		_cached_grid_texture = null
+		_last_grid_size = Vector2.ZERO
 		# Recompute tooltip position if visible
 		if _tooltip_visible:
 			_update_tooltip()
+		# Pre-calculate bar rects for new size
+		_precalculate_bar_rects()
 		_needs_redraw = true  # GUI Performance Fix: Mark as needing redraw
 		queue_redraw()
+
+func _precalculate_bar_rects() -> void:
+	"""Pre-calculate all bar rects in a single pass (performance optimization)."""
+	_cached_bar_rects.clear()
+	_cached_bar_colors.clear()
+	_cached_bar_valid.clear()
+	
+	if size.x <= 0 or size.y <= 0:
+		return
+	
+	var label_width: float = UIConstants.LABEL_WIDTH_NARROW
+	var frame_width: float = max((size.x - label_width) / float(VISIBLE_FRAMES), float(UIConstants.WATERFALL_FRAME_WIDTH_MIN))
+	
+	for lane_idx in range(LANE_COUNT):
+		var lane_rect: Rect2 = _get_lane_rect(lane_idx)
+		
+		for i in range(VISIBLE_FRAMES):
+			var history_frame_idx: int = (history_index - 1 - i + HISTORY_SIZE) % HISTORY_SIZE
+			if not history_full and history_frame_idx >= history_index:
+				_cached_bar_rects.append(Rect2())
+				_cached_bar_colors.append(Color.TRANSPARENT)
+				_cached_bar_valid.append(false)
+				continue
+			
+			var value: float = _get_lane_value(lane_idx, history_frame_idx)
+			
+			# Skip zero-value bars (performance optimization)
+			if value <= 0.0:
+				_cached_bar_rects.append(Rect2())
+				_cached_bar_colors.append(Color.TRANSPARENT)
+				_cached_bar_valid.append(false)
+				continue
+			
+			var bar_rect: Rect2 = _get_bar_rect(lane_idx, i, value)
+			var bar_color: Color = _get_lane_color(lane_idx, value)
+			
+			_cached_bar_rects.append(bar_rect)
+			_cached_bar_colors.append(bar_color)
+			_cached_bar_valid.append(bar_rect.size.x > 0 and bar_rect.size.y > 0)
 
 func _draw() -> void:
 	"""Draw the waterfall view with all lanes and bars."""
@@ -341,8 +397,8 @@ func _draw() -> void:
 	var bg_color: Color = Color(0.1, 0.08, 0.06, 0.9)  # Parchment-like
 	draw_rect(Rect2(Vector2.ZERO, size), bg_color)
 	
-	# Draw grid
-	_draw_grid()
+	# Draw cached grid (performance optimization)
+	_draw_cached_grid()
 	
 	# Draw lanes and bars
 	for lane_idx in range(LANE_COUNT):
@@ -362,27 +418,23 @@ func _draw() -> void:
 		var label_pos: Vector2 = Vector2(2, lane_rect.position.y + lane_rect.size.y / 2 - 8)
 		draw_string(ThemeDB.fallback_font, label_pos, label_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(1.0, 0.843, 0.0))
 		
-		# Draw bars for visible frames
+		# Draw bars using pre-calculated rects (performance optimization)
+		var bar_start_idx: int = lane_idx * VISIBLE_FRAMES
 		for i in range(VISIBLE_FRAMES):
-			var history_frame_idx: int = (history_index - 1 - i + HISTORY_SIZE) % HISTORY_SIZE
-			if not history_full and history_frame_idx >= history_index:
-				continue
-			
-			var value: float = _get_lane_value(lane_idx, history_frame_idx)
-			if value <= 0.0:
-				continue
-			
-			var bar_rect: Rect2 = _get_bar_rect(lane_idx, i, value)
-			if bar_rect.size.x > 0 and bar_rect.size.y > 0:
-				var bar_color: Color = _get_lane_color(lane_idx, value)
-				draw_rect(bar_rect, bar_color)
+			var bar_idx: int = bar_start_idx + i
+			if bar_idx < _cached_bar_valid.size() and _cached_bar_valid[bar_idx]:
+				draw_rect(_cached_bar_rects[bar_idx], _cached_bar_colors[bar_idx])
 			
 			# Draw primitives overlay line for lane 7
 			if lane_idx == 7:
+				var history_frame_idx: int = (history_index - 1 - i + HISTORY_SIZE) % HISTORY_SIZE
+				if not history_full and history_frame_idx >= history_index:
+					continue
 				var primitives_norm: float = _get_primitives_normalized(history_frame_idx)
 				var line_y: float = lane_rect.position.y + (1.0 - primitives_norm) * lane_rect.size.y
-				var line_x_start: float = lane_rect.position.x + float(i) * bar_rect.size.x
-				var line_x_end: float = line_x_start + bar_rect.size.x
+				var frame_width: float = max((size.x - UIConstants.LABEL_WIDTH_NARROW) / float(VISIBLE_FRAMES), float(UIConstants.WATERFALL_FRAME_WIDTH_MIN))
+				var line_x_start: float = lane_rect.position.x + float(i) * frame_width
+				var line_x_end: float = line_x_start + frame_width
 				draw_line(Vector2(line_x_start, line_y), Vector2(line_x_end, line_y), Color(1.0, 0.0, 1.0), 2.0)
 		
 		# Draw hover highlight if tooltip is visible
@@ -396,29 +448,44 @@ func _draw() -> void:
 	# GUI Performance Fix: Mark as drawn
 	_needs_redraw = false
 
-func _draw_grid() -> void:
-	"""Draw grid lines (vertical every 30 frames, reference lines for time lanes)."""
-	# Vertical grid lines every 30 frames
-	var label_width: float = UIConstants.LABEL_WIDTH_NARROW
-	var frame_width: float = max((size.x - label_width) / float(VISIBLE_FRAMES), float(UIConstants.WATERFALL_FRAME_WIDTH_MIN))
-	
-	for i in range(0, VISIBLE_FRAMES, 30):
-		var x: float = label_width + float(i) * frame_width
-		draw_line(Vector2(x, 0), Vector2(x, size.y), Color(1.0, 1.0, 1.0, 0.1), 1.0)
-	
-	# Reference lines for time lanes (16.67ms green, 33.33ms orange)
-	for lane_idx in range(7):  # Time lanes only
-		var lane_rect: Rect2 = _get_lane_rect(lane_idx)
+func _draw_cached_grid() -> void:
+	"""Draw cached grid or create cache if needed (performance optimization)."""
+	# Check if grid cache is valid
+	if _cached_grid_texture == null or _last_grid_size != size:
+		# Create grid texture cache
+		var grid_image: Image = Image.create(int(size.x), int(size.y), false, Image.FORMAT_RGBA8)
+		grid_image.fill(Color.TRANSPARENT)
 		
-		# 16.67ms line (green, dashed effect)
-		var target_y: float = lane_rect.position.y + lane_rect.size.y - (16.67 * lane_rect.size.y / UIConstants.WATERFALL_TARGET_FRAME_MS)
-		for x in range(int(lane_rect.position.x), int(lane_rect.position.x + lane_rect.size.x), 4):
-			draw_line(Vector2(x, target_y), Vector2(x + 2, target_y), Color(0.2, 1.0, 0.2, 0.5), 1.0)
+		# Draw grid to image
+		var label_width: float = UIConstants.LABEL_WIDTH_NARROW
+		var frame_width: float = max((size.x - label_width) / float(VISIBLE_FRAMES), float(UIConstants.WATERFALL_FRAME_WIDTH_MIN))
 		
-		# 33.33ms line (orange, dashed effect)
-		var warning_y: float = lane_rect.position.y + lane_rect.size.y - (33.33 * lane_rect.size.y / UIConstants.WATERFALL_TARGET_FRAME_MS)
-		for x in range(int(lane_rect.position.x), int(lane_rect.position.x + lane_rect.size.x), 4):
-			draw_line(Vector2(x, warning_y), Vector2(x + 2, warning_y), Color(1.0, 0.6, 0.0, 0.5), 1.0)
+		# Vertical grid lines every 30 frames
+		for i in range(0, VISIBLE_FRAMES, 30):
+			var x: float = label_width + float(i) * frame_width
+			grid_image.draw_line(Vector2(x, 0), Vector2(x, size.y), Color(1.0, 1.0, 1.0, 0.1))
+		
+		# Reference lines for time lanes (16.67ms green, 33.33ms orange)
+		for lane_idx in range(7):  # Time lanes only
+			var lane_rect: Rect2 = _get_lane_rect(lane_idx)
+			
+			# 16.67ms line (green, dashed effect)
+			var target_y: float = lane_rect.position.y + lane_rect.size.y - (16.67 * lane_rect.size.y / UIConstants.WATERFALL_TARGET_FRAME_MS)
+			for x in range(int(lane_rect.position.x), int(lane_rect.position.x + lane_rect.size.x), 4):
+				grid_image.draw_line(Vector2(x, target_y), Vector2(x + 2, target_y), Color(0.2, 1.0, 0.2, 0.5))
+			
+			# 33.33ms line (orange, dashed effect)
+			var warning_y: float = lane_rect.position.y + lane_rect.size.y - (33.33 * lane_rect.size.y / UIConstants.WATERFALL_TARGET_FRAME_MS)
+			for x in range(int(lane_rect.position.x), int(lane_rect.position.x + lane_rect.size.x), 4):
+				grid_image.draw_line(Vector2(x, warning_y), Vector2(x + 2, warning_y), Color(1.0, 0.6, 0.0, 0.5))
+		
+		# Create texture from image
+		_cached_grid_texture = ImageTexture.create_from_image(grid_image)
+		_last_grid_size = size
+	
+	# Draw cached grid texture
+	if _cached_grid_texture:
+		draw_texture(_cached_grid_texture, Vector2.ZERO)
 
 func _get_lane_name(lane_idx: int) -> String:
 	"""Get the display name for a lane."""
