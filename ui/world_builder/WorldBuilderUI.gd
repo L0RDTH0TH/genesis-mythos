@@ -96,16 +96,7 @@ func _ready() -> void:
 	# Apply responsive layout on initial load
 	call_deferred("_update_responsive_layout")
 	
-	# GUI Performance Fix: Add temporary FPS counter for verification
-	var fps_label := Label.new()
-	fps_label.name = "TempFPSLabel"
-	fps_label.position = Vector2(10, 10)
-	fps_label.add_theme_font_size_override("font_size", 24)
-	fps_label.add_theme_color_override("font_color", Color(1, 1, 0))
-	add_child(fps_label)
-	
-	# GUI Performance Fix: Enable _process for FPS counter (generation logic only runs when gen_timer > 0)
-	set_process(true)
+	set_process(false)
 
 
 func _apply_ui_constants() -> void:
@@ -482,16 +473,11 @@ func _generate_azgaar() -> void:
 	_update_status("Generating map...", 40)
 	gen_timer = 0.0
 	gen_elapsed_time = 0.0
-	# Note: _process is already enabled for FPS counter, no need to enable again
+	set_process(true)
 
 
 func _process(delta: float) -> void:
 	"""Process generation status updates (fallback polling if signals don't work)."""
-	# GUI Performance Fix: Update temporary FPS counter (always runs)
-	var fps_label: Label = get_node_or_null("TempFPSLabel")
-	if fps_label:
-		fps_label.text = "FPS: %.1f" % Engine.get_frames_per_second()
-	
 	# Generation logic only runs when generation is active (gen_timer > 0)
 	if gen_timer > 0.0:
 		gen_elapsed_time += delta
