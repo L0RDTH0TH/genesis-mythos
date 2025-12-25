@@ -22,6 +22,9 @@ var min_label: Label
 var max_label: Label
 var stats_label: Label  # Min/Avg/Max stats display
 
+## GUI Performance Fix: Dirty flag for redraw optimization
+var _needs_redraw: bool = true
+
 const GRID_LINES: int = 4
 
 func _ready() -> void:
@@ -91,6 +94,11 @@ func add_value(value: float) -> void:
 
 func _draw() -> void:
 	"""Draw the graph with background, grid, line, and labels."""
+	# GUI Performance Fix: Only draw if visible and needs redraw
+	if not visible:
+		return
+	if not _needs_redraw:
+		return
 	if history.is_empty():
 		return
 	
@@ -221,6 +229,9 @@ func _draw() -> void:
 		var max_stat: float = get_max()
 		stats_label.text = "Min: %.1f | Avg: %.1f | Max: %.1f" % [min_stat, avg_stat, max_stat]
 		stats_label.position = Vector2(size.x / 2 - 50, size.y - 12)
+	
+	# GUI Performance Fix: Mark as drawn
+	_needs_redraw = false
 
 func _get_auto_max() -> float:
 	"""Calculate maximum value from history with 10% padding."""

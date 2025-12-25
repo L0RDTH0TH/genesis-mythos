@@ -39,6 +39,9 @@ const MIN_BAR_WIDTH: float = 2.0
 ## Current hover position for tooltip
 var _hover_pos: Vector2 = Vector2(-1, -1)
 
+## GUI Performance Fix: Dirty flag for redraw optimization
+var _needs_redraw: bool = true
+
 
 func _ready() -> void:
 	"""Initialize flame graph control with tooltip."""
@@ -81,9 +84,9 @@ func _ready() -> void:
 	# Load max_render_depth from config (with fallback if config not loaded yet)
 	if FlameGraphProfiler and FlameGraphProfiler.config and not FlameGraphProfiler.config.is_empty():
 		max_render_depth = FlameGraphProfiler.config.get("max_render_depth", 30)
-		MythosLogger.debug("FlameGraphControl", "Loaded max_render_depth from config: %d" % max_render_depth)
+		MythosLogger.debug_file_only("FlameGraphControl", "Loaded max_render_depth from config: %d" % max_render_depth)
 	else:
-		MythosLogger.debug("FlameGraphControl", "Using default max_render_depth: %d" % max_render_depth)
+		MythosLogger.debug_file_only("FlameGraphControl", "Using default max_render_depth: %d" % max_render_depth)
 	
 	# Connect to profiler aggregation signal for immediate updates
 	if FlameGraphProfiler and FlameGraphProfiler.has_signal("aggregation_complete"):
@@ -115,18 +118,19 @@ func update_from_profiler() -> void:
 		_total_time_ms = 0.0
 	
 	# Debug logging
-	MythosLogger.debug("FlameGraphControl", "update_from_profiler() called - tree keys: %s, total_time_ms: %.2f" % [
+	MythosLogger.debug_file_only("FlameGraphControl", "update_from_profiler() called - tree keys: %s, total_time_ms: %.2f" % [
 		call_tree.keys() if not call_tree.is_empty() else "empty",
 		_total_time_ms
 	])
 	
-	# Trigger redraw
+	# GUI Performance Fix: Mark as needing redraw
+	_needs_redraw = true
 	queue_redraw()
 
 
 func _on_aggregation_complete(_samples_processed: int) -> void:
 	"""Called immediately when profiler finishes aggregating samples."""
-	MythosLogger.debug("FlameGraphControl", "Aggregation complete - updating from profiler (samples: %d)" % _samples_processed)
+	MythosLogger.debug_file_only("FlameGraphControl", "Aggregation complete - updating from profiler (samples: %d)" % _samples_processed)
 	update_from_profiler()
 
 
@@ -138,7 +142,9 @@ func _gui_input(event: InputEvent) -> void:
 		if _tooltip_node_key != "":
 			_tooltip_visible = true
 			_update_tooltip()
-			queue_redraw()  # Redraw to show hover highlight
+			_needs_redraw = true  # GUI Performance Fix: Mark as needing redraw
+			_needs_redraw = true  # GUI Performance Fix: Mark as needing redraw
+		queue_redraw()  # Redraw to show hover highlight
 		else:
 			_tooltip_visible = false
 			_update_tooltip()
@@ -314,7 +320,13 @@ func _clamp_tooltip_pos(pos: Vector2) -> Vector2:
 
 func _draw() -> void:
 	"""Draw the flame graph with nested rectangles and status feedback."""
-	MythosLogger.debug("FlameGraphControl", "_draw() called - size: %s, call_tree empty: %s, total_time_ms: %.2f" % [
+	# GUI Performance Fix: Only draw if visible and needs redraw
+	if not visible:
+		return
+	if not _needs_redraw:
+		return
+	
+	MythosLogger.debug_file_only("FlameGraphControl", "_draw() called - size: %s, call_tree empty: %s, total_time_ms: %.2f" % [
 		size, call_tree.is_empty(), _total_time_ms
 	])
 	
@@ -347,6 +359,9 @@ func _draw() -> void:
 	# Optional: overlay total time
 	var info_text: String = "Total frame time: %.2f ms" % _total_time_ms
 	draw_string(ThemeDB.fallback_font, Vector2(10, size.y - 10), info_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.8, 0.8, 0.8, 0.8))
+	
+	# GUI Performance Fix: Mark as drawn
+	_needs_redraw = false
 
 
 func _draw_grid() -> void:
@@ -548,5 +563,6 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED:
 		if _tooltip_visible:
 			_update_tooltip()
+		_needs_redraw = true  # GUI Performance Fix: Mark as needing redraw
 		queue_redraw()
 

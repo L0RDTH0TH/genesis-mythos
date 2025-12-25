@@ -34,6 +34,9 @@ var history_full: bool = false
 var _max_primitives_seen: float = 1.0
 var _last_rendered_index: int = -1
 
+## GUI Performance Fix: Dirty flag for redraw optimization
+var _needs_redraw: bool = true
+
 # Tooltip
 @onready var tooltip_panel: Panel = $TooltipPanel
 @onready var tooltip_label: Label = $TooltipPanel/TooltipLabel
@@ -149,8 +152,9 @@ func add_frame_metrics(primary: Dictionary, sub_metrics: Array[Dictionary] = [])
 	
 	# Conditional redraw
 	if history_index != _last_rendered_index:
-		queue_redraw()
 		_last_rendered_index = history_index
+		_needs_redraw = true  # GUI Performance Fix: Mark as needing redraw
+		queue_redraw()
 	
 	# Circular advance
 	history_index = (history_index + 1) % HISTORY_SIZE
@@ -305,6 +309,7 @@ func _gui_input(event: InputEvent) -> void:
 			_tooltip_pos = event.position
 			_tooltip_visible = true
 			_update_tooltip()
+			_needs_redraw = true  # GUI Performance Fix: Mark as needing redraw
 			queue_redraw()  # Redraw to show hover highlight
 	elif event is InputEventMouseButton:
 		if event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -321,10 +326,17 @@ func _notification(what: int) -> void:
 		# Recompute tooltip position if visible
 		if _tooltip_visible:
 			_update_tooltip()
+		_needs_redraw = true  # GUI Performance Fix: Mark as needing redraw
 		queue_redraw()
 
 func _draw() -> void:
 	"""Draw the waterfall view with all lanes and bars."""
+	# GUI Performance Fix: Only draw if visible and needs redraw
+	if not visible:
+		return
+	if not _needs_redraw:
+		return
+	
 	# Background (theme-based parchment)
 	var bg_color: Color = Color(0.1, 0.08, 0.06, 0.9)  # Parchment-like
 	draw_rect(Rect2(Vector2.ZERO, size), bg_color)
@@ -380,6 +392,9 @@ func _draw() -> void:
 			var hover_x: float = lane_rect.position.x + float(hover_frame_idx) * frame_width
 			var hover_rect: Rect2 = Rect2(Vector2(hover_x, lane_rect.position.y), Vector2(frame_width, lane_rect.size.y))
 			draw_rect(hover_rect, Color(1.0, 0.843, 0.0, 0.2))  # Semi-transparent glow
+	
+	# GUI Performance Fix: Mark as drawn
+	_needs_redraw = false
 
 func _draw_grid() -> void:
 	"""Draw grid lines (vertical every 30 frames, reference lines for time lanes)."""
