@@ -143,8 +143,7 @@ func _gui_input(event: InputEvent) -> void:
 			_tooltip_visible = true
 			_update_tooltip()
 			_needs_redraw = true  # GUI Performance Fix: Mark as needing redraw
-			_needs_redraw = true  # GUI Performance Fix: Mark as needing redraw
-		queue_redraw()  # Redraw to show hover highlight
+			queue_redraw()  # Redraw to show hover highlight
 		else:
 			_tooltip_visible = false
 			_update_tooltip()
