@@ -295,8 +295,8 @@ corner_radius_top_left = 8
 corner_radius_top_right = 8
 corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
-shadow_color = Color(1, 0.843137, 0, 0.4)
-shadow_size = 6
+shadow_color = Color(1, 0.843137, 0, 0)
+shadow_size = 0
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_40"]
 bg_color = Color(0.15, 0.09, 0.05, 1)
@@ -309,7 +309,7 @@ corner_radius_top_left = 8
 corner_radius_top_right = 8
 corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
-shadow_size = 4
+shadow_size = 0
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_42"]
 bg_color = Color(0.18, 0.11, 0.06, 1)
@@ -322,7 +322,7 @@ corner_radius_top_left = 8
 corner_radius_top_right = 8
 corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
-shadow_size = 4
+shadow_size = 0
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_43"]
 bg_color = Color(0.15, 0.09, 0.05, 1)
@@ -335,8 +335,8 @@ corner_radius_top_left = 8
 corner_radius_top_right = 8
 corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
-shadow_color = Color(1, 0.843137, 0, 0.6)
-shadow_size = 8
+shadow_color = Color(1, 0.843137, 0, 0)
+shadow_size = 0
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_39"]
 bg_color = Color(0.0392157, 0.0392157, 0.0392157, 1)
@@ -354,8 +354,8 @@ corner_radius_top_left = 8
 corner_radius_top_right = 8
 corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
-shadow_color = Color(1, 0.843137, 0, 0.4)
-shadow_size = 6
+shadow_color = Color(1, 0.843137, 0, 0)
+shadow_size = 0
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_34"]
 bg_color = Color(0.15, 0.09, 0.05, 1)
@@ -368,7 +368,7 @@ corner_radius_top_left = 8
 corner_radius_top_right = 8
 corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
-shadow_size = 4
+shadow_size = 0
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_36"]
 bg_color = Color(0.18, 0.11, 0.06, 1)
@@ -381,7 +381,7 @@ corner_radius_top_left = 8
 corner_radius_top_right = 8
 corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
-shadow_size = 4
+shadow_size = 0
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_37"]
 bg_color = Color(0.15, 0.09, 0.05, 1)
@@ -394,8 +394,8 @@ corner_radius_top_left = 8
 corner_radius_top_right = 8
 corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
-shadow_color = Color(1, 0.843137, 0, 0.6)
-shadow_size = 8
+shadow_color = Color(1, 0.843137, 0, 0)
+shadow_size = 0
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_44"]
 bg_color = Color(0.05, 0.05, 0.1, 0.85)
@@ -444,13 +444,13 @@ Button/styles/tab_pressed = SubResource("StyleBoxFlat_10")
 Button/styles/tab_selected = SubResource("StyleBoxFlat_12")
 ColorRect/colors/bg_dark = Color(0.0588235, 0.0588235, 0.0588235, 1)
 Label/colors/font_color = Color(1, 0.843137, 0, 1)
-Label/colors/font_shadow_color = Color(0, 0, 0, 0.5)
+Label/colors/font_shadow_color = Color(0, 0, 0, 0)
 Label/colors/negative = Color(0.9, 0.3, 0.3, 1)
 Label/colors/negative_modifier = Color(0.9, 0.4, 0.4, 1)
 Label/colors/positive = Color(0.85, 0.7, 0.4, 1)
 Label/colors/positive_modifier = Color(1, 0.843137, 0, 1)
-Label/constants/shadow_offset_x = 2
-Label/constants/shadow_offset_y = 2
+Label/constants/shadow_offset_x = 0
+Label/constants/shadow_offset_y = 0
 Label/font_sizes/font_size = 18
 Label/font_sizes/title_label = 64
 Panel/styles/bg3_description_panel = SubResource("StyleBoxFlat_16")
