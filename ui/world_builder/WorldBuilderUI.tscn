@@ -22,35 +22,55 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.15, 0.12, 0.1, 1)
+mouse_filter = 2
 
-[node name="MainHSplit" type="HSplitContainer" parent="."]
+[node name="MainVBox" type="VBoxContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-split_offset = 220
 size_flags_horizontal = 3
 size_flags_vertical = 3
+theme_override_constants/separation = 0
 
-[node name="LeftPanel" type="VBoxContainer" parent="MainHSplit"]
+[node name="TopBar" type="PanelContainer" parent="MainVBox"]
 layout_mode = 2
-custom_minimum_size = Vector2(220, 0)
 size_flags_horizontal = 3
-size_flags_vertical = 3
+size_flags_vertical = 0
+custom_minimum_size = Vector2(0, 60)
 
-[node name="LeftPanelBg" type="ColorRect" parent="MainHSplit/LeftPanel"]
-layout_mode = 2
+[node name="TopBarContent" type="CenterContainer" parent="MainVBox/TopBar"]
+layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.93, 0.89, 0.78, 0.9)
-mouse_filter = 2
 
-[node name="LeftContent" type="VBoxContainer" parent="MainHSplit/LeftPanel"]
+[node name="TitleLabel" type="Label" parent="MainVBox/TopBar/TopBarContent"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+theme_override_colors/font_color = Color(1, 0.843137, 0, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.5)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+text = "World Builder – Forging the World"
+horizontal_alignment = 1
+
+[node name="MainHSplit" type="HSplitContainer" parent="MainVBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="LeftPanel" type="PanelContainer" parent="MainVBox/MainHSplit"]
+layout_mode = 2
+custom_minimum_size = Vector2(220, 0)
+size_flags_horizontal = 0
+size_flags_vertical = 3
+
+[node name="LeftContent" type="VBoxContainer" parent="MainVBox/MainHSplit/LeftPanel"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -59,94 +79,74 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 10
 
-[node name="TitleLabel" type="Label" parent="MainHSplit/LeftPanel/LeftContent"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 24
-theme_override_colors/font_color = Color(1, 0.843137, 0, 1)
-theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.5)
-theme_override_constants/shadow_offset_x = 2
-theme_override_constants/shadow_offset_y = 2
-text = "World Builder – Forging the World"
-horizontal_alignment = 1
-
-[node name="StepSidebar" type="VBoxContainer" parent="MainHSplit/LeftPanel/LeftContent"]
+[node name="StepSidebar" type="VBoxContainer" parent="MainVBox/MainHSplit/LeftPanel/LeftContent"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants/separation = 5
 
-[node name="Step1Btn" type="Button" parent="MainHSplit/LeftPanel/LeftContent/StepSidebar"]
+[node name="Step1Btn" type="Button" parent="MainVBox/MainHSplit/LeftPanel/LeftContent/StepSidebar"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 40)
 size_flags_horizontal = 3
 text = "1. Map Generation & Editing"
 flat = true
 
-[node name="Step2Btn" type="Button" parent="MainHSplit/LeftPanel/LeftContent/StepSidebar"]
+[node name="Step2Btn" type="Button" parent="MainVBox/MainHSplit/LeftPanel/LeftContent/StepSidebar"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 40)
 size_flags_horizontal = 3
 text = "2. Terrain"
 flat = true
 
-[node name="Step3Btn" type="Button" parent="MainHSplit/LeftPanel/LeftContent/StepSidebar"]
+[node name="Step3Btn" type="Button" parent="MainVBox/MainHSplit/LeftPanel/LeftContent/StepSidebar"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 40)
 size_flags_horizontal = 3
 text = "3. Climate"
 flat = true
 
-[node name="Step4Btn" type="Button" parent="MainHSplit/LeftPanel/LeftContent/StepSidebar"]
+[node name="Step4Btn" type="Button" parent="MainVBox/MainHSplit/LeftPanel/LeftContent/StepSidebar"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 40)
 size_flags_horizontal = 3
 text = "4. Biomes"
 flat = true
 
-[node name="Step5Btn" type="Button" parent="MainHSplit/LeftPanel/LeftContent/StepSidebar"]
+[node name="Step5Btn" type="Button" parent="MainVBox/MainHSplit/LeftPanel/LeftContent/StepSidebar"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 40)
 size_flags_horizontal = 3
 text = "5. Structures & Civilizations"
 flat = true
 
-[node name="Step6Btn" type="Button" parent="MainHSplit/LeftPanel/LeftContent/StepSidebar"]
+[node name="Step6Btn" type="Button" parent="MainVBox/MainHSplit/LeftPanel/LeftContent/StepSidebar"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 40)
 size_flags_horizontal = 3
 text = "6. Environment"
 flat = true
 
-[node name="Step7Btn" type="Button" parent="MainHSplit/LeftPanel/LeftContent/StepSidebar"]
+[node name="Step7Btn" type="Button" parent="MainVBox/MainHSplit/LeftPanel/LeftContent/StepSidebar"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 40)
 size_flags_horizontal = 3
 text = "7. Resources & Magic"
 flat = true
 
-[node name="Step8Btn" type="Button" parent="MainHSplit/LeftPanel/LeftContent/StepSidebar"]
+[node name="Step8Btn" type="Button" parent="MainVBox/MainHSplit/LeftPanel/LeftContent/StepSidebar"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 40)
 size_flags_horizontal = 3
 text = "8. Export"
 flat = true
 
-[node name="CenterPanel" type="PanelContainer" parent="MainHSplit"]
+[node name="CenterPanel" type="PanelContainer" parent="MainVBox/MainHSplit"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="CenterPanelBg" type="ColorRect" parent="MainHSplit/CenterPanel"]
-layout_mode = 2
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-color = Color(0.85, 0.8, 0.75, 1)
-mouse_filter = 2
-
-[node name="CenterContent" type="VBoxContainer" parent="MainHSplit/CenterPanel"]
+[node name="CenterContent" type="Control" parent="MainVBox/MainHSplit/CenterPanel"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -155,169 +155,173 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("3_azgaar")
 
-[node name="AzgaarWebView" type="WebView" parent="MainHSplit/CenterPanel/CenterContent"]
-layout_mode = 2
+[node name="WebViewMargin" type="MarginContainer" parent="MainVBox/MainHSplit/CenterPanel/CenterContent"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="OverlayPlaceholder" type="TextureRect" parent="MainHSplit/CenterPanel/CenterContent"]
+[node name="AzgaarWebView" type="WebView" parent="MainVBox/MainHSplit/CenterPanel/CenterContent/WebViewMargin"]
+layout_mode = 1
+anchors_preset = 15
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 0.0
+offset_bottom = 0.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="OverlayPlaceholder" type="TextureRect" parent="MainVBox/MainHSplit/CenterPanel/CenterContent"]
 visible = false
-layout_mode = 2
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 stretch_mode = 6
 texture = null
 
-[node name="BottomHBox" type="HBoxContainer" parent="MainHSplit/CenterPanel"]
-layout_mode = 1
-anchors_preset = 12
-anchor_left = 0.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 0
-offset_top = -50.0
-custom_minimum_size = Vector2(0, 50)
-size_flags_vertical = 0
-alignment = 1
-theme_override_constants/separation = 20
-
-[node name="BottomBg" type="ColorRect" parent="MainHSplit/CenterPanel/BottomHBox"]
-layout_mode = 2
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-color = Color(0.2, 0.15, 0.1, 0.95)
-mouse_filter = 2
-
-[node name="BottomContent" type="HBoxContainer" parent="MainHSplit/CenterPanel/BottomHBox"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-alignment = 1
-theme_override_constants/separation = 20
-
-[node name="SpacerLeft" type="Control" parent="MainHSplit/CenterPanel/BottomHBox/BottomContent"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-
-[node name="BackBtn" type="Button" parent="MainHSplit/CenterPanel/BottomHBox/BottomContent"]
-layout_mode = 2
-custom_minimum_size = Vector2(120, 0)
-text = "← Back"
-
-[node name="GenBtn" type="Button" parent="MainHSplit/CenterPanel/BottomHBox/BottomContent"]
-layout_mode = 2
-custom_minimum_size = Vector2(250, 0)
-text = "✨ Generate / Apply Changes"
-flat = false
-
-[node name="BakeTo3DBtn" type="Button" parent="MainHSplit/CenterPanel/BottomHBox/BottomContent"]
-layout_mode = 2
-custom_minimum_size = Vector2(180, 0)
-disabled = true
-visible = false
-text = "🎨 Bake to 3D"
-
-[node name="NextBtn" type="Button" parent="MainHSplit/CenterPanel/BottomHBox/BottomContent"]
-layout_mode = 2
-custom_minimum_size = Vector2(120, 0)
-text = "Next →"
-
-[node name="ProgressBar" type="ProgressBar" parent="MainHSplit/CenterPanel/BottomHBox/BottomContent"]
-layout_mode = 2
-custom_minimum_size = Vector2(200, 0)
-size_flags_horizontal = 3
-max_value = 100.0
-visible = false
-
-[node name="StatusLabel" type="Label" parent="MainHSplit/CenterPanel/BottomHBox/BottomContent"]
-layout_mode = 2
-custom_minimum_size = Vector2(150, 0)
-size_flags_horizontal = 1
-text = "Ready"
-horizontal_alignment = 1
-
-[node name="SpacerRight" type="Control" parent="MainHSplit/CenterPanel/BottomHBox/BottomContent"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-
-[node name="RightPanel" type="ScrollContainer" parent="MainHSplit"]
+[node name="RightPanel" type="PanelContainer" parent="MainVBox/MainHSplit"]
 layout_mode = 2
 custom_minimum_size = Vector2(240, 0)
-size_flags_horizontal = 3
+size_flags_horizontal = 0
 size_flags_vertical = 3
 
-[node name="RightPanelBg" type="ColorRect" parent="MainHSplit/RightPanel"]
-layout_mode = 2
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-color = Color(0.93, 0.89, 0.78, 0.9)
-mouse_filter = 2
-
-[node name="RightVBox" type="VBoxContainer" parent="MainHSplit/RightPanel"]
+[node name="RightScroll" type="ScrollContainer" parent="MainVBox/MainHSplit/RightPanel"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="RightVBox" type="VBoxContainer" parent="MainVBox/MainHSplit/RightPanel/RightScroll"]
+layout_mode = 1
+size_flags_horizontal = 3
+size_flags_vertical = 0
 theme_override_constants/separation = 20
 
-[node name="GlobalControls" type="VBoxContainer" parent="MainHSplit/RightPanel/RightVBox"]
+[node name="GlobalControls" type="VBoxContainer" parent="MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox"]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="ArchetypeLabel" type="Label" parent="MainHSplit/RightPanel/RightVBox/GlobalControls"]
+[node name="ArchetypeLabel" type="Label" parent="MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/GlobalControls"]
 layout_mode = 2
 text = "Archetype Preset:"
 
-[node name="ArchetypeOption" type="OptionButton" parent="MainHSplit/RightPanel/RightVBox/GlobalControls"]
+[node name="ArchetypeOption" type="OptionButton" parent="MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/GlobalControls"]
 layout_mode = 2
 selected = 0
 
-[node name="SeedLabel" type="Label" parent="MainHSplit/RightPanel/RightVBox/GlobalControls"]
+[node name="SeedLabel" type="Label" parent="MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/GlobalControls"]
 layout_mode = 2
 text = "Seed:"
 
-[node name="SeedHBox" type="HBoxContainer" parent="MainHSplit/RightPanel/RightVBox/GlobalControls"]
+[node name="SeedHBox" type="HBoxContainer" parent="MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/GlobalControls"]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="SeedSpin" type="SpinBox" parent="MainHSplit/RightPanel/RightVBox/GlobalControls/SeedHBox"]
+[node name="SeedSpin" type="SpinBox" parent="MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/GlobalControls/SeedHBox"]
 layout_mode = 2
 custom_minimum_size = Vector2(200, 0)
 min_value = 0.0
 max_value = 4294967295.0
 value = 12345.0
 
-[node name="RandomizeBtn" type="Button" parent="MainHSplit/RightPanel/RightVBox/GlobalControls/SeedHBox"]
+[node name="RandomizeBtn" type="Button" parent="MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/GlobalControls/SeedHBox"]
 layout_mode = 2
 custom_minimum_size = Vector2(64, 50)
 text = "🎲"
 flat = true
 
-[node name="SectionSep" type="HSeparator" parent="MainHSplit/RightPanel/RightVBox"]
+[node name="SectionSep" type="HSeparator" parent="MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox"]
 layout_mode = 2
 
-[node name="StepTitle" type="Label" parent="MainHSplit/RightPanel/RightVBox"]
+[node name="StepTitle" type="Label" parent="MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 theme_override_colors/font_color = Color(1, 0.843137, 0, 1)
 text = "Step 1: Terrain & Heightmap"
 horizontal_alignment = 1
 
-[node name="ActiveParams" type="VBoxContainer" parent="MainHSplit/RightPanel/RightVBox"]
+[node name="ActiveParams" type="VBoxContainer" parent="MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox"]
 layout_mode = 2
 theme_override_constants/separation = 20
+
+[node name="BottomBar" type="PanelContainer" parent="MainVBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 0
+custom_minimum_size = Vector2(0, 50)
+
+[node name="BottomContent" type="HBoxContainer" parent="MainVBox/BottomBar"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+alignment = 1
+theme_override_constants/separation = 20
+
+[node name="SpacerLeft" type="Control" parent="MainVBox/BottomBar/BottomContent"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="BackBtn" type="Button" parent="MainVBox/BottomBar/BottomContent"]
+layout_mode = 2
+custom_minimum_size = Vector2(120, 0)
+text = "← Back"
+
+[node name="GenBtn" type="Button" parent="MainVBox/BottomBar/BottomContent"]
+layout_mode = 2
+custom_minimum_size = Vector2(250, 0)
+text = "✨ Generate / Apply Changes"
+flat = false
+
+[node name="BakeTo3DBtn" type="Button" parent="MainVBox/BottomBar/BottomContent"]
+layout_mode = 2
+custom_minimum_size = Vector2(180, 0)
+disabled = true
+visible = false
+text = "🎨 Bake to 3D"
+
+[node name="NextBtn" type="Button" parent="MainVBox/BottomBar/BottomContent"]
+layout_mode = 2
+custom_minimum_size = Vector2(120, 0)
+text = "Next →"
+
+[node name="ProgressBar" type="ProgressBar" parent="MainVBox/BottomBar/BottomContent"]
+layout_mode = 2
+custom_minimum_size = Vector2(200, 0)
+size_flags_horizontal = 3
+max_value = 100.0
+visible = false
+
+[node name="StatusLabel" type="Label" parent="MainVBox/BottomBar/BottomContent"]
+layout_mode = 2
+custom_minimum_size = Vector2(150, 0)
+size_flags_horizontal = 1
+text = "Ready"
+horizontal_alignment = 1
+
+[node name="SpacerRight" type="Control" parent="MainVBox/BottomBar/BottomContent"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
