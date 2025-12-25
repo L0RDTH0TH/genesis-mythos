@@ -16,24 +16,29 @@ const TOTAL_STEPS: int = 8
 
 # UI References
 @onready var step_buttons: Array[Button] = []
-@onready var archetype_option: OptionButton = $MainHSplit/RightPanel/RightVBox/GlobalControls/ArchetypeOption
-@onready var seed_spin: SpinBox = $MainHSplit/RightPanel/RightVBox/GlobalControls/SeedHBox/SeedSpin
-@onready var randomize_btn: Button = $MainHSplit/RightPanel/RightVBox/GlobalControls/SeedHBox/RandomizeBtn
-@onready var step_title: Label = $MainHSplit/RightPanel/RightVBox/StepTitle
-@onready var active_params: VBoxContainer = $MainHSplit/RightPanel/RightVBox/ActiveParams
-@onready var back_btn: Button = $MainHSplit/CenterPanel/BottomHBox/BottomContent/BackBtn
-@onready var next_btn: Button = $MainHSplit/CenterPanel/BottomHBox/BottomContent/NextBtn
-@onready var gen_btn: Button = $MainHSplit/CenterPanel/BottomHBox/BottomContent/GenBtn
-@onready var bake_to_3d_btn: Button = $MainHSplit/CenterPanel/BottomHBox/BottomContent/BakeTo3DBtn
-@onready var progress_bar: ProgressBar = $MainHSplit/CenterPanel/BottomHBox/BottomContent/ProgressBar
-@onready var status_label: Label = $MainHSplit/CenterPanel/BottomHBox/BottomContent/StatusLabel
-@onready var azgaar_webview: Node = $MainHSplit/CenterPanel/CenterContent/AzgaarWebView
-@onready var world_builder_azgaar: Node = $MainHSplit/CenterPanel/CenterContent  # WorldBuilderAzgaar script
-@onready var overlay_placeholder: TextureRect = $MainHSplit/CenterPanel/CenterContent/OverlayPlaceholder
+@onready var archetype_option: OptionButton = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/GlobalControls/ArchetypeOption
+@onready var seed_spin: SpinBox = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/GlobalControls/SeedHBox/SeedSpin
+@onready var randomize_btn: Button = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/GlobalControls/SeedHBox/RandomizeBtn
+@onready var step_title: Label = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/StepTitle
+@onready var active_params: VBoxContainer = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/ActiveParams
+@onready var bottom_hbox: HBoxContainer = $MainVBox/BottomBar/BottomContent
+@onready var back_btn: Button = $MainVBox/BottomBar/BottomContent/BackBtn
+@onready var next_btn: Button = $MainVBox/BottomBar/BottomContent/NextBtn
+@onready var gen_btn: Button = $MainVBox/BottomBar/BottomContent/GenBtn
+@onready var bake_to_3d_btn: Button = $MainVBox/BottomBar/BottomContent/BakeTo3DBtn
+@onready var progress_bar: ProgressBar = $MainVBox/BottomBar/BottomContent/ProgressBar
+@onready var status_label: Label = $MainVBox/BottomBar/BottomContent/StatusLabel
+@onready var webview_margin: MarginContainer = $MainVBox/MainHSplit/CenterPanel/CenterContent/WebViewMargin
+@onready var azgaar_webview: Node = $MainVBox/MainHSplit/CenterPanel/CenterContent/WebViewMargin/AzgaarWebView
+@onready var world_builder_azgaar: Node = $MainVBox/MainHSplit/CenterPanel/CenterContent  # WorldBuilderAzgaar script
+@onready var overlay_placeholder: TextureRect = $MainVBox/MainHSplit/CenterPanel/CenterContent/OverlayPlaceholder
 
 var current_params: Dictionary = {}
 var gen_timer: float = 0.0
 var gen_elapsed_time: float = 0.0
+
+# GUI Performance Fix: Throttle resize updates
+var _resize_pending: bool = false
 
 # Archetype presets
 const ARCHETYPES: Dictionary = {
@@ -65,7 +70,7 @@ func _ready() -> void:
 		archetype_option.add_item(archetype_name)
 	
 	# Collect step buttons and connect signals
-	var step_sidebar: VBoxContainer = $MainHSplit/LeftPanel/LeftContent/StepSidebar
+	var step_sidebar: VBoxContainer = $MainVBox/MainHSplit/LeftPanel/LeftContent/StepSidebar
 	for i in range(TOTAL_STEPS):
 		var btn: Button = step_sidebar.get_child(i) as Button
 		if btn:
@@ -88,29 +93,44 @@ func _ready() -> void:
 	# Initialize Azgaar with default map
 	_initialize_azgaar_default()
 	
-	set_process(false)
+	# Apply responsive layout on initial load
+	call_deferred("_update_responsive_layout")
+	
+	# GUI Performance Fix: Add temporary FPS counter for verification
+	var fps_label := Label.new()
+	fps_label.name = "TempFPSLabel"
+	fps_label.position = Vector2(10, 10)
+	fps_label.add_theme_font_size_override("font_size", 24)
+	fps_label.add_theme_color_override("font_color", Color(1, 1, 0))
+	add_child(fps_label)
+	
+	# GUI Performance Fix: Enable _process for FPS counter (generation logic only runs when gen_timer > 0)
+	set_process(true)
 
 
 func _apply_ui_constants() -> void:
 	"""Apply UIConstants to UI elements for responsive sizing."""
 	# Left panel
-	var left_panel: VBoxContainer = $MainHSplit/LeftPanel
+	var left_panel: PanelContainer = $MainVBox/MainHSplit/LeftPanel
 	left_panel.custom_minimum_size = Vector2(UIConstants.LEFT_PANEL_WIDTH, 0)
 	
 	# Step buttons
-	var step_sidebar: VBoxContainer = $MainHSplit/LeftPanel/LeftContent/StepSidebar
+	var step_sidebar: VBoxContainer = $MainVBox/MainHSplit/LeftPanel/LeftContent/StepSidebar
 	for btn in step_sidebar.get_children():
 		if btn is Button:
 			btn.custom_minimum_size = Vector2(0, UIConstants.STEP_BUTTON_HEIGHT)
 	
 	# Right panel
-	var right_panel: ScrollContainer = $MainHSplit/RightPanel
+	var right_panel: PanelContainer = $MainVBox/MainHSplit/RightPanel
 	right_panel.custom_minimum_size = Vector2(UIConstants.RIGHT_PANEL_WIDTH, 0)
 	
-	# Bottom bar
-	var bottom_hbox: HBoxContainer = $MainHSplit/CenterPanel/BottomHBox
-	bottom_hbox.custom_minimum_size = Vector2(0, UIConstants.BOTTOM_BAR_HEIGHT)
-	bottom_hbox.offset_top = -UIConstants.BOTTOM_BAR_HEIGHT
+	# Bottom bar (now in MainVBox)
+	var bottom_bar: PanelContainer = $MainVBox/BottomBar
+	bottom_bar.custom_minimum_size = Vector2(0, UIConstants.BOTTOM_BAR_HEIGHT)
+	
+	# WebView margin for bottom bar space (reserve space for bottom overlay bar)
+	if webview_margin:
+		webview_margin.add_theme_constant_override("margin_bottom", UIConstants.BOTTOM_BAR_HEIGHT)
 	
 	# Buttons
 	back_btn.custom_minimum_size = Vector2(UIConstants.BUTTON_WIDTH_SMALL, 0)
@@ -127,26 +147,32 @@ func _apply_ui_constants() -> void:
 	status_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_STANDARD, 0)
 	
 	# Set initial split offset
-	var main_hsplit: HSplitContainer = $MainHSplit
+	var main_hsplit: HSplitContainer = $MainVBox/MainHSplit
 	main_hsplit.split_offset = UIConstants.LEFT_PANEL_WIDTH
 
 
 func _notification(what: int) -> void:
 	"""Handle window resize for responsive layout."""
 	if what == NOTIFICATION_RESIZED:
-		_update_responsive_layout()
+		# GUI Performance Fix: Throttle resize updates with deferred batching
+		if not _resize_pending:
+			_resize_pending = true
+			call_deferred("_update_responsive_layout")
 
 
 func _update_responsive_layout() -> void:
 	"""Update layout based on viewport size."""
+	# GUI Performance Fix: Reset resize pending flag
+	_resize_pending = false
+	
 	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
 	if viewport_size.x <= 0 or viewport_size.y <= 0:
 		return
 	
 	# Calculate panel widths as percentages, clamped to min/max
-	var left_panel: VBoxContainer = $MainHSplit/LeftPanel
-	var right_panel: ScrollContainer = $MainHSplit/RightPanel
-	var main_hsplit: HSplitContainer = $MainHSplit
+	var left_panel: PanelContainer = $MainVBox/MainHSplit/LeftPanel
+	var right_panel: PanelContainer = $MainVBox/MainHSplit/RightPanel
+	var main_hsplit: HSplitContainer = $MainVBox/MainHSplit
 	
 	# Left panel: 15-20% of width, clamped
 	var left_width_percent: float = 0.175  # 17.5% default
@@ -456,26 +482,34 @@ func _generate_azgaar() -> void:
 	_update_status("Generating map...", 40)
 	gen_timer = 0.0
 	gen_elapsed_time = 0.0
-	set_process(true)
+	# Note: _process is already enabled for FPS counter, no need to enable again
 
 
 func _process(delta: float) -> void:
 	"""Process generation status updates (fallback polling if signals don't work)."""
-	gen_elapsed_time += delta
-	gen_timer += delta
+	# GUI Performance Fix: Update temporary FPS counter (always runs)
+	var fps_label: Label = get_node_or_null("TempFPSLabel")
+	if fps_label:
+		fps_label.text = "FPS: %.1f" % Engine.get_frames_per_second()
 	
-	# Check timeout first (increased to 60s to match timeout timer)
-	if gen_elapsed_time > 60.0:
-		_update_status("Timeout - reduce points?", 0)
-		set_process(false)
-		return
-	
-	# Poll every 2 seconds for completion (reduced frequency)
-	if gen_timer > 2.0:
-		gen_timer = 0.0
-		# Update progress based on elapsed time
-		var progress = min(40 + (gen_elapsed_time / 60.0 * 40.0), 80.0)
-		_update_status("Generating map... (%d%%)" % int(progress), progress)
+	# Generation logic only runs when generation is active (gen_timer > 0)
+	if gen_timer > 0.0:
+		gen_elapsed_time += delta
+		gen_timer += delta
+		
+		# Check timeout first (increased to 60s to match timeout timer)
+		if gen_elapsed_time > 60.0:
+			_update_status("Timeout - reduce points?", 0)
+			gen_timer = 0.0
+			gen_elapsed_time = 0.0
+			return
+		
+		# Poll every 2 seconds for completion (reduced frequency)
+		if gen_timer > 2.0:
+			gen_timer = 0.0
+			# Update progress based on elapsed time
+			var progress = min(40 + (gen_elapsed_time / 60.0 * 40.0), 80.0)
+			_update_status("Generating map... (%d%%)" % int(progress), progress)
 
 
 func _bake_to_3d() -> void:

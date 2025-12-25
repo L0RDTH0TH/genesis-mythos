@@ -319,7 +319,7 @@ func set_mode(new_mode: Mode) -> void:
 			if FlameGraphProfiler and FlameGraphProfiler.is_profiling_enabled:
 				FlameGraphProfiler.stop_profiling()
 			_update_flame_status_label(false)
-			set_process(false)
+			set_process(false)  # GUI Performance Fix: Disable _process when OFF
 		Mode.SIMPLE:
 			MythosLogger.debug("PerformanceMonitor", "Setting SIMPLE mode - showing FPS only")
 			if perf_panel:
@@ -334,7 +334,7 @@ func set_mode(new_mode: Mode) -> void:
 			if FlameGraphProfiler and FlameGraphProfiler.is_profiling_enabled:
 				FlameGraphProfiler.stop_profiling()
 			_update_flame_status_label(false)
-			set_process(true)
+			set_process(true and visible)  # GUI Performance Fix: Only enable if visible
 		Mode.DETAILED:
 			MythosLogger.debug("PerformanceMonitor", "Setting DETAILED mode - showing all metrics and graphs")
 			if perf_panel:
@@ -358,7 +358,7 @@ func set_mode(new_mode: Mode) -> void:
 			if FlameGraphProfiler and FlameGraphProfiler.is_profiling_enabled:
 				FlameGraphProfiler.stop_profiling()
 			_update_flame_status_label(false)
-			set_process(true)
+			set_process(true and visible)  # GUI Performance Fix: Only enable if visible
 		Mode.FLAME:
 			MythosLogger.debug("PerformanceMonitor", "Setting FLAME mode - showing all metrics, graphs, and flame profiling")
 			if perf_panel:
@@ -379,13 +379,17 @@ func set_mode(new_mode: Mode) -> void:
 			if FlameGraphProfiler:
 				FlameGraphProfiler.start_profiling()
 			_update_flame_status_label(true)
-			set_process(true)
+			set_process(true and visible)  # GUI Performance Fix: Only enable if visible
 	
 	MythosLogger.debug("PerformanceMonitor", "Mode set complete - perf_panel exists: %s, visible: %s" % [perf_panel != null, perf_panel.visible if perf_panel else "N/A"])
 	_save_mode()
 
 func _process(_delta: float) -> void:
 	"""Update performance metrics each frame. DiagnosticDispatcher: drains queue first, then metrics, then existing logic."""
+	# GUI Performance Fix: Only process if overlay is visible and mode is not OFF
+	if not visible or current_mode == Mode.OFF:
+		return
+	
 	_frame_count += 1
 	
 	# FIRST: Drain diagnostic queue completely (thread-safe log/UI updates)
