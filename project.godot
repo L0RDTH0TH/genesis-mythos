@@ -27,6 +27,7 @@ PerformanceMonitorSingleton="*res://core/singletons/PerformanceMonitorSingleton.
 PerformanceLogger="*res://core/singletons/PerformanceLogger.gd"
 FlameGraphProfiler="*res://core/singletons/FlameGraphProfiler.gd"
 AzgaarIntegrator="*res://scripts/managers/AzgaarIntegrator.gd"
+AzgaarServer="*res://scripts/managers/AzgaarServer.gd"
 
 [debug]
 
@@ -36,6 +37,8 @@ settings/show_collision_shapes=false
 settings/show_navigation=false
 settings/show_paths=false
 settings/show_visibility_rects=false
+settings/profiler/enabled=true
+settings/profiler/max_functions=1000
 
 [display]
 
@@ -47,6 +50,7 @@ window/stretch/mode="viewport"
 window/stretch/aspect="expand"
 window/size/initial_size=1280
 x720window/size/windowed_scale=0.75
+window/vsync/vsync_mode=0
 
 [editor_plugins]
 

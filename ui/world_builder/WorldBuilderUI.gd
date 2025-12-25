@@ -28,8 +28,11 @@ const TOTAL_STEPS: int = 8
 @onready var bake_to_3d_btn: Button = $MainVBox/BottomBar/BottomContent/BakeTo3DBtn
 @onready var progress_bar: ProgressBar = $MainVBox/BottomBar/BottomContent/ProgressBar
 @onready var status_label: Label = $MainVBox/BottomBar/BottomContent/StatusLabel
-@onready var webview_margin: MarginContainer = $MainVBox/MainHSplit/CenterPanel/CenterContent/WebViewMargin
-@onready var azgaar_webview: Node = $MainVBox/MainHSplit/CenterPanel/CenterContent/WebViewMargin/AzgaarWebView
+# DIAGNOSTIC: WebView nodes temporarily removed to test presentation throttling
+# @onready var webview_margin: MarginContainer = $MainVBox/MainHSplit/CenterPanel/CenterContent/WebViewMargin
+# @onready var azgaar_webview: Node = $MainVBox/MainHSplit/CenterPanel/CenterContent/WebViewMargin/AzgaarWebView
+var webview_margin: MarginContainer = null
+var azgaar_webview: Node = null
 @onready var world_builder_azgaar: Node = $MainVBox/MainHSplit/CenterPanel/CenterContent  # WorldBuilderAzgaar script
 @onready var overlay_placeholder: TextureRect = $MainVBox/MainHSplit/CenterPanel/CenterContent/OverlayPlaceholder
 
