@@ -492,7 +492,6 @@ func _update_row_visibility() -> void:
 	var visible_bottom: float = scroll_offset + visible_height + padding
 	
 	# Update each visible row
-	var active_count: int = 0
 	for row in parameter_row_pool:
 		if not row.visible:
 			row.set_active(false)
@@ -511,11 +510,9 @@ func _update_row_visibility() -> void:
 		var row_bottom: float = row_pos.y + row_size.y
 		
 		# Check if row is in visible range (intersects with visible area)
-		var is_visible: bool = (row_bottom >= visible_top and row_top <= visible_bottom)
+		var row_in_view: bool = (row_bottom >= visible_top and row_top <= visible_bottom)
 		
-		row.set_active(is_visible)
-		if is_visible:
-			active_count += 1
+		row.set_active(row_in_view)
 
 
 func _on_parameter_changed(azgaar_key: String, value: Variant) -> void:
