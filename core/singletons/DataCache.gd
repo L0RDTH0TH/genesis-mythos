@@ -6,8 +6,6 @@
 
 extends Node
 
-class_name DataCache
-
 var _json_cache: Dictionary = {}
 
 ## Returns parsed JSON data for the given path. Caches result on first load.
