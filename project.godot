@@ -8,13 +8,17 @@
 
 config_version=5
 
+[animation]
+
+compatibility/default_parent_skeleton_in_mesh_instance_3d=true
+
 [application]
 
 config/name="Eryndor 4.0 Final"
 config/version="1.0.0"
 run/main_scene="res://scenes/MainMenu.tscn"
 config/use_hidden_project_data_directory=false
-config/features=PackedStringArray("4.5", "Forward Plus")
+config/features=PackedStringArray("4.6", "Forward Plus")
 run/max_fps=65
 run/low_processor_mode=true
 
@@ -31,6 +35,7 @@ FlameGraphProfiler="*res://core/singletons/FlameGraphProfiler.gd"
 AzgaarIntegrator="*res://scripts/managers/AzgaarIntegrator.gd"
 AzgaarServer="*res://scripts/managers/AzgaarServer.gd"
 LoadingOverlay="*res://core/singletons/LoadingOverlay.gd"
+DataCache="*res://core/singletons/DataCache.gd"
 
 [debug]
 

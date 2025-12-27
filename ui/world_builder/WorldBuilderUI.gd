@@ -230,27 +230,20 @@ func _update_responsive_layout() -> void:
 
 func _load_step_definitions() -> void:
 	"""Load step definitions from JSON file."""
-	var file: FileAccess = FileAccess.open(STEP_PARAMETERS_PATH, FileAccess.READ)
-	if not file:
+	var data: Variant = DataCache.get_json_data(STEP_PARAMETERS_PATH)
+	if data == null:
 		MythosLogger.error("UI/WorldBuilder", "Failed to load step parameters", {"path": STEP_PARAMETERS_PATH})
 		# Fallback to empty definitions
 		for i in range(TOTAL_STEPS):
 			STEP_DEFINITIONS[i] = {"title": "Step %d" % (i + 1), "params": []}
 		return
 	
-	var json_string: String = file.get_as_text()
-	file.close()
-	
-	var json: JSON = JSON.new()
-	var parse_result: Error = json.parse(json_string)
-	if parse_result != OK:
-		MythosLogger.error("UI/WorldBuilder", "Failed to parse step parameters JSON", {"error": parse_result})
+	if not data is Dictionary:
+		MythosLogger.error("UI/WorldBuilder", "Step parameters JSON is not a Dictionary", {"path": STEP_PARAMETERS_PATH})
 		# Fallback to empty definitions
 		for i in range(TOTAL_STEPS):
 			STEP_DEFINITIONS[i] = {"title": "Step %d" % (i + 1), "params": []}
 		return
-	
-	var data: Dictionary = json.data
 	if not data.has("steps") or not data.steps is Array:
 		MythosLogger.error("UI/WorldBuilder", "Invalid step parameters JSON structure")
 		return

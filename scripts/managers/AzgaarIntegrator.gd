@@ -15,6 +15,21 @@ func _ready() -> void:
 
 func copy_azgaar_to_user() -> void:
 	"""Copy Azgaar bundled files to user://azgaar/ for writability."""
+	# Check if destination exists and is up-to-date
+	var source_index_path: String = AZGAAR_BUNDLE_PATH.path_join("index.html")
+	var dest_index_path: String = AZGAAR_USER_PATH.path_join("index.html")
+	
+	if FileAccess.file_exists(dest_index_path):
+		# Compare modification times
+		var source_time: int = FileAccess.get_modified_time(source_index_path)
+		var dest_time: int = FileAccess.get_modified_time(dest_index_path)
+		
+		if dest_time >= source_time:
+			# Destination is up-to-date, skip copy
+			MythosLogger.debug("AzgaarIntegrator", "Azgaar files are up-to-date, skipping copy")
+			return
+	
+	# Files need to be copied (missing or outdated)
 	var source_dir := DirAccess.open(AZGAAR_BUNDLE_PATH)
 	if not source_dir:
 		push_error("Failed to open Azgaar bundle path: " + AZGAAR_BUNDLE_PATH)
@@ -39,7 +54,7 @@ func copy_azgaar_to_user() -> void:
 		return
 	
 	_copy_directory_recursive(source_dir, target_dir, AZGAAR_BUNDLE_PATH, "user://azgaar/")
-	print("Azgaar bundled files copied to user://azgaar/ for writability")
+	MythosLogger.info("AzgaarIntegrator", "Azgaar bundled files copied to user://azgaar/ for writability")
 
 func _copy_directory_recursive(source_dir: DirAccess, target_dir: DirAccess, source_path: String, target_path: String) -> void:
 	"""Recursively copy directory contents."""
