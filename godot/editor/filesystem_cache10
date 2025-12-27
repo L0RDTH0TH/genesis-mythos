@@ -1,11 +1,11 @@
 72322a848ab928aa5c89f0cb78209805
-::res://::1766857133
+::res://::1766860567
 Fantasy archetypes _251206_024005.txt::TextFile::-1::1765006861::0::1::::<><><>0<>0<><>::
 flame_graph_freeze_audit.md::TextFile::-1::1766297260::0::1::::<><><>0<>0<><>::
 FORENSIC_DEBUG_SCRIPT.txt::TextFile::-1::1764612538::0::1::::<><><>0<>0<><>::
 icon.png::CompressedTexture2D::557325075131260776::1743421832::1765424551::1::::<><><>0<>0<>d64e49bb3c5547d967251bf56759ba11<>res://godot/imported/icon.png-487276ed1e3a0c39cad0279d744ee560.bptc.ctex<*>res://godot/imported/icon.png-487276ed1e3a0c39cad0279d744ee560.astc.ctex::
 README.md::TextFile::-1::1766209791::0::1::::<><><>0<>0<><>::
-system_specs.md::TextFile::-1::1766818403::0::1::::<><><>0<>0<><>::
+system_specs.md::TextFile::-1::1766858616::0::1::::<><><>0<>0<><>::
 test_scrollcontainer_bug.tscn::PackedScene::-1::1764567677::0::1::::<><><>0<>0<><>::
 theme.res::Theme::4225037749892648109::1766785082::0::1::::<><><>0<>0<><>::
 ::res://addons/::1766554787
@@ -631,7 +631,7 @@ parchment_stain_overlay.png::CompressedTexture2D::7820103648329580427::161110828
 ::res://assets/themes/::1764867475
 dark_fantasy_theme.tres::Theme::-1::1764867830::0::1::::<><><>0<>0<><>::
 ::res://assets/ui/::1765173111
-::res://audit/::1766856815
+::res://audit/::1766858756
 ABILITY_SCORE_PREVIEW_ANALYSIS.md::TextFile::-1::1765229909::0::1::::<><><>0<>0<><>::
 audit-ability-score-tab-logging.md::TextFile::-1::1765229909::0::1::::<><><>0<>0<><>::
 audit_report.md::TextFile::-1::1764979789::0::1::::<><><>0<>0<><>::
@@ -672,6 +672,7 @@ LATEST_LOG_ANALYSIS.md::TextFile::-1::1765592848::0::1::::<><><>0<>0<><>::
 LAYOUT_ANALYSIS.md::TextFile::-1::1764605661::0::1::::<><><>0<>0<><>::
 LAYOUT_INSPECTION_REPORT.md::TextFile::-1::1765229909::0::1::::<><><>0<>0<><>::
 LAYOUT_INVESTIGATION_SUMMARY.md::TextFile::-1::1764605661::0::1::::<><><>0<>0<><>::
+load_time_audit.md::TextFile::-1::1766858784::0::1::::<><><>0<>0<><>::
 LOG_ANALYSIS_MAP_PREVIEW.md::TextFile::-1::1765592581::0::1::::<><><>0<>0<><>::
 map_maker_audit_2025-12-25.md::TextFile::-1::1766640988::0::1::::<><><>0<>0<><>::
 MAP_PREVIEW_RESIZE_INVESTIGATION.md::TextFile::-1::1765592016::0::1::::<><><>0<>0<><>::
@@ -743,9 +744,10 @@ world_root.tscn::PackedScene::-1::1766109679::0::1::::<><><>0<>0<><>::res://asse
 ::res://core/sim/::1765663507
 entity_sim.gd::GDScript::6235923763481011544::1765666461::0::1::::<>Node<><>0<>0<><>::
 faction_economy.gd::GDScript::6046487480137432325::1765666462::0::1::::<>Node<><>0<>0<><>::
-::res://core/singletons/::1766790698
+::res://core/singletons/::1766858887
 eryndor.gd::GDScript::1432957162486994240::1766004506::0::1::::<>Node<><>0<>0<><>::
 FlameGraphProfiler.gd::GDScript::2193217037716338699::1766799561::0::1::::<>Node<><>0<>0<><>::
+LoadingOverlay.gd::GDScript::4819698228358251::1766858935::0::1::::<>Node<><>0<>0<><>::
 Logger.gd::GDScript::6214699523481349061::1766558384::0::1::::<>Node<><>0<>0<><>::
 PerformanceLogger.gd::GDScript::2556307135869307221::1766799561::0::1::::<>Node<><>0<>0<><>::
 PerformanceMonitorSingleton.gd::GDScript::7625570755706766893::1766799561::0::1::::<>Node<><>0<>0<><>::
@@ -963,8 +965,9 @@ BackgroundTab.tscn::PackedScene::-1::1766004827::0::1::::<><><>0<>0<><>::res://s
 ClassTab.tscn::PackedScene::-1::1766004827::0::1::::<><><>0<>0<><>::res://scripts/character_creation/tabs/ClassTab.gd<>uid://dpiqolc47bhf4::::res://themes/bg3_theme.tres
 NameConfirmTab.tscn::PackedScene::-1::1766004827::0::1::::<><><>0<>0<><>::res://scripts/character_creation/tabs/NameConfirmTab.gd<>uid://dpiqolc47bhf4::::res://themes/bg3_theme.tres
 RaceTab.tscn::PackedScene::-1::1766004827::0::1::::<><><>0<>0<><>::res://scripts/character_creation/tabs/RaceTab.gd<>uid://dpiqolc47bhf4::::res://themes/bg3_theme.tres
-::res://scenes/ui/::1766856805
+::res://scenes/ui/::1766858899
 DebugOverlay.tscn::PackedScene::-1::1766082153::0::1::::<><><>0<>0<><>::
+LoadingOverlay.tscn::PackedScene::-1::1766858935::0::1::::<><><>0<>0<><>::res://scripts/ui/LoadingOverlay.gd<>uid://dpiqolc47bhf4::::res://themes/bg3_theme.tres
 progress_dialog.tscn::PackedScene::-1::1765958690::0::1::::<><><>0<>0<><>::res://themes/bg3_theme.tres<>res://scripts/ui/progress_dialog.gd
 ::res://scenes/ui/components/::1764783572
 SkyrimSlider.tscn::PackedScene::-1::1764786250::0::1::::<><><>0<>0<><>::res://scripts/ui/components/SkyrimSlider.gd
@@ -997,7 +1000,8 @@ AzgaarServer.gd::GDScript::1394242482151490158::1766856800::0::1::::<>Node<><>0<
 ::res://scripts/preview/::1765663509
 PreviewManager.gd::GDScript::1161500945953968570::1765070942::0::1::::PreviewManager<>Node<><>0<>0<><>::
 ::res://scripts/singletons/::1765327687
-::res://scripts/ui/::1766856914
+::res://scripts/ui/::1766858883
+LoadingOverlay.gd::GDScript::8842896136816418905::1766858935::0::1::::LoadingOverlay<>Control<><>0<>0<><>::
 progress_dialog.gd::GDScript::2565764471291712936::1766012913::0::1::::<>Window<><>0<>0<><>::
 UIConstants.gd::GDScript::6503700145817242455::1766612897::0::1::::UIConstants<>RefCounted<><>0<>0<><>::
 WorldBuilderAzgaar.gd::GDScript::4113175012340539943::1766821515::0::1::::<>Control<><>0<>0<><>::
@@ -1642,7 +1646,7 @@ AbilityScoreRow.tscn::PackedScene::-1::1765958690::0::1::::<><><>0<>0<><>::res:/
 ParameterRow.gd::GDScript::7450295581090046616::1766807255::0::1::::ParameterRow<>HBoxContainer<><>0<>0<><>::
 ParameterRow.tscn::PackedScene::-1::1766796522::0::1::::<><><>0<>0<><>::res://ui/components/ParameterRow.gd<>res://themes/bg3_theme.tres
 ::res://ui/main_menu/::1766030451
-main_menu_controller.gd::GDScript::8536344055793938363::1766796523::0::1::::MainMenuController<>Control<><>0<>0<><>::
+main_menu_controller.gd::GDScript::8536344055793938363::1766858935::0::1::::MainMenuController<>Control<><>0<>0<><>::
 ::res://ui/theme/::1764874104
 global_theme.tres::Theme::-1::1764874104::0::1::::<><><>0<>0<><>::
 ::res://ui/world_builder/::1766856807

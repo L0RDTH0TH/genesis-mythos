@@ -4,7 +4,7 @@
 # ║ Author: Lordthoth
 # ╚═══════════════════════════════════════════════════════════
 
-class_name LoadingOverlay
+class_name LoadingOverlayUI
 extends Control
 
 ## Status label showing current loading message
@@ -45,4 +45,3 @@ func hide_loading() -> void:
 	"""Hide loading overlay."""
 	visible = false
 	MythosLogger.debug("UI/LoadingOverlay", "Loading overlay hidden")
-

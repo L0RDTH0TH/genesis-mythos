@@ -85,7 +85,11 @@ func _ready() -> void:
 	# Terrain3D initialization is now deferred - Terrain3DManager only loads config in _ready().
 	# Terrain3D will be created and configured only when "Bake to 3D" button is clicked in WorldBuilderUI.
 	# This improves performance by avoiding unnecessary Terrain3D setup until user actually needs 3D terrain.
-	_setup_world_builder_ui()
+	
+	# Update progress and setup UI asynchronously
+	LoadingOverlay.update_progress("Setting up World Builder UI...", 40.0)
+	await get_tree().process_frame
+	await _setup_world_builder_ui_async()
 	MythosLogger.info("World", "Setup complete - splash removed, terrain visible, UI added")
 
 
@@ -99,20 +103,31 @@ func regenerate_world() -> void:
 		MythosLogger.warn("World", "Cannot regenerate world - terrain_manager missing or invalid")
 
 
-func _setup_world_builder_ui() -> void:
-	"""Setup and display the world builder UI overlay."""
-	MythosLogger.verbose("World", "_setup_world_builder_ui() called")
+func _setup_world_builder_ui_async() -> void:
+	"""Setup and display the world builder UI overlay asynchronously with progress updates."""
+	MythosLogger.verbose("World", "_setup_world_builder_ui_async() called")
 	MythosLogger.debug("World", "Setting up WorldBuilderUI...")
 	
-	# Load and instance WorldBuilderUI scene
+	# Update progress: Loading UI scene
+	LoadingOverlay.update_progress("Loading UI scene...", 45.0)
+	await get_tree().process_frame
+	
+	# Load WorldBuilderUI scene
 	var ui_scene: PackedScene = load("res://ui/world_builder/WorldBuilderUI.tscn")
 	if ui_scene == null:
 		MythosLogger.error("World", "Failed to load WorldBuilderUI scene")
+		LoadingOverlay.hide_loading()
 		return
 	
+	# Update progress: Instantiating UI
+	LoadingOverlay.update_progress("Instantiating UI...", 55.0)
+	await get_tree().process_frame
+	
+	# Instantiate WorldBuilderUI
 	world_builder_ui = ui_scene.instantiate()
 	if world_builder_ui == null:
 		MythosLogger.error("World", "Failed to instantiate WorldBuilderUI")
+		LoadingOverlay.hide_loading()
 		return
 	
 	MythosLogger.info("World", "WorldBuilderUI instantiated successfully")
@@ -120,7 +135,24 @@ func _setup_world_builder_ui() -> void:
 	# Verify it's the correct type
 	if not world_builder_ui.has_method("set_terrain_manager"):
 		MythosLogger.error("World", "Instantiated node is not WorldBuilderUI")
+		LoadingOverlay.hide_loading()
 		return
+	
+	# Update progress: Applying theme
+	LoadingOverlay.update_progress("Applying theme...", 60.0)
+	await get_tree().process_frame
+	
+	# Apply project theme (preload for better performance)
+	var theme: Theme = preload("res://themes/bg3_theme.tres")
+	if theme != null:
+		world_builder_ui.theme = theme
+		MythosLogger.debug("World", "Theme applied to WorldBuilderUI")
+	else:
+		MythosLogger.warn("World", "Failed to load bg3_theme.tres")
+	
+	# Update progress: Adding to CanvasLayer
+	LoadingOverlay.update_progress("Adding to CanvasLayer...", 65.0)
+	await get_tree().process_frame
 	
 	# Add UI to scene tree as a CanvasLayer child for proper overlay
 	var canvas_layer: CanvasLayer = CanvasLayer.new()
@@ -131,13 +163,9 @@ func _setup_world_builder_ui() -> void:
 	
 	MythosLogger.debug("World", "WorldBuilderUI added to scene tree")
 	
-	# Apply project theme
-	var theme: Theme = load("res://themes/bg3_theme.tres")
-	if theme != null:
-		world_builder_ui.theme = theme
-		MythosLogger.debug("World", "Theme applied to WorldBuilderUI")
-	else:
-		MythosLogger.warn("World", "Failed to load bg3_theme.tres")
+	# Update progress: Finalizing
+	LoadingOverlay.update_progress("Finalizing...", 70.0)
+	await get_tree().process_frame
 	
 	# Connect UI to terrain manager
 	if terrain_manager:
@@ -157,3 +185,6 @@ func _setup_world_builder_ui() -> void:
 		"size": world_builder_ui.size,
 		"position": world_builder_ui.position
 	})
+	
+	# Hide loading overlay - setup complete
+	LoadingOverlay.hide_loading()

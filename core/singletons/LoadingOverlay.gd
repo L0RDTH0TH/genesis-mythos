@@ -7,7 +7,7 @@
 extends Node
 
 ## Reference to the instantiated overlay instance
-var overlay_instance: LoadingOverlay = null
+var overlay_instance: LoadingOverlayUI = null
 
 
 func show_loading(text: String = "Loading...", progress: float = 0.0) -> void:

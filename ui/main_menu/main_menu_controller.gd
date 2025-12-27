@@ -73,15 +73,66 @@ func _on_create_character_pressed() -> void:
 	get_tree().change_scene_to_file(CHARACTER_CREATION_SCENE)
 
 func _on_create_world_pressed() -> void:
-	"""Transition to world builder with loading overlay."""
+	"""Transition to world builder with async loading and progress updates."""
 	# Show loading overlay immediately for instant visual feedback
-	LoadingOverlay.show_loading("Entering World Builder...", 0.0)
+	LoadingOverlay.show_loading("Loading World Builder...", 0.0)
 	
 	# Critical: yield to ensure overlay draws before any blocking work
 	await get_tree().process_frame
 	
-	# Transition to world scene (UI still works, just generation is disabled)
-	get_tree().change_scene_to_file(WORLD_CREATION_SCENE)
+	# Start threaded scene loading
+	ResourceLoader.load_threaded_request(WORLD_CREATION_SCENE)
+	
+	# Poll for load completion with progress updates
+	var load_stage: int = 0
+	var total_stages: int = 10  # Estimate: 10 stages for loading
+	
+	while true:
+		var load_status: ResourceLoader.ThreadLoadStatus = ResourceLoader.load_threaded_get_status(WORLD_CREATION_SCENE)
+		
+		match load_status:
+			ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+				# Update progress: 0-30% during scene loading
+				load_stage += 1
+				var progress: float = min((float(load_stage) / float(total_stages)) * 30.0, 30.0)
+				LoadingOverlay.update_progress("Loading World Builder...", progress)
+				await get_tree().process_frame
+			
+			ResourceLoader.THREAD_LOAD_LOADED:
+				# Scene loaded successfully
+				LoadingOverlay.update_progress("Initializing world...", 30.0)
+				await get_tree().process_frame
+				
+				# Get the loaded scene
+				var packed_scene: PackedScene = ResourceLoader.load_threaded_get(WORLD_CREATION_SCENE)
+				if packed_scene == null:
+					MythosLogger.error("MainMenuController", "Failed to get loaded scene")
+					LoadingOverlay.hide_loading()
+					return
+				
+				# Change to loaded scene
+				get_tree().change_scene_to_packed(packed_scene)
+				break
+			
+			ResourceLoader.THREAD_LOAD_FAILED:
+				# Loading failed
+				MythosLogger.error("MainMenuController", "Failed to load world scene")
+				LoadingOverlay.update_progress("Failed to load world scene", 0.0)
+				await get_tree().create_timer(2.0).timeout
+				LoadingOverlay.hide_loading()
+				return
+			
+			ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+				# Invalid resource path
+				MythosLogger.error("MainMenuController", "Invalid scene path: %s" % WORLD_CREATION_SCENE)
+				LoadingOverlay.update_progress("Invalid scene path", 0.0)
+				await get_tree().create_timer(2.0).timeout
+				LoadingOverlay.hide_loading()
+				return
+			
+			_:
+				# Unknown status, wait and retry
+				await get_tree().process_frame
 
 
 func _setup_progress_bar() -> void:
