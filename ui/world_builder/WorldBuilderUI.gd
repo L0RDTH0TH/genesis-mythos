@@ -20,8 +20,7 @@ const TOTAL_STEPS: int = 8
 @onready var seed_spin: SpinBox = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/SeedHBox/SeedSpin
 @onready var randomize_btn: Button = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/SeedHBox/RandomizeBtn
 @onready var step_title: Label = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/RightScroll/RightVBox/StepTitle
-@onready var active_params: VBoxContainer = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/RightScroll/RightVBox/ActiveParams
-@onready var right_scroll: ScrollContainer = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/RightScroll
+@onready var param_tree: Tree = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/RightScroll/RightVBox/ParamTree
 @onready var bottom_hbox: HBoxContainer = $MainVBox/BottomBar/BottomContent
 @onready var back_btn: Button = $MainVBox/BottomBar/BottomContent/BackBtn
 @onready var next_btn: Button = $MainVBox/BottomBar/BottomContent/NextBtn
@@ -30,9 +29,8 @@ const TOTAL_STEPS: int = 8
 @onready var progress_bar: ProgressBar = $MainVBox/BottomBar/BottomContent/ProgressBar
 @onready var status_label: Label = $MainVBox/BottomBar/BottomContent/StatusLabel
 
-# GUI Performance Fix: Object pool for parameter rows
-var parameter_row_pool: Array[ParameterRow] = []
-const MAX_PARAM_ROWS: int = 30  # Maximum expected parameters per step
+# GUI Performance Fix: Tree storage for parameter metadata (for value updates)
+var param_tree_items: Dictionary = {}  # Maps azgaar_key -> TreeItem
 # DIAGNOSTIC: WebView nodes temporarily removed to test presentation throttling
 # @onready var webview_margin: MarginContainer = $MainVBox/MainHSplit/CenterPanel/CenterContent/WebViewMargin
 # @onready var azgaar_webview: Node = $MainVBox/MainHSplit/CenterPanel/CenterContent/WebViewMargin/AzgaarWebView
@@ -47,10 +45,6 @@ var gen_elapsed_time: float = 0.0
 
 # GUI Performance Fix: Throttle resize updates
 var _resize_pending: bool = false
-
-# GUI Performance Fix: Visibility-based process disabling
-var _scroll_visibility_timer: Timer = null
-const SCROLL_UPDATE_INTERVAL: float = 0.2  # Update visibility every 200ms (throttled)
 
 # Archetype presets
 const ARCHETYPES: Dictionary = {
@@ -98,11 +92,8 @@ func _ready() -> void:
 	gen_btn.pressed.connect(_generate_azgaar)
 	bake_to_3d_btn.pressed.connect(_bake_to_3d)
 	
-	# GUI Performance Fix: Pre-create parameter row pool
-	_create_parameter_row_pool()
-	
-	# GUI Performance Fix: Setup scroll visibility tracking
-	_setup_scroll_visibility_tracking()
+	# GUI Performance Fix: Setup Tree for parameters
+	_setup_param_tree()
 	
 	# Initialize with first step
 	_load_archetype_params(0)
@@ -179,8 +170,7 @@ func _apply_ui_constants() -> void:
 	var seed_hbox: HBoxContainer = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/SeedHBox
 	seed_hbox.add_theme_constant_override("separation", UIConstants.SPACING_MEDIUM)
 	
-	var active_params_vbox: VBoxContainer = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/RightScroll/RightVBox/ActiveParams
-	active_params_vbox.add_theme_constant_override("separation", UIConstants.SPACING_LARGE)
+	# Tree node doesn't need separation override (uses built-in item spacing)
 	
 	var bottom_content: HBoxContainer = $MainVBox/BottomBar/BottomContent
 	bottom_content.add_theme_constant_override("separation", UIConstants.SPACING_LARGE)
@@ -237,9 +227,6 @@ func _update_responsive_layout() -> void:
 	# Update split offset to match left panel width
 	main_hsplit.split_offset = left_width
 	
-	# GUI Performance Fix: Update row visibility after resize (viewport size affects visible area)
-	call_deferred("_update_row_visibility")
-	
 	MythosLogger.debug("UI/WorldBuilder", "Layout updated for resize", {
 		"viewport": viewport_size,
 		"left_width": left_width,
@@ -281,7 +268,7 @@ func _load_step_definitions() -> void:
 		var step_idx: int = step_data.index
 		var params_list: Array = []
 		
-		# Convert parameter definitions to format expected by _populate_params()
+		# Convert parameter definitions to format expected by _populate_param_tree()
 		if step_data.has("parameters") and step_data.parameters is Array:
 			for param_data in step_data.parameters:
 				if not param_data is Dictionary:
@@ -380,144 +367,222 @@ func _update_step_ui() -> void:
 		bake_to_3d_btn.disabled = true
 	
 	# Populate parameters for current step
-	_populate_params()
-	
-	# GUI Performance Fix: Update visibility after step change
-	call_deferred("_update_row_visibility")
+	_populate_param_tree()
 
 
-func _create_parameter_row_pool() -> void:
-	"""Pre-create parameter row pool for object pooling (GUI Performance Fix)."""
-	var row_scene: PackedScene = load("res://ui/components/ParameterRow.tscn")
-	if not row_scene:
-		MythosLogger.error("UI/WorldBuilder", "Failed to load ParameterRow.tscn")
+func _setup_param_tree() -> void:
+	"""Setup Tree for parameter display (GUI Performance Fix - replaces pooling)."""
+	if not param_tree:
+		MythosLogger.error("UI/WorldBuilder", "ParamTree not found")
 		return
 	
-	for i in range(MAX_PARAM_ROWS):
-		var row: ParameterRow = row_scene.instantiate() as ParameterRow
-		if row:
-			row.parameter_changed.connect(_on_parameter_changed)
-			row.visible = false
-			row.set_process(false)  # Disable processing for hidden rows
-			active_params.add_child(row)
-			parameter_row_pool.append(row)
+	# Connect Tree signals
+	param_tree.item_selected.connect(_on_tree_item_selected)
+	param_tree.item_edited.connect(_on_tree_item_edited)
+	param_tree.cell_selected.connect(_on_tree_cell_selected)
 	
-	MythosLogger.debug("UI/WorldBuilder", "Created parameter row pool", {"size": parameter_row_pool.size()})
+	# Configure Tree columns
+	param_tree.columns = 3
+	param_tree.column_titles_visible = false
+	param_tree.hide_root = true
+	param_tree.allow_reselect = true
+	param_tree.allow_rmb_select = false
+	
+	# Set column widths (proportional)
+	param_tree.set_column_expand(0, true)   # Label column
+	param_tree.set_column_expand(1, true)   # Control column (slider/option)
+	param_tree.set_column_expand(2, false)  # Value column (fixed width)
+	
+	var value_column_width: int = UIConstants.LABEL_WIDTH_NARROW
+	param_tree.set_column_custom_minimum_width(2, value_column_width)
+	
+	MythosLogger.debug("UI/WorldBuilder", "ParamTree setup complete")
 
 
-func _populate_params() -> void:
-	"""Populate parameter controls for current step using object pooling (GUI Performance Fix)."""
-	# GUI Performance Fix: Disable all rows first (visibility-based activation)
-	for row in parameter_row_pool:
-		row.hide_row()
-		row.set_active(false)  # Disable processing for all rows initially
+func _populate_param_tree() -> void:
+	"""Populate Tree with parameters for current step (GUI Performance Fix)."""
+	if not param_tree:
+		return
+	
+	# Clear existing items
+	param_tree.clear()
+	param_tree_items.clear()
 	
 	var step_def: Dictionary = STEP_DEFINITIONS.get(current_step, {})
 	var params_list: Array = step_def.get("params", [])
 	
 	if params_list.is_empty():
-		# Show empty message if available, otherwise skip
 		MythosLogger.debug("UI/WorldBuilder", "No parameters for step", {"step": current_step})
 		return
 	
-	# Reuse rows from pool for current step only
-	var pool_index: int = 0
+	# Create root (hidden)
+	var root: TreeItem = param_tree.create_item()
+	
+	# Create items for each parameter
 	for param in params_list:
-		if pool_index >= parameter_row_pool.size():
-			MythosLogger.warn("UI/WorldBuilder", "Parameter pool exhausted, need more rows", {
-				"requested": params_list.size(),
-				"pool_size": parameter_row_pool.size()
-			})
-			break
-		
-		var row: ParameterRow = parameter_row_pool[pool_index]
-		row.setup(param)
-		# Note: set_active() will be called by _update_row_visibility() based on scroll position
-		
-		# Set initial value from current_params if available
 		var azgaar_key: String = param.get("azgaar_key", param.get("name", ""))
-		if current_params.has(azgaar_key):
-			row.update_value(current_params[azgaar_key])
-		else:
-			# Use default from param
-			var default_val = param.get("default")
-			if default_val != null:
-				row.update_value(default_val)
-				current_params[azgaar_key] = default_val
+		var param_name: String = param.get("name", "")
+		var param_type: String = param.get("type", param.get("ui_type", "HSlider"))
 		
-		pool_index += 1
+		# Create TreeItem
+		var item: TreeItem = param_tree.create_item(root)
+		
+		# Column 0: Parameter name
+		item.set_text(0, param_name.capitalize() + ":")
+		
+		# Column 1: Control (slider, option, checkbox, etc.)
+		# Column 2: Value display
+		var current_value: Variant = current_params.get(azgaar_key)
+		if current_value == null:
+			current_value = param.get("default", 0)
+			current_params[azgaar_key] = current_value
+		
+		match param_type:
+			"HSlider":
+				# Use RANGE cell mode for sliders
+				item.set_cell_mode(1, TreeItem.CELL_MODE_RANGE)
+				var min_val: float = param.get("min", 0.0)
+				var max_val: float = param.get("max", 100.0)
+				var step_val: float = param.get("step", 1.0)
+				item.set_range_config(1, min_val, max_val, step_val, false)
+				item.set_range(1, float(current_value))
+				item.set_text(2, str(current_value))
+				item.set_editable(1, true)
+				item.set_editable(2, false)
+			
+			"OptionButton":
+				# Use RANGE cell mode as dropdown (values are indices)
+				if param.has("options"):
+					var options: Array = param.options
+					item.set_cell_mode(1, TreeItem.CELL_MODE_RANGE)
+					item.set_range_config(1, 0, options.size() - 1, 1, false)
+					var selected_idx: int = options.find(current_value)
+					if selected_idx < 0:
+						selected_idx = 0
+					item.set_range(1, selected_idx)
+					item.set_text(2, str(options[selected_idx]))
+					item.set_editable(1, true)
+					item.set_editable(2, false)
+				else:
+					item.set_text(1, "No options")
+					item.set_text(2, str(current_value))
+			
+			"CheckBox":
+				# Use CHECK cell mode
+				item.set_cell_mode(1, TreeItem.CELL_MODE_CHECK)
+				item.set_checked(1, bool(current_value))
+				item.set_text(2, "Yes" if bool(current_value) else "No")
+				item.set_editable(1, true)
+				item.set_editable(2, false)
+			
+			"SpinBox":
+				# Use RANGE cell mode for spinbox
+				item.set_cell_mode(1, TreeItem.CELL_MODE_RANGE)
+				var min_val: float = param.get("min", 0.0)
+				var max_val: float = param.get("max", 100.0)
+				var step_val: float = param.get("step", 1.0)
+				item.set_range_config(1, min_val, max_val, step_val, false)
+				item.set_range(1, float(current_value))
+				item.set_text(2, str(int(current_value)))
+				item.set_editable(1, true)
+				item.set_editable(2, false)
+			
+			_:
+				# Default: text display
+				item.set_text(1, str(current_value))
+				item.set_text(2, "")
+				item.set_editable(1, false)
+				item.set_editable(2, false)
+		
+		# Store metadata in TreeItem (azgaar_key and param data)
+		item.set_metadata(0, {"azgaar_key": azgaar_key, "param": param})
+		
+		# Store mapping for quick lookup
+		param_tree_items[azgaar_key] = item
 	
-	# GUI Performance Fix: Update visibility after populating (deferred to allow layout)
-	call_deferred("_update_row_visibility")
+	MythosLogger.debug("UI/WorldBuilder", "Populated ParamTree", {
+		"step": current_step,
+		"param_count": params_list.size()
+	})
 
 
-func _setup_scroll_visibility_tracking() -> void:
-	"""Setup scroll visibility tracking for performance optimization (GUI Performance Fix)."""
-	if not right_scroll:
-		MythosLogger.warn("UI/WorldBuilder", "ScrollContainer not found, skipping scroll tracking")
+func _on_tree_item_selected() -> void:
+	"""Handle Tree item selection (for focus/highlighting)."""
+	pass  # Selection not needed for parameter editing
+
+
+func _on_tree_item_edited() -> void:
+	"""Handle Tree item edit (when user changes a value)."""
+	var edited_item: TreeItem = param_tree.get_selected()
+	if not edited_item:
 		return
 	
-	# Create throttled timer for scroll updates
-	_scroll_visibility_timer = Timer.new()
-	_scroll_visibility_timer.wait_time = SCROLL_UPDATE_INTERVAL
-	_scroll_visibility_timer.one_shot = false
-	_scroll_visibility_timer.autostart = true
-	add_child(_scroll_visibility_timer)
-	_scroll_visibility_timer.timeout.connect(_update_row_visibility)
-	
-	# Also update on scroll changes (with throttling via timer)
-	if right_scroll.get_v_scroll_bar():
-		right_scroll.get_v_scroll_bar().changed.connect(func(): _scroll_visibility_timer.start())
-	
-	MythosLogger.debug("UI/WorldBuilder", "Scroll visibility tracking initialized")
-
-
-func _update_row_visibility() -> void:
-	"""Update which rows are active based on scroll position (GUI Performance Fix)."""
-	if not right_scroll or not active_params:
+	var metadata: Dictionary = edited_item.get_metadata(0)
+	if not metadata or not metadata.has("azgaar_key"):
 		return
 	
-	# Get scroll offset (how far scrolled vertically)
-	var scroll_offset: float = 0.0
-	if right_scroll.get_v_scroll_bar():
-		scroll_offset = right_scroll.get_v_scroll_bar().value
+	var azgaar_key: String = metadata.azgaar_key
+	var param: Dictionary = metadata.param
+	var param_type: String = param.get("type", param.get("ui_type", "HSlider"))
 	
-	# Get visible height of scroll container
-	var visible_height: float = right_scroll.size.y
+	# Get edited value from column 1
+	var new_value: Variant = null
+	match param_type:
+		"HSlider", "SpinBox":
+			new_value = edited_item.get_range(1)
+			# Update value display in column 2
+			edited_item.set_text(2, str(new_value))
+		
+		"OptionButton":
+			if param.has("options"):
+				var options: Array = param.options
+				var selected_idx: int = int(edited_item.get_range(1))
+				if selected_idx >= 0 and selected_idx < options.size():
+					new_value = options[selected_idx]
+					edited_item.set_text(2, str(new_value))
+		
+		"CheckBox":
+			new_value = edited_item.is_checked(1)
+			edited_item.set_text(2, "Yes" if bool(new_value) else "No")
 	
-	# Calculate visible range with padding (show rows slightly above/below viewport)
-	# ScrollContainer scrolls the content, so we check row positions relative to scroll offset
-	var padding: float = UIConstants.SPACING_LARGE * 2.0  # Show rows slightly outside viewport
-	var visible_top: float = scroll_offset - padding
-	var visible_bottom: float = scroll_offset + visible_height + padding
-	
-	# Update each visible row
-	for row in parameter_row_pool:
-		if not row.visible:
-			row.set_active(false)
-			continue
-		
-		# Get row position relative to active_params parent (VBoxContainer)
-		# The ScrollContainer scrolls the content, so row positions are relative to content container
-		var row_pos: Vector2 = row.position
-		var row_size: Vector2 = row.size
-		
-		# If size is zero or not yet calculated, use a default height estimate
-		if row_size.y <= 0:
-			row_size.y = UIConstants.BUTTON_HEIGHT_MEDIUM
-		
-		var row_top: float = row_pos.y
-		var row_bottom: float = row_pos.y + row_size.y
-		
-		# Check if row is in visible range (intersects with visible area)
-		var row_in_view: bool = (row_bottom >= visible_top and row_top <= visible_bottom)
-		
-		row.set_active(row_in_view)
+	if new_value != null:
+		_on_parameter_changed(azgaar_key, new_value)
+
+
+func _on_tree_cell_selected() -> void:
+	"""Handle Tree cell selection (for editing)."""
+	pass  # Editing handled by _on_tree_item_edited
 
 
 func _on_parameter_changed(azgaar_key: String, value: Variant) -> void:
-	"""Handle parameter value change from parameter row."""
+	"""Handle parameter value change (from Tree or other sources)."""
 	current_params[azgaar_key] = value
+	
+	# Update Tree display if item exists (for programmatic updates)
+	if param_tree_items.has(azgaar_key):
+		var item: TreeItem = param_tree_items[azgaar_key]
+		var metadata: Dictionary = item.get_metadata(0)
+		if metadata and metadata.has("param"):
+			var param: Dictionary = metadata.param
+			var param_type: String = param.get("type", param.get("ui_type", "HSlider"))
+			
+			match param_type:
+				"HSlider", "SpinBox":
+					item.set_range(1, float(value))
+					item.set_text(2, str(value))
+				
+				"OptionButton":
+					if param.has("options"):
+						var options: Array = param.options
+						var selected_idx: int = options.find(value)
+						if selected_idx >= 0:
+							item.set_range(1, selected_idx)
+							item.set_text(2, str(value))
+				
+				"CheckBox":
+					item.set_checked(1, bool(value))
+					item.set_text(2, "Yes" if bool(value) else "No")
+	
 	MythosLogger.debug("UI/WorldBuilder", "Parameter changed", {"key": azgaar_key, "value": value})
 
 
@@ -548,7 +613,7 @@ func _load_archetype_params(idx: int) -> void:
 	for key in current_params:
 		if key == "points":
 			current_params[key] = UIConstants.get_clamped_points(current_params[key])
-	_populate_params()
+	_populate_param_tree()
 
 
 func _on_seed_changed(value: float) -> void:
