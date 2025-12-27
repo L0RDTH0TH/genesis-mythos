@@ -1,0 +1,30 @@
+# GUI Performance Rules – Cursor Instructions
+
+**File:** `.cursor/rules/gui_performance_rules.mdc`  
+**Purpose:** Dedicated Cursor rule file to enforce GUI performance guidelines automatically.
+
+```
+[GENESIS MYTHOS – GUI PERFORMANCE RULES ENFORCEMENT]
+
+You MUST strictly enforce the following performance rules in ALL UI-related work:
+
+Hard prohibitions:
+- Never create or destroy Control nodes at runtime for frequently updated content (e.g., parameter rows, list items).
+  → Always use object pooling, visibility toggling, or single-node data updates (RichTextLabel, ItemList).
+- Never add per-node theme overrides (theme_override_* or add_theme_*_override()).
+  → Use theme_type_variation or shared theme styles only.
+- Never use hard-coded sizes/positions (custom_minimum_size = Vector2(..., ...), offset_*, etc.).
+  → Always use UIConstants.gd, anchors/size flags, or theme constants.
+- Keep nesting depth ≤ 6 levels and total CanvasItem count < 600 in worst-case scenes.
+
+Before any UI scene or script change:
+- Check current CanvasItem count via run_project and debugger if needed.
+- After changes, verify FPS remains 60+ and node count stays under limits.
+
+If you detect a violation pattern in existing code during a task:
+- Refactor it to comply before adding new features.
+- Note the fix in commit message.
+
+Always prioritize built-in containers, anchors, size flags, and UIConstants for responsive layouts.
+Never reintroduce patterns from the December 2025 performance regression.
+```
