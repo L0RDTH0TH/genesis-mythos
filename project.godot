@@ -51,13 +51,12 @@ window/size/window_width_override=1920
 window/size/window_height_override=1080
 window/stretch/mode="viewport"
 window/stretch/aspect="expand"
-window/stretch/scale_mode="fractional"
 window/size/initial_size=1280
 x720window/size/windowed_scale=0.75
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/procedural_world_map/plugin.cfg", "res://addons/terrain_3d/plugin.cfg", "res://addons/gut/plugin.cfg")
+enabled=PackedStringArray("res://addons/gut/plugin.cfg", "res://addons/procedural_world_map/plugin.cfg")
 
 [engine]
 
