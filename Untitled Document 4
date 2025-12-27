@@ -1,0 +1,55 @@
+The audit is thorough, well-reasoned, and aligns closely with the project's constraints (bundle size under ~200KB target, 60 FPS goal, phased migration, embedded WebView overhead). Overall, I **agree with nearly all recommendations**—they strike an excellent balance between productivity gains and minimalism. The progressive approach (vanilla → Alpine → charts) is spot-on for risk mitigation.
+
+Here are my **final decisions**, with a few minor adjustments/refinements based on current (2025) library realities:
+
+### Confirmed & Adopted Without Change
+- **Phase 1: Vanilla JavaScript + Custom CSS**  
+  Perfect starting point. Zero overhead, validates bridge/performance early.
+
+- **Phase 2: Add Alpine.js**  
+  Strongly agree. Alpine.js remains the gold standard for lightweight reactivity in embedded/constrained environments (~15-16KB gzipped in latest versions). It's declarative, HTML-centric, and ideal for wizard state (steps, validation, dynamic forms). No better alternative at this size/feature ratio.
+
+- **Tabs Component: Switch to Tabby (or similar lightweight vanilla tabs)**  
+  Agree on avoiding heavy frameworks. "Vanilla JS Tabs" is generic—recommend **Tabby** (by Chris Ferdinandi) specifically: <5KB, accessible (ARIA-compliant), progressive enhancement, no dependencies. It's actively maintained and fits CharacterCreation tabs perfectly.
+
+- **CSS: Custom CSS primary, Tailwind conditional**  
+  Fully agree. Convert `bg3_theme.tres` to CSS variables. Tailwind only if rapid prototyping justifies the build complexity (purge to ~30-50KB possible, but custom is cleaner long-term).
+
+- **Build Tool: esbuild from Phase 2+**  
+  Best choice—blazing fast, simple config, excellent tree-shaking/minification. Phase 1 can use CDN for Alpine/Chart.js prototyping.
+
+- **Phase 3 Charts: Chart.js primary**  
+  Agree—latest Chart.js is ~70KB gzipped (tree-shakable further by importing only needed controllers/scales). Canvas-based = excellent WebView performance.
+
+### Minor Adjustments
+- **Waterfall View (PerformanceMonitor):**  
+  The audit mentions "chartjs-plugin-waterfall"—this is an older/third-party plugin (not official Chart.js). Instead, use **native Chart.js stacked bar with floating bars** (built-in since v3+). No extra plugin needed, zero added size. Simpler, more maintainable. Example config can mimic your WaterfallControl exactly.
+
+- **Flame Graphs (PerformanceMonitor):**  
+  d3-flame-graph is specialized and good, but D3 modular imports can still add ~40-80KB (even selective). Since flame graphs are niche/critical, **defer to Phase 4 or make optional**. Fallback: Custom canvas drawing (reuse patterns from existing FlameGraphControl.gd). Only add if profiling shows native version is a real bottleneck post-migration.
+
+- **Updated Bundle Estimates (2025 sizes):**
+  - Phase 1: ~0-10KB (custom + minimal utils)
+  - Phase 2: ~25-35KB (Alpine ~16KB + Tabby ~5KB + custom CSS/JS)
+  - Phase 3 (full, no flame): ~100-120KB (Chart.js ~70KB tree-shaken + rest)
+  - With flame (modular D3): +40-60KB → ~140-180KB (still under 200KB target)
+
+  All comfortably safe, with room for esbuild optimizations.
+
+### Final Recommended Stack
+| Phase | Framework/Reactivity | Components/Layout | Charts/Graphs | Build | Est. Bundle (gzipped) |
+|-------|----------------------|-------------------|---------------|-------|-----------------------|
+| 1     | Vanilla JS          | Custom CSS       | N/A          | CDN/plain | ~10KB                |
+| 2     | Alpine.js           | Tabby tabs + Custom CSS | N/A          | esbuild | ~35KB                |
+| 3     | Alpine.js           | Tabby + Custom CSS | Chart.js (line/FPS + stacked floating bar for waterfall) | esbuild | ~120KB               |
+| 4 (optional) | Alpine.js           | Same             | + d3-flame-graph (modular) or custom canvas fallback | esbuild | ~160-180KB           |
+
+### Next Steps (Approved Plan)
+1. **Start Phase 1 immediately** — Implement MainMenu/ProgressDialog in vanilla JS. Focus on solidifying bridge.js patterns and baseline WebView perf metrics.
+2. **Phase 1 complete → Evaluate** — If FPS/memory stable, proceed to Phase 2 (add Alpine + Tabby for wizards).
+3. **Monitor bundle/perf at each gate** — Use esbuild analyzer; fallback to native if any regression.
+4. **PerformanceMonitor decision post-Phase 2** — Prototype Chart.js versions; defer flame if needed.
+
+This stack gives massive dev velocity wins (reactivity, tabs, charts) while staying lean and controllable. Excited to see the migration kick off—Phase 1 should feel transformative already compared to native Controls.
+
+If anything here doesn't align (e.g., flame graph priority), let me know and I'll adjust!

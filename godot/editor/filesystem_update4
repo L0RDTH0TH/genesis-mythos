@@ -1,2 +1,3 @@
 res://scripts/managers/AzgaarServer.gd
 res://ui/world_builder/WorldBuilderUI.gd
+res://ui/components/ParameterRow.gd
