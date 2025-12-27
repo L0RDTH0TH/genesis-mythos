@@ -26,9 +26,14 @@ func _ready() -> void:
 	# Apply UIConstants for consistent sizing
 	_apply_ui_constants()
 	
-	# OLD: WorldGenerator instantiation removed (old generation disabled for Azgaar integration)
-	# Create progress bar UI (kept for interface compatibility, but won't be used)
-	_setup_progress_bar()
+	# Progress bar UI is now pre-created in .tscn (see ProgressContainer)
+	# Get references if they exist
+	progress_bar = get_node_or_null("ProgressContainer/ProgressBar") as ProgressBar
+	progress_label = get_node_or_null("ProgressContainer/ProgressLabel") as Label
+	if progress_bar:
+		progress_bar.visible = false
+	if progress_label:
+		progress_label.visible = false
 	
 	if character_button:
 		character_button.visible = true
@@ -51,9 +56,21 @@ func _apply_ui_constants() -> void:
 	if world_button:
 		world_button.custom_minimum_size = Vector2(0, UIConstants.BUTTON_HEIGHT_MEDIUM)
 	
-	# Apply spacing to GGVBox container using UIConstants
+	# Apply spacing to VBoxContainer using UIConstants
+	# Note: Theme constant override for separation is acceptable for container spacing
+	# (documented exception for layout constants)
 	if vbox_container:
 		vbox_container.add_theme_constant_override("separation", UIConstants.SPACING_LARGE)
+	
+	# Apply UIConstants to progress container (pre-created in .tscn)
+	var progress_container: VBoxContainer = get_node_or_null("ProgressContainer") as VBoxContainer
+	if progress_container:
+		progress_container.custom_minimum_size = Vector2(UIConstants.PROGRESS_BAR_WIDTH, 0)
+		progress_container.offset_top = UIConstants.PROGRESS_BAR_MARGIN_TOP
+		progress_container.offset_left = -UIConstants.PROGRESS_BAR_WIDTH / 2
+		progress_container.offset_right = UIConstants.PROGRESS_BAR_WIDTH / 2
+	if progress_bar:
+		progress_bar.custom_minimum_size = Vector2(UIConstants.PROGRESS_BAR_WIDTH, UIConstants.PROGRESS_BAR_HEIGHT)
 
 func _ensure_ui_bounds() -> void:
 	"""Ensure UI elements stay within viewport bounds on window resize."""
@@ -75,37 +92,13 @@ func _on_create_world_pressed() -> void:
 	get_tree().change_scene_to_file(WORLD_CREATION_SCENE)
 
 
+# GUI Performance Fix: Progress bar UI is now pre-created in .tscn file
+# This method is kept for compatibility but no longer creates nodes at runtime
 func _setup_progress_bar() -> void:
-	"""Setup progress bar UI for world generation."""
-	# Create container for progress bar
-	var progress_container: VBoxContainer = VBoxContainer.new()
-	progress_container.name = "ProgressContainer"
-	progress_container.add_theme_constant_override("separation", UIConstants.SPACING_SMALL)
-	
-	# Position container (centered, below buttons)
-	progress_container.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	progress_container.offset_top = UIConstants.PROGRESS_BAR_MARGIN_TOP
-	progress_container.custom_minimum_size = Vector2(UIConstants.PROGRESS_BAR_WIDTH, 0)
-	add_child(progress_container)
-	
-	# Create progress label
-	progress_label = Label.new()
-	progress_label.name = "ProgressLabel"
-	progress_label.text = "Ready"
-	progress_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	progress_label.add_theme_font_size_override("font_size", 16)
-	progress_label.visible = false
-	progress_container.add_child(progress_label)
-	
-	# Create progress bar
-	progress_bar = ProgressBar.new()
-	progress_bar.name = "ProgressBar"
-	progress_bar.custom_minimum_size = Vector2(UIConstants.PROGRESS_BAR_WIDTH, UIConstants.PROGRESS_BAR_HEIGHT)
-	progress_bar.max_value = 1.0
-	progress_bar.value = 0.0
-	progress_bar.show_percentage = false
-	progress_bar.visible = false
-	progress_container.add_child(progress_bar)
+	"""Setup progress bar UI for world generation (nodes pre-created in .tscn)."""
+	# Progress bar nodes are now pre-created in .tscn to avoid runtime node creation
+	# References are obtained in _ready() via get_node_or_null()
+	pass
 
 
 func _on_generation_progress(phase: String, percent: float) -> void:
