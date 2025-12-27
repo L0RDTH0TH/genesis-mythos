@@ -28,6 +28,13 @@ const TOTAL_STEPS: int = 8
 @onready var bake_to_3d_btn: Button = $MainVBox/BottomBar/BottomContent/BakeTo3DBtn
 @onready var progress_bar: ProgressBar = $MainVBox/BottomBar/BottomContent/ProgressBar
 @onready var status_label: Label = $MainVBox/BottomBar/BottomContent/StatusLabel
+@onready var left_panel: PanelContainer = $MainVBox/MainHSplit/LeftPanel
+@onready var step_sidebar: VBoxContainer = $MainVBox/MainHSplit/LeftPanel/LeftContent/StepSidebar
+@onready var center_panel: PanelContainer = $MainVBox/MainHSplit/CenterPanel
+@onready var right_panel: PanelContainer = $MainVBox/MainHSplit/RightPanel
+@onready var right_outer_vbox: VBoxContainer = $MainVBox/MainHSplit/RightPanel/RightOuterVBox
+@onready var right_scroll: ScrollContainer = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/RightScroll
+@onready var right_vbox: VBoxContainer = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/RightScroll/RightVBox
 
 # GUI Performance Fix: Tree storage for parameter metadata (for value updates)
 var param_tree_items: Dictionary = {}  # Maps azgaar_key -> TreeItem
@@ -76,7 +83,6 @@ func _ready() -> void:
 		archetype_option.add_item(archetype_name)
 	
 	# Collect step buttons and connect signals
-	var step_sidebar: VBoxContainer = $MainVBox/MainHSplit/LeftPanel/LeftContent/StepSidebar
 	for i in range(TOTAL_STEPS):
 		var btn: Button = step_sidebar.get_child(i) as Button
 		if btn:
@@ -113,17 +119,14 @@ func _ready() -> void:
 func _apply_ui_constants() -> void:
 	"""Apply UIConstants to UI elements for responsive sizing."""
 	# Left panel
-	var left_panel: PanelContainer = $MainVBox/MainHSplit/LeftPanel
 	left_panel.custom_minimum_size = Vector2(UIConstants.LEFT_PANEL_WIDTH, 0)
 	
 	# Step buttons
-	var step_sidebar: VBoxContainer = $MainVBox/MainHSplit/LeftPanel/LeftContent/StepSidebar
 	for btn in step_sidebar.get_children():
 		if btn is Button:
 			btn.custom_minimum_size = Vector2(0, UIConstants.STEP_BUTTON_HEIGHT)
 	
 	# Right panel
-	var right_panel: PanelContainer = $MainVBox/MainHSplit/RightPanel
 	right_panel.custom_minimum_size = Vector2(UIConstants.RIGHT_PANEL_WIDTH, 0)
 	
 	# Bottom bar (now in MainVBox)
@@ -158,13 +161,10 @@ func _apply_ui_constants() -> void:
 	var left_content: VBoxContainer = $MainVBox/MainHSplit/LeftPanel/LeftContent
 	left_content.add_theme_constant_override("separation", UIConstants.SPACING_MEDIUM)
 	
-	var step_sidebar_vbox: VBoxContainer = $MainVBox/MainHSplit/LeftPanel/LeftContent/StepSidebar
-	step_sidebar_vbox.add_theme_constant_override("separation", UIConstants.SPACING_SMALL)
+	step_sidebar.add_theme_constant_override("separation", UIConstants.SPACING_SMALL)
 	
-	var right_outer_vbox: VBoxContainer = $MainVBox/MainHSplit/RightPanel/RightOuterVBox
 	right_outer_vbox.add_theme_constant_override("separation", UIConstants.SPACING_SMALL)
 	
-	var right_vbox: VBoxContainer = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/RightScroll/RightVBox
 	right_vbox.add_theme_constant_override("separation", UIConstants.SPACING_LARGE)
 	
 	var seed_hbox: HBoxContainer = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/SeedHBox
@@ -180,9 +180,8 @@ func _apply_ui_constants() -> void:
 	if title_label:
 		title_label.modulate = Color(1.0, 0.843, 0.0, 1.0)  # Gold color
 	
-	var step_title_label: Label = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/RightScroll/RightVBox/StepTitle
-	if step_title_label:
-		step_title_label.modulate = Color(1.0, 0.843, 0.0, 1.0)  # Gold color
+	if step_title:
+		step_title.modulate = Color(1.0, 0.843, 0.0, 1.0)  # Gold color
 	
 	# Set initial split offset
 	var main_hsplit: HSplitContainer = $MainVBox/MainHSplit
@@ -208,8 +207,6 @@ func _update_responsive_layout() -> void:
 		return
 	
 	# Calculate panel widths as percentages, clamped to min/max
-	var left_panel: PanelContainer = $MainVBox/MainHSplit/LeftPanel
-	var right_panel: PanelContainer = $MainVBox/MainHSplit/RightPanel
 	var main_hsplit: HSplitContainer = $MainVBox/MainHSplit
 	
 	# Left panel: 15-20% of width, clamped

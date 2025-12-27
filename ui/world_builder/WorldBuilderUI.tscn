@@ -83,49 +83,42 @@ flat = true
 
 [node name="Step2Btn" type="Button" parent="MainVBox/MainHSplit/LeftPanel/LeftContent/StepSidebar"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 40)
 size_flags_horizontal = 3
 text = "2. Terrain"
 flat = true
 
 [node name="Step3Btn" type="Button" parent="MainVBox/MainHSplit/LeftPanel/LeftContent/StepSidebar"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 40)
 size_flags_horizontal = 3
 text = "3. Climate"
 flat = true
 
 [node name="Step4Btn" type="Button" parent="MainVBox/MainHSplit/LeftPanel/LeftContent/StepSidebar"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 40)
 size_flags_horizontal = 3
 text = "4. Biomes"
 flat = true
 
 [node name="Step5Btn" type="Button" parent="MainVBox/MainHSplit/LeftPanel/LeftContent/StepSidebar"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 40)
 size_flags_horizontal = 3
 text = "5. Structures & Civilizations"
 flat = true
 
 [node name="Step6Btn" type="Button" parent="MainVBox/MainHSplit/LeftPanel/LeftContent/StepSidebar"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 40)
 size_flags_horizontal = 3
 text = "6. Environment"
 flat = true
 
 [node name="Step7Btn" type="Button" parent="MainVBox/MainHSplit/LeftPanel/LeftContent/StepSidebar"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 40)
 size_flags_horizontal = 3
 text = "7. Resources & Magic"
 flat = true
 
 [node name="Step8Btn" type="Button" parent="MainVBox/MainHSplit/LeftPanel/LeftContent/StepSidebar"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 40)
 size_flags_horizontal = 3
 text = "8. Export"
 flat = true
