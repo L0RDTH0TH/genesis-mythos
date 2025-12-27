@@ -106,8 +106,9 @@ func _ready() -> void:
 	# Apply responsive layout on initial load
 	call_deferred("_update_responsive_layout")
 	
-	# GUI Performance Fix: Enable _process always for queue_redraw() (lightweight)
-	set_process(true)
+	# GUI Performance Fix: _process() is conditionally enabled only during generation
+	# (see _generate_azgaar() and generation complete/failed handlers)
+	set_process(false)
 
 
 func _apply_ui_constants() -> void:
@@ -503,32 +504,35 @@ func _generate_azgaar() -> void:
 	_update_status("Generating map...", 40)
 	gen_timer = 0.0
 	gen_elapsed_time = 0.0
-	# _process is always enabled now for queue_redraw()
+	# GUI Performance Fix: Enable _process() only when generation starts
+	set_process(true)
 
 
 func _process(delta: float) -> void:
 	"""Process generation status updates (fallback polling if signals don't work)."""
-	# GUI Performance Fix: Force redraw every frame for smoother UI
-	queue_redraw()
+	# GUI Performance Fix: Early exit if generation is not active
+	if gen_timer <= 0.0:
+		set_process(false)  # Disable when no longer needed
+		return
 	
-	# Generation logic only runs when generation is active (gen_timer > 0)
-	if gen_timer > 0.0:
-		gen_elapsed_time += delta
-		gen_timer += delta
-		
-		# Check timeout first (increased to 60s to match timeout timer)
-		if gen_elapsed_time > 60.0:
-			_update_status("Timeout - reduce points?", 0)
-			gen_timer = 0.0
-			gen_elapsed_time = 0.0
-			return
-		
-		# Poll every 2 seconds for completion (reduced frequency)
-		if gen_timer > 2.0:
-			gen_timer = 0.0
-			# Update progress based on elapsed time
-			var progress = min(40 + (gen_elapsed_time / 60.0 * 40.0), 80.0)
-			_update_status("Generating map... (%d%%)" % int(progress), progress)
+	# Generation logic (gen_timer > 0.0 guaranteed at this point)
+	gen_elapsed_time += delta
+	gen_timer += delta
+	
+	# Check timeout first (increased to 60s to match timeout timer)
+	if gen_elapsed_time > 60.0:
+		_update_status("Timeout - reduce points?", 0)
+		gen_timer = 0.0
+		gen_elapsed_time = 0.0
+		set_process(false)  # Disable when timeout occurs
+		return
+	
+	# Poll every 2 seconds for completion (reduced frequency)
+	if gen_timer > 2.0:
+		gen_timer = 0.0  # Reset timer for next polling cycle
+		# Update progress based on elapsed time
+		var progress = min(40 + (gen_elapsed_time / 60.0 * 40.0), 80.0)
+		_update_status("Generating map... (%d%%)" % int(progress), progress)
 
 func _bake_to_3d() -> void:
 	"""Bake to 3D - export heightmap from Azgaar and feed to Terrain3D."""
