@@ -34,8 +34,13 @@ func _ready() -> void:
 	web_view.load_url(html_url)
 	MythosLogger.info("MainMenuWebController", "Loaded MainMenu HTML", {"url": html_url})
 	
-	# Wait for page to load, then inject bridge initialization
-	await get_tree().create_timer(1.0).timeout
+	# Wait for page to load using process_frame yields instead of timer
+	var tree = get_tree()
+	if tree:
+		# Yield multiple frames for WebView initialization (~1 second at 60 FPS)
+		for i in range(60):
+			await tree.process_frame
+	
 	_inject_ipc_bridge()
 
 func _on_ipc_message(message: String) -> void:
@@ -141,6 +146,7 @@ func _deferred_change_scene(scene_path: String) -> void:
 func _hide_progress_after_scene_change() -> void:
 	"""Hide progress overlay after scene change completes."""
 	# Small delay to ensure new scene is fully initialized
-	await get_tree().create_timer(0.1).timeout
+	var tree = get_tree()
+	if tree:
+		await tree.create_timer(0.1).timeout
 	ProgressDialogWeb.hide_progress()
-

@@ -71,15 +71,45 @@ func _ready() -> void:
 
 func _deferred_load_web_ui() -> void:
 	"""Deferred WebView load to allow overlay to render first."""
+	var tree = get_tree()
+	if not tree:
+		MythosLogger.warn("WorldBuilderWebController", "Node not in tree, cannot load WebView")
+		return
+	
+	# Show progress for load sequence
+	ProgressDialogWeb.show_progress("Loading World Builder", "Initializing WebView...")
+	await tree.process_frame
+	
 	# Load the World Builder HTML file
 	var html_url: String = "res://web_ui/world_builder/index.html"
 	web_view.load_url(html_url)
 	MythosLogger.info("WorldBuilderWebController", "Loaded World Builder HTML (deferred)", {"url": html_url})
+	ProgressDialogWeb.update_progress(0.2, "Loading HTML...")
+	await tree.process_frame
 	
-	# Wait for page to load, then send initial data
-	await get_tree().create_timer(1.5).timeout
+	# Wait for page to load (yield multiple frames for WebView initialization)
+	# Use process_frame yields instead of timer for better precision
+	for i in range(30):  # ~0.5 seconds at 60 FPS
+		await tree.process_frame
+		if i == 10:
+			ProgressDialogWeb.update_progress(0.4, "Initializing Alpine.js...")
+		elif i == 20:
+			ProgressDialogWeb.update_progress(0.6, "Preparing UI...")
+	
+	# Send initial data
+	ProgressDialogWeb.update_progress(0.8, "Loading step definitions...")
+	await tree.process_frame
 	_send_step_definitions()
+	await tree.process_frame
+	
+	ProgressDialogWeb.update_progress(0.9, "Loading archetypes...")
+	await tree.process_frame
 	_send_archetypes()
+	await tree.process_frame
+	
+	ProgressDialogWeb.update_progress(1.0, "Ready")
+	await tree.process_frame
+	ProgressDialogWeb.hide_progress()
 
 
 func _find_azgaar_controller() -> void:

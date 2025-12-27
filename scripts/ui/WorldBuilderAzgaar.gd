@@ -85,9 +85,25 @@ func _initialize_webview() -> void:
 			web_view.load_url(url)
 			MythosLogger.info("WorldBuilderAzgaar", "Loaded Azgaar URL", {"url": url})
 			
-			# Wait for page to load, then inject bridge script
-			await get_tree().create_timer(2.0).timeout
-			_inject_azgaar_bridge()
+			# Wait for page to load using process_frame yields instead of timer
+			# Azgaar is a heavy page, so we yield more frames (~2 seconds at 60 FPS)
+			var tree = get_tree()
+			if tree:
+				# Yield frames for Azgaar initialization
+				for i in range(120):  # ~2 seconds at 60 FPS
+					await tree.process_frame
+					# Log progress at key intervals
+					if i == 30:
+						MythosLogger.debug("WorldBuilderAzgaar", "Azgaar loading... (25%)")
+					elif i == 60:
+						MythosLogger.debug("WorldBuilderAzgaar", "Azgaar loading... (50%)")
+					elif i == 90:
+						MythosLogger.debug("WorldBuilderAzgaar", "Azgaar loading... (75%)")
+				
+				_inject_azgaar_bridge()
+			else:
+				MythosLogger.warn("WorldBuilderAzgaar", "Node not in tree, injecting bridge immediately")
+				_inject_azgaar_bridge()
 		else:
 			MythosLogger.error("WorldBuilderAzgaar", "WebView does not have load_url method")
 	else:
@@ -129,9 +145,10 @@ func _execute_azgaar_js(code: String) -> Variant:
 		MythosLogger.debug("WorldBuilderAzgaar", "Executed JS", {"code": code, "result": result})
 		return result
 	elif web_view.has_method("eval"):
-		var result = web_view.eval(code)
-		MythosLogger.debug("WorldBuilderAzgaar", "Executed JS via eval", {"code": code, "result": result})
-		return result
+		# eval() returns void, so don't try to capture return value
+		web_view.eval(code)
+		MythosLogger.debug("WorldBuilderAzgaar", "Executed JS via eval", {"code": code})
+		return null
 	else:
 		MythosLogger.warn("WorldBuilderAzgaar", "WebView does not have execute_js or eval method")
 		# Fallback: use post_message to send JS code
