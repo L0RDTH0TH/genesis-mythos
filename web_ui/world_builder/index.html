@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>World Builder - Genesis Mythos</title>
+    <link rel="stylesheet" href="world_builder.css">
+</head>
+<body>
+    <div class="world-builder-container" x-data="worldBuilder">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <h1 class="title-label">World Builder – Forging the World</h1>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="main-hsplit">
+            <!-- Left Panel: Step Sidebar -->
+            <div class="left-panel">
+                <div class="step-sidebar">
+                    <template x-for="(step, index) in steps" :key="index">
+                        <button 
+                            class="step-button" 
+                            :class="{ 'active': currentStep === index }"
+                            @click="setStep(index)"
+                            x-text="step.title || `Step ${index + 1}`">
+                        </button>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Center Panel: Azgaar Preview (placeholder - handled by separate WebView in Godot) -->
+            <div class="center-panel">
+                <div class="azgaar-placeholder">
+                    <p>Map Preview</p>
+                    <p class="placeholder-note">(Azgaar WebView handled separately)</p>
+                </div>
+            </div>
+
+            <!-- Right Panel: Parameters -->
+            <div class="right-panel">
+                <div class="right-outer-vbox">
+                    <!-- Archetype Selector -->
+                    <div class="archetype-selector">
+                        <label>Archetype:</label>
+                        <select x-model="archetype" @change="loadArchetype($event.target.value)">
+                            <template x-for="arch in archetypeNames" :key="arch">
+                                <option :value="arch" x-text="arch"></option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <!-- Seed Controls -->
+                    <div class="seed-controls">
+                        <label>Seed:</label>
+                        <input 
+                            type="number" 
+                            x-model.number="seed" 
+                            @change="setSeed(seed)"
+                            :min="1" 
+                            :max="999999999">
+                        <button @click="randomizeSeed()" class="randomize-btn">🎲</button>
+                    </div>
+
+                    <!-- Step Title -->
+                    <div class="step-title-section">
+                        <h2 class="step-title" x-text="currentStepTitle"></h2>
+                    </div>
+
+                    <!-- Parameters Tree -->
+                    <div class="param-scroll">
+                        <div class="param-list">
+                            <template x-for="param in currentStepParams" :key="param.azgaar_key">
+                                <div class="param-row">
+                                    <label class="param-label" x-text="(param.name || param.azgaar_key).replace(/([A-Z])/g, ' $1').trim() + ':'"></label>
+                                    <div class="param-control">
+                                        <!-- OptionButton -->
+                                        <template x-if="param.ui_type === 'OptionButton'">
+                                            <select 
+                                                x-model="params[param.azgaar_key]"
+                                                @change="updateParam(param.azgaar_key, $event.target.value)">
+                                                <template x-for="opt in param.options" :key="opt">
+                                                    <option :value="opt" x-text="opt"></option>
+                                                </template>
+                                            </select>
+                                        </template>
+
+                                        <!-- HSlider -->
+                                        <template x-if="param.ui_type === 'HSlider'">
+                                            <div class="slider-container">
+                                                <input 
+                                                    type="range" 
+                                                    x-model.number="params[param.azgaar_key]"
+                                                    @input="updateParam(param.azgaar_key, $event.target.value)"
+                                                    :min="param.min || 0"
+                                                    :max="param.max || 100"
+                                                    :step="param.step || 1">
+                                                <span class="slider-value" x-text="params[param.azgaar_key] || param.default || 0"></span>
+                                            </div>
+                                        </template>
+
+                                        <!-- SpinBox -->
+                                        <template x-if="param.ui_type === 'SpinBox'">
+                                            <input 
+                                                type="number" 
+                                                x-model.number="params[param.azgaar_key]"
+                                                @change="updateParam(param.azgaar_key, $event.target.value)"
+                                                :min="param.min || 0"
+                                                :max="param.max || 999999"
+                                                :step="param.step || 1">
+                                        </template>
+
+                                        <!-- CheckBox -->
+                                        <template x-if="param.ui_type === 'CheckBox'">
+                                            <input 
+                                                type="checkbox" 
+                                                x-model="params[param.azgaar_key]"
+                                                @change="updateParam(param.azgaar_key, $event.target.checked)">
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Bar: Navigation -->
+        <div class="bottom-bar">
+            <div class="bottom-content">
+                <div class="spacer-left"></div>
+                <button @click="previousStep()" :disabled="currentStep === 0" class="nav-button">← Back</button>
+                <button @click="generate()" class="nav-button generate-btn">✨ Generate / Apply Changes</button>
+                <button @click="nextStep()" :disabled="currentStep >= totalSteps - 1" class="nav-button">Next →</button>
+                <div class="progress-section" x-show="isGenerating">
+                    <progress :value="progressValue" max="100" class="progress-bar"></progress>
+                    <span class="status-label" x-text="statusText"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../shared/bridge.js"></script>
+    <script src="../shared/alpine.min.js" defer></script>
+    <script src="world_builder.js"></script>
+</body>
+</html>
+
