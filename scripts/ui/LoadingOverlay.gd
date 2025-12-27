@@ -21,6 +21,10 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	z_index = 1000  # Ensure overlay is on top of everything
 	
+	# Improve visibility: Set gold color for status label (readable against dark backgrounds)
+	if status_label:
+		status_label.modulate = Color(1.0, 0.843, 0.0, 1.0)  # Gold color
+	
 	# Initially hidden
 	visible = false
 
