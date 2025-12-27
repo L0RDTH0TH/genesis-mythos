@@ -21,6 +21,7 @@ const TOTAL_STEPS: int = 8
 @onready var randomize_btn: Button = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/SeedHBox/RandomizeBtn
 @onready var step_title: Label = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/RightScroll/RightVBox/StepTitle
 @onready var active_params: VBoxContainer = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/RightScroll/RightVBox/ActiveParams
+@onready var right_scroll: ScrollContainer = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/RightScroll
 @onready var bottom_hbox: HBoxContainer = $MainVBox/BottomBar/BottomContent
 @onready var back_btn: Button = $MainVBox/BottomBar/BottomContent/BackBtn
 @onready var next_btn: Button = $MainVBox/BottomBar/BottomContent/NextBtn
@@ -46,6 +47,10 @@ var gen_elapsed_time: float = 0.0
 
 # GUI Performance Fix: Throttle resize updates
 var _resize_pending: bool = false
+
+# GUI Performance Fix: Visibility-based process disabling
+var _scroll_visibility_timer: Timer = null
+const SCROLL_UPDATE_INTERVAL: float = 0.2  # Update visibility every 200ms (throttled)
 
 # Archetype presets
 const ARCHETYPES: Dictionary = {
@@ -95,6 +100,9 @@ func _ready() -> void:
 	
 	# GUI Performance Fix: Pre-create parameter row pool
 	_create_parameter_row_pool()
+	
+	# GUI Performance Fix: Setup scroll visibility tracking
+	_setup_scroll_visibility_tracking()
 	
 	# Initialize with first step
 	_load_archetype_params(0)
@@ -228,6 +236,9 @@ func _update_responsive_layout() -> void:
 	
 	# Update split offset to match left panel width
 	main_hsplit.split_offset = left_width
+	
+	# GUI Performance Fix: Update row visibility after resize (viewport size affects visible area)
+	call_deferred("_update_row_visibility")
 	
 	MythosLogger.debug("UI/WorldBuilder", "Layout updated for resize", {
 		"viewport": viewport_size,
@@ -370,6 +381,9 @@ func _update_step_ui() -> void:
 	
 	# Populate parameters for current step
 	_populate_params()
+	
+	# GUI Performance Fix: Update visibility after step change
+	call_deferred("_update_row_visibility")
 
 
 func _create_parameter_row_pool() -> void:
@@ -393,10 +407,10 @@ func _create_parameter_row_pool() -> void:
 
 func _populate_params() -> void:
 	"""Populate parameter controls for current step using object pooling (GUI Performance Fix)."""
-	# Hide all rows in pool and disable processing (reuse instead of destroy)
+	# GUI Performance Fix: Disable all rows first (visibility-based activation)
 	for row in parameter_row_pool:
 		row.hide_row()
-		row.set_process(false)  # Disable processing for hidden rows
+		row.set_active(false)  # Disable processing for all rows initially
 	
 	var step_def: Dictionary = STEP_DEFINITIONS.get(current_step, {})
 	var params_list: Array = step_def.get("params", [])
@@ -418,7 +432,7 @@ func _populate_params() -> void:
 		
 		var row: ParameterRow = parameter_row_pool[pool_index]
 		row.setup(param)
-		row.set_process(true)  # Enable processing for visible rows
+		# Note: set_active() will be called by _update_row_visibility() based on scroll position
 		
 		# Set initial value from current_params if available
 		var azgaar_key: String = param.get("azgaar_key", param.get("name", ""))
@@ -432,6 +446,76 @@ func _populate_params() -> void:
 				current_params[azgaar_key] = default_val
 		
 		pool_index += 1
+	
+	# GUI Performance Fix: Update visibility after populating (deferred to allow layout)
+	call_deferred("_update_row_visibility")
+
+
+func _setup_scroll_visibility_tracking() -> void:
+	"""Setup scroll visibility tracking for performance optimization (GUI Performance Fix)."""
+	if not right_scroll:
+		MythosLogger.warn("UI/WorldBuilder", "ScrollContainer not found, skipping scroll tracking")
+		return
+	
+	# Create throttled timer for scroll updates
+	_scroll_visibility_timer = Timer.new()
+	_scroll_visibility_timer.wait_time = SCROLL_UPDATE_INTERVAL
+	_scroll_visibility_timer.one_shot = false
+	_scroll_visibility_timer.autostart = true
+	add_child(_scroll_visibility_timer)
+	_scroll_visibility_timer.timeout.connect(_update_row_visibility)
+	
+	# Also update on scroll changes (with throttling via timer)
+	if right_scroll.get_v_scroll_bar():
+		right_scroll.get_v_scroll_bar().changed.connect(func(): _scroll_visibility_timer.start())
+	
+	MythosLogger.debug("UI/WorldBuilder", "Scroll visibility tracking initialized")
+
+
+func _update_row_visibility() -> void:
+	"""Update which rows are active based on scroll position (GUI Performance Fix)."""
+	if not right_scroll or not active_params:
+		return
+	
+	# Get scroll offset (how far scrolled vertically)
+	var scroll_offset: float = 0.0
+	if right_scroll.get_v_scroll_bar():
+		scroll_offset = right_scroll.get_v_scroll_bar().value
+	
+	# Get visible height of scroll container
+	var visible_height: float = right_scroll.size.y
+	
+	# Calculate visible range with padding (show rows slightly above/below viewport)
+	# ScrollContainer scrolls the content, so we check row positions relative to scroll offset
+	var padding: float = UIConstants.SPACING_LARGE * 2.0  # Show rows slightly outside viewport
+	var visible_top: float = scroll_offset - padding
+	var visible_bottom: float = scroll_offset + visible_height + padding
+	
+	# Update each visible row
+	var active_count: int = 0
+	for row in parameter_row_pool:
+		if not row.visible:
+			row.set_active(false)
+			continue
+		
+		# Get row position relative to active_params parent (VBoxContainer)
+		# The ScrollContainer scrolls the content, so row positions are relative to content container
+		var row_pos: Vector2 = row.position
+		var row_size: Vector2 = row.size
+		
+		# If size is zero or not yet calculated, use a default height estimate
+		if row_size.y <= 0:
+			row_size.y = UIConstants.BUTTON_HEIGHT_MEDIUM
+		
+		var row_top: float = row_pos.y
+		var row_bottom: float = row_pos.y + row_size.y
+		
+		# Check if row is in visible range (intersects with visible area)
+		var is_visible: bool = (row_bottom >= visible_top and row_top <= visible_bottom)
+		
+		row.set_active(is_visible)
+		if is_visible:
+			active_count += 1
 
 
 func _on_parameter_changed(azgaar_key: String, value: Variant) -> void:

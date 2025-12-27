@@ -208,7 +208,16 @@ func update_value(value: Variant) -> void:
 func hide_row() -> void:
 	"""Hide the row (for object pooling)."""
 	visible = false
+	set_active(false)  # Disable processing when hidden
 	_clear_control()
 	param_data = {}
 	azgaar_key = ""
+
+
+func set_active(active: bool) -> void:
+	"""Enable/disable processing for this row based on visibility (GUI Performance Fix)."""
+	if active:
+		process_mode = Node.PROCESS_MODE_INHERIT
+	else:
+		process_mode = Node.PROCESS_MODE_DISABLED
 
