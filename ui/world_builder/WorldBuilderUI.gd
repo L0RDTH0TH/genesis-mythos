@@ -16,11 +16,11 @@ const TOTAL_STEPS: int = 8
 
 # UI References
 @onready var step_buttons: Array[Button] = []
-@onready var archetype_option: OptionButton = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/ArchetypeOption
-@onready var seed_spin: SpinBox = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/SeedHBox/SeedSpin
-@onready var randomize_btn: Button = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/SeedHBox/RandomizeBtn
-@onready var step_title: Label = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/StepTitle
-@onready var active_params: VBoxContainer = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/ActiveParams
+@onready var archetype_option: OptionButton = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/ArchetypeOption
+@onready var seed_spin: SpinBox = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/SeedHBox/SeedSpin
+@onready var randomize_btn: Button = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/SeedHBox/RandomizeBtn
+@onready var step_title: Label = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/RightScroll/RightVBox/StepTitle
+@onready var active_params: VBoxContainer = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/RightScroll/RightVBox/ActiveParams
 @onready var bottom_hbox: HBoxContainer = $MainVBox/BottomBar/BottomContent
 @onready var back_btn: Button = $MainVBox/BottomBar/BottomContent/BackBtn
 @onready var next_btn: Button = $MainVBox/BottomBar/BottomContent/NextBtn
@@ -106,8 +106,8 @@ func _ready() -> void:
 	# Apply responsive layout on initial load
 	call_deferred("_update_responsive_layout")
 	
-	# Only enable _process when generation is active
-	set_process(false)
+	# GUI Performance Fix: Enable _process always for queue_redraw() (lightweight)
+	set_process(true)
 
 
 func _apply_ui_constants() -> void:
@@ -140,9 +140,12 @@ func _apply_ui_constants() -> void:
 	gen_btn.custom_minimum_size = Vector2(UIConstants.BUTTON_WIDTH_LARGE, 0)
 	bake_to_3d_btn.custom_minimum_size = Vector2(UIConstants.BUTTON_WIDTH_MEDIUM, 0)
 	
-	# Seed controls
+	# Seed controls (now in RightOuterVBox, always visible)
 	seed_spin.custom_minimum_size = Vector2(UIConstants.SEED_SPIN_WIDTH, 0)
 	randomize_btn.custom_minimum_size = UIConstants.RANDOMIZE_BTN_SIZE
+	
+	# Archetype control sizing
+	archetype_option.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, UIConstants.BUTTON_HEIGHT_SMALL)
 	
 	# Progress bar and status
 	progress_bar.custom_minimum_size = Vector2(UIConstants.PROGRESS_BAR_WIDTH, 0)
@@ -158,13 +161,16 @@ func _apply_ui_constants() -> void:
 	var step_sidebar_vbox: VBoxContainer = $MainVBox/MainHSplit/LeftPanel/LeftContent/StepSidebar
 	step_sidebar_vbox.add_theme_constant_override("separation", UIConstants.SPACING_SMALL)
 	
-	var right_vbox: VBoxContainer = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox
+	var right_outer_vbox: VBoxContainer = $MainVBox/MainHSplit/RightPanel/RightOuterVBox
+	right_outer_vbox.add_theme_constant_override("separation", UIConstants.SPACING_SMALL)
+	
+	var right_vbox: VBoxContainer = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/RightScroll/RightVBox
 	right_vbox.add_theme_constant_override("separation", UIConstants.SPACING_LARGE)
 	
-	var seed_hbox: HBoxContainer = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/SeedHBox
+	var seed_hbox: HBoxContainer = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/SeedHBox
 	seed_hbox.add_theme_constant_override("separation", UIConstants.SPACING_MEDIUM)
 	
-	var active_params_vbox: VBoxContainer = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/ActiveParams
+	var active_params_vbox: VBoxContainer = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/RightScroll/RightVBox/ActiveParams
 	active_params_vbox.add_theme_constant_override("separation", UIConstants.SPACING_LARGE)
 	
 	var bottom_content: HBoxContainer = $MainVBox/BottomBar/BottomContent
@@ -175,7 +181,7 @@ func _apply_ui_constants() -> void:
 	if title_label:
 		title_label.modulate = Color(1.0, 0.843, 0.0, 1.0)  # Gold color
 	
-	var step_title_label: Label = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/StepTitle
+	var step_title_label: Label = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/RightScroll/RightVBox/StepTitle
 	if step_title_label:
 		step_title_label.modulate = Color(1.0, 0.843, 0.0, 1.0)  # Gold color
 	
@@ -377,6 +383,7 @@ func _create_parameter_row_pool() -> void:
 		if row:
 			row.parameter_changed.connect(_on_parameter_changed)
 			row.visible = false
+			row.set_process(false)  # Disable processing for hidden rows
 			active_params.add_child(row)
 			parameter_row_pool.append(row)
 	
@@ -385,9 +392,10 @@ func _create_parameter_row_pool() -> void:
 
 func _populate_params() -> void:
 	"""Populate parameter controls for current step using object pooling (GUI Performance Fix)."""
-	# Hide all rows in pool (reuse instead of destroy)
+	# Hide all rows in pool and disable processing (reuse instead of destroy)
 	for row in parameter_row_pool:
 		row.hide_row()
+		row.set_process(false)  # Disable processing for hidden rows
 	
 	var step_def: Dictionary = STEP_DEFINITIONS.get(current_step, {})
 	var params_list: Array = step_def.get("params", [])
@@ -397,7 +405,7 @@ func _populate_params() -> void:
 		MythosLogger.debug("UI/WorldBuilder", "No parameters for step", {"step": current_step})
 		return
 	
-	# Reuse rows from pool
+	# Reuse rows from pool for current step only
 	var pool_index: int = 0
 	for param in params_list:
 		if pool_index >= parameter_row_pool.size():
@@ -409,6 +417,7 @@ func _populate_params() -> void:
 		
 		var row: ParameterRow = parameter_row_pool[pool_index]
 		row.setup(param)
+		row.set_process(true)  # Enable processing for visible rows
 		
 		# Set initial value from current_params if available
 		var azgaar_key: String = param.get("azgaar_key", param.get("name", ""))
@@ -494,11 +503,14 @@ func _generate_azgaar() -> void:
 	_update_status("Generating map...", 40)
 	gen_timer = 0.0
 	gen_elapsed_time = 0.0
-	set_process(true)
+	# _process is always enabled now for queue_redraw()
 
 
 func _process(delta: float) -> void:
 	"""Process generation status updates (fallback polling if signals don't work)."""
+	# GUI Performance Fix: Force redraw every frame for smoother UI
+	queue_redraw()
+	
 	# Generation logic only runs when generation is active (gen_timer > 0)
 	if gen_timer > 0.0:
 		gen_elapsed_time += delta
@@ -509,7 +521,6 @@ func _process(delta: float) -> void:
 			_update_status("Timeout - reduce points?", 0)
 			gen_timer = 0.0
 			gen_elapsed_time = 0.0
-			set_process(false)  # Disable _process when generation completes
 			return
 		
 		# Poll every 2 seconds for completion (reduced frequency)
@@ -518,9 +529,6 @@ func _process(delta: float) -> void:
 			# Update progress based on elapsed time
 			var progress = min(40 + (gen_elapsed_time / 60.0 * 40.0), 80.0)
 			_update_status("Generating map... (%d%%)" % int(progress), progress)
-	else:
-		# Generation complete - disable _process
-		set_process(false)
 
 func _bake_to_3d() -> void:
 	"""Bake to 3D - export heightmap from Azgaar and feed to Terrain3D."""

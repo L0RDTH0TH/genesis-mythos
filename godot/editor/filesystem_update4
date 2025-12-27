@@ -1,2 +1,2 @@
-res://ui/main_menu/main_menu_controller.gd
+res://scripts/managers/AzgaarServer.gd
 res://ui/world_builder/WorldBuilderUI.gd

@@ -162,7 +162,7 @@ layout_mode = 2
 size_flags_horizontal = 0
 size_flags_vertical = 3
 
-[node name="RightScroll" type="ScrollContainer" parent="MainVBox/MainHSplit/RightPanel"]
+[node name="RightOuterVBox" type="VBoxContainer" parent="MainVBox/MainHSplit/RightPanel"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -172,46 +172,51 @@ grow_vertical = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="RightVBox" type="VBoxContainer" parent="MainVBox/MainHSplit/RightPanel/RightScroll"]
-layout_mode = 1
-size_flags_horizontal = 3
-size_flags_vertical = 0
-
-[node name="ArchetypeLabel" type="Label" parent="MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox"]
+[node name="ArchetypeLabel" type="Label" parent="MainVBox/MainHSplit/RightPanel/RightOuterVBox"]
 layout_mode = 2
 text = "Archetype Preset:"
 
-[node name="ArchetypeOption" type="OptionButton" parent="MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox"]
+[node name="ArchetypeOption" type="OptionButton" parent="MainVBox/MainHSplit/RightPanel/RightOuterVBox"]
 layout_mode = 2
 selected = 0
 
-[node name="SeedLabel" type="Label" parent="MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox"]
+[node name="SeedLabel" type="Label" parent="MainVBox/MainHSplit/RightPanel/RightOuterVBox"]
 layout_mode = 2
 text = "Seed:"
 
-[node name="SeedHBox" type="HBoxContainer" parent="MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox"]
+[node name="SeedHBox" type="HBoxContainer" parent="MainVBox/MainHSplit/RightPanel/RightOuterVBox"]
 layout_mode = 2
 
-[node name="SeedSpin" type="SpinBox" parent="MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/SeedHBox"]
+[node name="SeedSpin" type="SpinBox" parent="MainVBox/MainHSplit/RightPanel/RightOuterVBox/SeedHBox"]
 layout_mode = 2
 min_value = 0.0
 max_value = 4294967295.0
 value = 12345.0
 
-[node name="RandomizeBtn" type="Button" parent="MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/SeedHBox"]
+[node name="RandomizeBtn" type="Button" parent="MainVBox/MainHSplit/RightPanel/RightOuterVBox/SeedHBox"]
 layout_mode = 2
 text = "🎲"
 flat = true
 
-[node name="SectionSep" type="HSeparator" parent="MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox"]
+[node name="RightScroll" type="ScrollContainer" parent="MainVBox/MainHSplit/RightPanel/RightOuterVBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="RightVBox" type="VBoxContainer" parent="MainVBox/MainHSplit/RightPanel/RightOuterVBox/RightScroll"]
+layout_mode = 1
+size_flags_horizontal = 3
+size_flags_vertical = 0
+
+[node name="SectionSep" type="HSeparator" parent="MainVBox/MainHSplit/RightPanel/RightOuterVBox/RightScroll/RightVBox"]
 layout_mode = 2
 
-[node name="StepTitle" type="Label" parent="MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox"]
+[node name="StepTitle" type="Label" parent="MainVBox/MainHSplit/RightPanel/RightOuterVBox/RightScroll/RightVBox"]
 layout_mode = 2
 text = "Step 1: Terrain & Heightmap"
 horizontal_alignment = 1
 
-[node name="ActiveParams" type="VBoxContainer" parent="MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox"]
+[node name="ActiveParams" type="VBoxContainer" parent="MainVBox/MainHSplit/RightPanel/RightOuterVBox/RightScroll/RightVBox"]
 layout_mode = 2
 
 [node name="BottomBar" type="PanelContainer" parent="MainVBox"]

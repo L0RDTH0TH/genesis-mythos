@@ -1,0 +1,724 @@
+# ╔═══════════════════════════════════════════════════════════
+# ║ FlameGraphProfiler.gd
+# ║ Desc: Singleton for flame graph profiling data collection
+# ║ Author: Lordthoth
+# ╚═══════════════════════════════════════════════════════════
+#
+# Flame Graph Profiler - Collects stack traces and builds hierarchical call trees
+# for performance analysis. Supports sampling-based profiling with configurable
+# intervals. Exports data in JSON format compatible with flame graph visualization tools.
+#
+# Usage:
+#   - Controlled via PerformanceMonitor F3 cycle (FLAME mode)
+#   - Or manually: FlameGraphProfiler.start_profiling() / stop_profiling()
+#   - Manual instrumentation: FlameGraphProfiler.push_flame_data_instrumented(function_name, time_ms, params)
+#   - Export: Automatic on stop_profiling() or via auto_export_interval_seconds
+#
+# Performance Overhead:
+#   - Sampling mode: <2% CPU overhead (configurable via sampling_interval_ms)
+#   - Buffer size: MAX_SAMPLES (1000) samples, ~50KB memory
+#   - Thread-safe: Uses mutex for buffer operations
+#
+# Export Format:
+#   - JSON with metadata, call_tree (hierarchical), and raw samples
+#   - Call tree nodes include: function, source, line, total_time_ms, self_time_ms, call_count
+#   - Compatible with external flame graph tools (speedscope, flamegraph.pl)
+#
+# ╚═══════════════════════════════════════════════════════════
+
+extends Node
+
+## Signal emitted when aggregation completes
+signal aggregation_complete(samples_processed: int)
+
+## Configuration file path
+const CONFIG_PATH: String = "res://data/config/flame_graph_config.json"
+
+## Configuration dictionary loaded from JSON
+var config: Dictionary = {}
+
+## Is flame graph profiling currently enabled
+var is_profiling_enabled: bool = false
+
+## Sampling timer for interval-based stack collection
+var sampling_timer: Timer = null
+
+## Ring buffer for stack trace samples
+var stack_samples: Array[Dictionary] = []
+const MAX_SAMPLES: int = 1000  ## Maximum samples in buffer
+
+## Hierarchical call tree (aggregated from samples)
+var call_tree: Dictionary = {}
+
+## Mutex for thread-safe operations
+var _buffer_mutex: Mutex = Mutex.new()
+
+## Auto-export timer
+var auto_export_timer: Timer = null
+
+## Aggregation timer (periodically update call tree for visualization)
+var aggregation_timer: Timer = null
+const AGGREGATION_INTERVAL_SECONDS: float = 1.0  ## Aggregate every 1 second
+
+## Throttling: Minimum time between samples (additional safety beyond timer interval)
+var _last_sample_time: int = 0
+const MIN_SAMPLE_INTERVAL_MSEC: int = 50  ## Minimum 50ms between samples (20 samples/sec max)
+
+
+func _ready() -> void:
+	"""Initialize the flame graph profiler on ready."""
+	_load_config()
+	_apply_config()
+	
+	# DIAGNOSTIC TEST: Force disable profiling regardless of config
+	is_profiling_enabled = false
+	MythosLogger.info("FlameGraphProfiler", "DIAGNOSTIC: Flame graph profiling force-disabled for FPS testing")
+	
+	if is_profiling_enabled:
+		# Setup timers directly since config says enabled
+		var sampling_mode: String = config.get("sampling_mode", "sampling")
+		if sampling_mode == "sampling":
+			_setup_sampling_timer()
+		_setup_auto_export_timer()
+		MythosLogger.info_file_only("FlameGraphProfiler", "Flame graph profiling initialized and enabled")
+	else:
+		MythosLogger.debug_file_only("FlameGraphProfiler", "Flame graph profiling initialized (disabled)")
+
+
+func _exit_tree() -> void:
+	"""Cleanup on exit."""
+	stop_profiling()
+	MythosLogger.info_file_only("FlameGraphProfiler", "Flame graph profiler shutting down")
+
+
+func _load_config() -> void:
+	"""Load configuration from JSON file."""
+	var config_file := FileAccess.open(CONFIG_PATH, FileAccess.READ)
+	
+	if not config_file:
+		MythosLogger.warn_file_only("FlameGraphProfiler", "Could not load config from %s, using defaults" % CONFIG_PATH)
+		config = _get_default_config()
+		return
+	
+	var content: String = config_file.get_as_text()
+	config_file.close()
+	
+	var json := JSON.new()
+	var parse_result: Error = json.parse(content)
+	
+	if parse_result != OK:
+		MythosLogger.warn_file_only("FlameGraphProfiler", "Failed to parse config JSON, using defaults")
+		config = _get_default_config()
+		return
+	
+	var parsed: Variant = json.data
+	if parsed is Dictionary:
+		config = parsed as Dictionary
+	else:
+		MythosLogger.warn_file_only("FlameGraphProfiler", "Invalid config format, using defaults")
+		config = _get_default_config()
+
+
+func _get_default_config() -> Dictionary:
+	"""Return default configuration dictionary."""
+	return {
+		"enabled": false,
+		"sampling_mode": "sampling",
+		"sampling_interval_ms": 10.0,
+		"max_stack_depth": 40,
+		"max_render_depth": 30,
+		"export_format": "json",
+		"export_directory": "user://flame_graphs/",
+		"auto_export_interval_seconds": 60.0,
+		"systems": {
+			"world_generation": true,
+			"rendering": true,
+			"entity_sim": false
+		}
+	}
+
+
+func _apply_config() -> void:
+	"""Apply loaded configuration to internal variables."""
+	is_profiling_enabled = config.get("enabled", false)
+
+
+func start_profiling() -> void:
+	"""Start flame graph profiling (safe to call multiple times)."""
+	if is_profiling_enabled:
+		MythosLogger.debug_file_only("FlameGraphProfiler", "Profiling already started, skipping")
+		return
+	
+	is_profiling_enabled = true
+	
+	# Setup sampling timer if using sampling mode
+	var sampling_mode: String = config.get("sampling_mode", "sampling")
+	if sampling_mode == "sampling":
+		_setup_sampling_timer()
+	
+	# Setup auto-export timer
+	_setup_auto_export_timer()
+	
+	# Setup aggregation timer (for periodic call tree updates)
+	_setup_aggregation_timer()
+	
+	MythosLogger.info_file_only("FlameGraphProfiler", "Flame graph profiling started")
+
+
+func stop_profiling() -> void:
+	"""Stop flame graph profiling and auto-export data (safe to call multiple times)."""
+	if not is_profiling_enabled:
+		MythosLogger.debug_file_only("FlameGraphProfiler", "Profiling already stopped, skipping")
+		return
+	
+	is_profiling_enabled = false
+	
+	# Auto-export data before stopping
+	if stack_samples.size() > 0:
+		var export_path: String = export_to_json()
+		if export_path != "":
+			MythosLogger.info_file_only("FlameGraphProfiler", "Auto-exported flame graph data to: %s" % export_path)
+		else:
+			MythosLogger.warn_file_only("FlameGraphProfiler", "Failed to auto-export flame graph data")
+	
+	# Stop timers
+	if sampling_timer:
+		sampling_timer.stop()
+		sampling_timer.queue_free()
+		sampling_timer = null
+	
+	if auto_export_timer:
+		auto_export_timer.stop()
+		auto_export_timer.queue_free()
+		auto_export_timer = null
+	
+	if aggregation_timer:
+		aggregation_timer.stop()
+		aggregation_timer.queue_free()
+		aggregation_timer = null
+	
+	MythosLogger.info_file_only("FlameGraphProfiler", "Flame graph profiling stopped")
+
+
+func _setup_sampling_timer() -> void:
+	"""Setup timer for interval-based stack sampling."""
+	if sampling_timer:
+		return
+	
+	var interval_ms: float = config.get("sampling_interval_ms", 10.0)
+	sampling_timer = Timer.new()
+	sampling_timer.name = "SamplingTimer"
+	sampling_timer.wait_time = interval_ms / 1000.0  # Convert ms to seconds
+	sampling_timer.timeout.connect(_collect_stack_sample)
+	add_child(sampling_timer)
+	sampling_timer.start()
+	
+	MythosLogger.debug_file_only("FlameGraphProfiler", "Sampling timer setup with interval: %.2f ms" % interval_ms)
+
+
+func _setup_auto_export_timer() -> void:
+	"""Setup timer for automatic data export."""
+	if auto_export_timer:
+		return
+	
+	var interval_seconds: float = config.get("auto_export_interval_seconds", 60.0)
+	auto_export_timer = Timer.new()
+	auto_export_timer.name = "AutoExportTimer"
+	auto_export_timer.wait_time = interval_seconds
+	auto_export_timer.timeout.connect(_auto_export_data)
+	add_child(auto_export_timer)
+	auto_export_timer.start()
+	
+	MythosLogger.debug_file_only("FlameGraphProfiler", "Auto-export timer setup with interval: %.2f seconds" % interval_seconds)
+
+
+func _setup_aggregation_timer() -> void:
+	"""Setup timer for periodic call tree aggregation (for visualization)."""
+	if aggregation_timer:
+		return
+	
+	aggregation_timer = Timer.new()
+	aggregation_timer.name = "AggregationTimer"
+	aggregation_timer.wait_time = AGGREGATION_INTERVAL_SECONDS
+	aggregation_timer.timeout.connect(_periodic_aggregate)
+	add_child(aggregation_timer)
+	aggregation_timer.start()
+	
+	MythosLogger.debug_file_only("FlameGraphProfiler", "Aggregation timer setup with interval: %.2f seconds" % AGGREGATION_INTERVAL_SECONDS)
+
+
+func _periodic_aggregate() -> void:
+	"""Periodically aggregate samples into call tree for visualization."""
+	if not is_profiling_enabled:
+		return
+	
+	# Get current samples (thread-safe copy)
+	_buffer_mutex.lock()
+	var samples_to_aggregate: Array[Dictionary] = stack_samples.duplicate()
+	_buffer_mutex.unlock()
+	
+	# Aggregate if we have samples
+	if samples_to_aggregate.size() > 0:
+		_aggregate_samples_to_tree(samples_to_aggregate)
+		MythosLogger.debug_file_only("FlameGraphProfiler", "Periodic aggregation: %d samples -> call tree" % samples_to_aggregate.size())
+		
+		# Emit signal when aggregation completes
+		var processed_count: int = samples_to_aggregate.size()
+		aggregation_complete.emit(processed_count)
+
+
+func _collect_stack_sample() -> void:
+	"""Collect a stack trace sample (called by sampling timer)."""
+	if not is_profiling_enabled:
+		return
+	
+	# Additional throttling: Ensure minimum time between samples
+	# This prevents excessive calls even if timer fires too frequently
+	var now: int = Time.get_ticks_msec()
+	if now - _last_sample_time < MIN_SAMPLE_INTERVAL_MSEC:
+		return  # Skip if sampled too recently
+	_last_sample_time = now
+	
+	# Check rate limiting via PerformanceMonitorSingleton
+	if PerformanceMonitorSingleton and not PerformanceMonitorSingleton.can_log():
+		return
+	
+	# DEBUG: Measure get_stack() cost
+	var stack_start: int = Time.get_ticks_usec()
+	
+	# Get stack trace (get_stack() returns Array[Dictionary] with source, function, line)
+	# WARNING: get_stack() is EXPENSIVE - can take 1-5ms with deep stacks
+	# Calling this too frequently causes severe performance issues
+	# Current config: 100ms interval = 10 samples/sec (acceptable)
+	# Previous config: 10ms interval = 100 samples/sec (TOO FREQUENT - causes freeze)
+	var raw_stack: Array = get_stack()
+	
+	var stack_elapsed: int = Time.get_ticks_usec() - stack_start
+	if stack_elapsed > 1000:  # Log if > 1ms
+		MythosLogger.warn_file_only("FlameGraphProfiler", "get_stack() took %d usec (%.2f ms) - consider increasing sampling_interval_ms" % [stack_elapsed, stack_elapsed / 1000.0])
+	var max_depth: int = config.get("max_stack_depth", 40)
+	
+	# Limit stack depth (keep deepest frames, remove top-level ones)
+	var stack: Array = []
+	if raw_stack.size() > max_depth:
+		# Keep the deepest frames (most recent calls)
+		var start_idx: int = raw_stack.size() - max_depth
+		stack = raw_stack.slice(start_idx)
+	else:
+		stack = raw_stack.duplicate()
+	
+	# Format stack frames for better readability with parameter support
+	var formatted_stack: Array[Dictionary] = []
+	for i in range(stack.size()):
+		var frame = stack[i]
+		if frame is Dictionary:
+			var formatted_frame: Dictionary = {
+				"function": frame.get("function", "unknown"),
+				"source": frame.get("source", "unknown"),
+				"line": frame.get("line", 0),
+				"params": frame.get("params", {})  # Parameters dictionary (placeholder for future use)
+			}
+			# Add caller information for call site distinction
+			# stack[0] is deepest (current function), stack[1] is caller of stack[0], etc.
+			# So for stack[i], the caller is stack[i+1] (shallower in the stack)
+			if i < stack.size() - 1 and stack[i + 1] is Dictionary:
+				var caller_frame: Dictionary = stack[i + 1]
+				formatted_frame["caller_function"] = caller_frame.get("function", "unknown")
+				formatted_frame["caller_source"] = caller_frame.get("source", "unknown")
+				formatted_frame["caller_line"] = caller_frame.get("line", 0)
+			formatted_stack.append(formatted_frame)
+	
+	# Create sample dictionary
+	var sample: Dictionary = {
+		"frame_id": Engine.get_process_frames(),
+		"timestamp_usec": Time.get_ticks_usec(),
+		"stack": formatted_stack,
+		"stack_depth": formatted_stack.size()
+	}
+	
+	# Diagnostic logging: log stack depth
+	MythosLogger.debug_file_only("FlameGraphProfiler", "Collected stack sample: depth=%d" % formatted_stack.size())
+	
+	# Push to buffer (thread-safe)
+	_buffer_mutex.lock()
+	stack_samples.append(sample)
+	if stack_samples.size() > MAX_SAMPLES:
+		stack_samples.pop_front()
+	_buffer_mutex.unlock()
+
+
+func _auto_export_data() -> void:
+	"""Automatically export data (called by auto-export timer)."""
+	if not is_profiling_enabled:
+		return
+	
+	export_to_json()
+
+
+func push_flame_data_instrumented(function_name: String, time_ms: float, params: Dictionary = {}, frame_id: int = -1) -> void:
+	"""
+	Push flame graph data for manual instrumentation of a single function.
+	
+	This method allows systems to report actual measured times for specific functions,
+	providing more accurate profiling than statistical sampling.
+	
+	Args:
+		function_name: Name of the function being instrumented
+		time_ms: Actual time spent in the function (measured, not estimated)
+		params: Optional dictionary of function parameters for context
+		frame_id: Frame ID for synchronization (defaults to current frame)
+	"""
+	if not is_profiling_enabled:
+		return
+	
+	if frame_id == -1:
+		frame_id = Engine.get_process_frames()
+	
+	# Create a synthetic stack trace with just this function
+	# In a real scenario, you might want to include the actual caller
+	var current_stack: Array = get_stack()
+	var caller_info: Dictionary = {}
+	
+	# Try to get caller from actual stack (skip this function and push_flame_data_instrumented)
+	if current_stack.size() > 2:
+		var caller_frame: Dictionary = current_stack[2]  # Skip [0]=this, [1]=push_flame_data_instrumented
+		if caller_frame is Dictionary:
+			caller_info = {
+				"function": caller_frame.get("function", "unknown"),
+				"source": caller_frame.get("source", "unknown"),
+				"line": caller_frame.get("line", 0)
+			}
+	
+	# Create synthetic frame for the instrumented function
+	var formatted_frame: Dictionary = {
+		"function": function_name,
+		"source": "instrumented",  # Mark as instrumented
+		"line": 0,
+		"params": params,
+		"caller_function": caller_info.get("function", ""),
+		"caller_source": caller_info.get("source", ""),
+		"caller_line": caller_info.get("line", 0)
+	}
+	
+	var sample: Dictionary = {
+		"frame_id": frame_id,
+		"timestamp_usec": Time.get_ticks_usec(),
+		"time_ms": time_ms,  # Use actual measured time
+		"stack": [formatted_frame],  # Single-frame stack for instrumented function
+		"stack_depth": 1,
+		"instrumented": true  # Flag to indicate this is instrumented data
+	}
+	
+	# Push to buffer (thread-safe)
+	_buffer_mutex.lock()
+	stack_samples.append(sample)
+	if stack_samples.size() > MAX_SAMPLES:
+		stack_samples.pop_front()
+	_buffer_mutex.unlock()
+
+
+func push_flame_data(stack_trace: Array, time_ms: float, frame_id: int = -1) -> void:
+	"""
+	Push flame graph data with stack trace and timing.
+	
+	Args:
+		stack_trace: Array of stack frame dictionaries from get_stack()
+		time_ms: Time spent in milliseconds
+		frame_id: Frame ID for synchronization (defaults to current frame)
+	"""
+	if not is_profiling_enabled:
+		return
+	
+	if frame_id == -1:
+		frame_id = Engine.get_process_frames()
+	
+	var max_depth: int = config.get("max_stack_depth", 40)
+	
+	# Format and limit stack trace
+	var formatted_stack: Array[Dictionary] = []
+	var stack_size: int = stack_trace.size()
+	var start_idx: int = 0
+	if stack_size > max_depth:
+		start_idx = stack_size - max_depth
+	
+	for i in range(start_idx, stack_size):
+		var frame = stack_trace[i]
+		if frame is Dictionary:
+			var formatted_frame: Dictionary = {
+				"function": frame.get("function", "unknown"),
+				"source": frame.get("source", "unknown"),
+				"line": frame.get("line", 0),
+				"params": frame.get("params", {})  # Parameters dictionary
+			}
+			# Add caller information for call site distinction
+			# stack_trace[0] is deepest (current function), stack_trace[1] is caller, etc.
+			# So for stack_trace[i], the caller is stack_trace[i+1] (shallower in the stack)
+			if i < stack_trace.size() - 1 and stack_trace[i + 1] is Dictionary:
+				var caller_frame: Dictionary = stack_trace[i + 1]
+				formatted_frame["caller_function"] = caller_frame.get("function", "unknown")
+				formatted_frame["caller_source"] = caller_frame.get("source", "unknown")
+				formatted_frame["caller_line"] = caller_frame.get("line", 0)
+			formatted_stack.append(formatted_frame)
+	
+	var sample: Dictionary = {
+		"frame_id": frame_id,
+		"timestamp_usec": Time.get_ticks_usec(),
+		"time_ms": time_ms,
+		"stack": formatted_stack,
+		"stack_depth": formatted_stack.size()
+	}
+	
+	# Push to buffer (thread-safe)
+	_buffer_mutex.lock()
+	stack_samples.append(sample)
+	if stack_samples.size() > MAX_SAMPLES:
+		stack_samples.pop_front()
+	_buffer_mutex.unlock()
+
+
+func export_to_json() -> String:
+	"""
+	Export collected flame graph data to JSON file.
+	
+	Returns:
+		Path to exported file, or empty string on failure
+	"""
+	var export_dir: String = config.get("export_directory", "user://flame_graphs/")
+	
+	# Ensure directory exists
+	var dir: DirAccess = DirAccess.open("user://")
+	if dir == null:
+		MythosLogger.error("FlameGraphProfiler", "Failed to access user:// directory")
+		return ""
+	
+	# Create export directory if needed
+	var dir_path: String = export_dir.trim_prefix("user://")
+	if not dir.dir_exists(dir_path):
+		var err: Error = dir.make_dir(dir_path)
+		if err != OK:
+			MythosLogger.error("FlameGraphProfiler", "Failed to create export directory: %s" % dir_path)
+			return ""
+	
+	# Generate timestamped filename
+	var timestamp: String = Time.get_datetime_string_from_system(true, true).replace(":", "").replace("-", "").replace("T", "_").replace(".", "")
+	var filename: String = "flame_graph_%s.json" % timestamp
+	var full_path: String = export_dir + filename if export_dir.ends_with("/") else export_dir + "/" + filename
+	
+	# Get samples (thread-safe copy)
+	_buffer_mutex.lock()
+	var samples_to_export: Array[Dictionary] = stack_samples.duplicate()
+	_buffer_mutex.unlock()
+	
+	# Aggregate samples into hierarchical call tree
+	_aggregate_samples_to_tree(samples_to_export)
+	
+	# Create export data structure with hierarchical tree
+	var export_data: Dictionary = {
+		"metadata": {
+			"export_timestamp": Time.get_datetime_string_from_system(),
+			"sample_count": samples_to_export.size(),
+			"profiler": "GenesisMythos_FlameGraphProfiler",
+			"version": "1.0.0",
+			"config": config
+		},
+		"call_tree": call_tree,
+		"samples": samples_to_export  # Keep raw samples for reference
+	}
+	
+	# Write JSON file
+	var file := FileAccess.open(full_path, FileAccess.WRITE)
+	if not file:
+		MythosLogger.error("FlameGraphProfiler", "Failed to open file for export: %s" % full_path)
+		return ""
+	
+	var json_string: String = JSON.stringify(export_data, "\t")
+	file.store_string(json_string)
+	file.close()
+	
+	MythosLogger.info_file_only("FlameGraphProfiler", "Exported %d samples and call tree to: %s" % [samples_to_export.size(), full_path])
+	return full_path
+
+
+func get_sample_count() -> int:
+	"""Get current number of samples in buffer."""
+	_buffer_mutex.lock()
+	var count: int = stack_samples.size()
+	_buffer_mutex.unlock()
+	return count
+
+
+func clear_samples() -> void:
+	"""Clear all collected samples."""
+	_buffer_mutex.lock()
+	stack_samples.clear()
+	call_tree.clear()
+	_buffer_mutex.unlock()
+	MythosLogger.debug_file_only("FlameGraphProfiler", "Cleared all samples and call tree")
+
+
+func _aggregate_samples_to_tree(samples: Array[Dictionary]) -> void:
+	"""
+	Aggregate stack trace samples into hierarchical call tree.
+	
+	Builds a tree structure where each node represents a function call,
+	with parent-child relationships based on call stack depth.
+	"""
+	call_tree.clear()
+	
+	if samples.is_empty():
+		return
+	
+	# Initialize root node
+	call_tree = {
+		"function": "<root>",
+		"source": "",
+		"line": 0,
+		"total_time_ms": 0.0,
+		"self_time_ms": 0.0,
+		"call_count": 0,
+		"frame_ids": [],
+		"children": {}
+	}
+	
+	# Process each sample
+	for sample in samples:
+		var stack: Array = sample.get("stack", [])
+		var frame_id: int = sample.get("frame_id", -1)
+		var time_ms: float = sample.get("time_ms", 0.0)
+		
+		# If no time_ms provided, use sampling interval as estimate
+		if time_ms <= 0.0:
+			time_ms = config.get("sampling_interval_ms", 10.0)
+		
+		# Update root statistics
+		call_tree["total_time_ms"] += time_ms
+		call_tree["call_count"] += 1
+		if not call_tree["frame_ids"].has(frame_id):
+			call_tree["frame_ids"].append(frame_id)
+		
+		# Build tree from root to leaf (stack[0] is deepest, stack[-1] is shallowest)
+		var current_node: Dictionary = call_tree
+		
+		for i in range(stack.size()):
+			var frame: Dictionary = stack[i]
+			if not frame is Dictionary:
+				continue
+			
+			var function_name: String = frame.get("function", "unknown")
+			var source: String = frame.get("source", "unknown")
+			var line: int = frame.get("line", 0)
+			
+			# Create unique key for this function with call site distinction
+			# Format: source:function:line@caller_source:caller_function:caller_line
+			var node_key: String = "%s:%s:%d" % [source, function_name, line]
+			
+			# Add call site information if available (caller function + line)
+			var caller_function: String = frame.get("caller_function", "")
+			var caller_source: String = frame.get("caller_source", "")
+			var caller_line: int = frame.get("caller_line", 0)
+			
+			if caller_function != "" and caller_source != "":
+				node_key += "@%s:%s:%d" % [caller_source, caller_function, caller_line]
+				# Diagnostic logging: log distinct call site nodes
+				if caller_function != "unknown" and caller_function != "":
+					MythosLogger.debug_file_only("FlameGraphProfiler", "Created distinct call site node: %s" % node_key)
+			
+			# Get or create child node
+			var children: Dictionary = current_node.get("children", {})
+			
+			if not children.has(node_key):
+				# Create new node with call site information
+				var new_node: Dictionary = {
+					"function": function_name,
+					"source": source,
+					"line": line,
+					"total_time_ms": 0.0,
+					"self_time_ms": 0.0,
+					"call_count": 0,
+					"frame_ids": [],
+					"children": {},
+					"params": frame.get("params", {})  # Store parameters if available
+				}
+				
+				# Add call site information to node
+				if caller_function != "" and caller_source != "":
+					new_node["caller_function"] = caller_function
+					new_node["caller_source"] = caller_source
+					new_node["caller_line"] = caller_line
+				
+				children[node_key] = new_node
+			
+			var node: Dictionary = children[node_key]
+			
+			# Update node statistics
+			node["total_time_ms"] += time_ms
+			node["call_count"] += 1
+			if not node["frame_ids"].has(frame_id):
+				node["frame_ids"].append(frame_id)
+			
+			# Update current_node's children reference
+			current_node["children"] = children
+			
+			# Move to child node for next iteration
+			current_node = node
+		
+		# Add time to leaf node's self_time (time spent in the function itself)
+		if current_node.has("function") and current_node["function"] != "<root>":
+			current_node["self_time_ms"] += time_ms
+	
+	# Calculate self_time for all nodes (total_time - sum of children's total_time)
+	_calculate_self_times(call_tree)
+	
+	# Diagnostic logging: tree statistics
+	var tree_depth: int = _get_tree_depth(call_tree)
+	var root_children_count: int = call_tree.get("children", {}).size()
+	MythosLogger.debug_file_only("FlameGraphProfiler", "Aggregated %d samples into call tree" % samples.size())
+	MythosLogger.debug_file_only("FlameGraphProfiler", "Call tree max depth: %d, root children: %d" % [tree_depth, root_children_count])
+
+
+func _calculate_self_times(node: Dictionary) -> void:
+	"""Recursively calculate self_time for all nodes (total_time - children's total_time)."""
+	if not node.has("children"):
+		return
+	
+	var children: Dictionary = node.get("children", {})
+	var children_total: float = 0.0
+	
+	# First, recursively calculate self_times for all children
+	for child_key in children.keys():
+		var child: Dictionary = children[child_key]
+		_calculate_self_times(child)
+		children_total += child.get("total_time_ms", 0.0)
+	
+	# Then calculate self_time for this node
+	var total_time: float = node.get("total_time_ms", 0.0)
+	var self_time: float = max(0.0, total_time - children_total)
+	node["self_time_ms"] = self_time
+
+
+func get_call_tree() -> Dictionary:
+	"""Get the current aggregated call tree."""
+	_buffer_mutex.lock()
+	var tree: Dictionary = call_tree.duplicate(true)  # Deep copy
+	_buffer_mutex.unlock()
+	return tree
+
+
+func _get_tree_depth(node: Dictionary, current_depth: int = 0) -> int:
+	"""
+	Recursively calculate maximum depth of the call tree.
+	
+	Args:
+		node: Current node in the call tree
+		current_depth: Current recursion depth
+		
+	Returns:
+		Maximum depth found in the tree
+	"""
+	var max_depth: int = current_depth
+	var children: Dictionary = node.get("children", {})
+	for child in children.values():
+		var child_depth: int = _get_tree_depth(child, current_depth + 1)
+		max_depth = max(max_depth, child_depth)
+	return max_depth
+
