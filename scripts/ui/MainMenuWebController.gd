@@ -74,7 +74,13 @@ func _handle_navigate(data: Dictionary) -> void:
 		return
 	
 	MythosLogger.info("MainMenuWebController", "Navigating to scene", {"scene_path": scene_path})
-	get_tree().change_scene_to_file(scene_path)
+	
+	# Show progress overlay immediately (before blocking scene change)
+	if scene_path.contains("world_builder") or scene_path.contains("WorldBuilder"):
+		ProgressDialogWeb.show_progress("Loading World Builder", "Initializing...")
+	
+	# Defer scene change to allow overlay to render first
+	call_deferred("_deferred_change_scene", scene_path)
 
 func _handle_viewport_resize(data: Dictionary) -> void:
 	"""Handle viewport resize notification from WebView."""
@@ -83,9 +89,10 @@ func _handle_viewport_resize(data: Dictionary) -> void:
 	
 	MythosLogger.debug("MainMenuWebController", "Viewport resize", {"width": width, "height": height})
 	
-	# Ensure WebView matches viewport size
+	# Defer resize to avoid borrowing conflict (godot-rust issue)
+	# The WebView is already borrowed by the signal handler, so we must defer
 	if web_view and web_view.has_method("set_size"):
-		web_view.set_size(Vector2i(width, height))
+		call_deferred("_deferred_webview_resize", Vector2i(width, height))
 
 func _inject_ipc_bridge() -> void:
 	"""Verify IPC bridge is available (godot_wry provides window.ipc automatically)."""
@@ -111,8 +118,29 @@ func _inject_ipc_bridge() -> void:
 func _notification(what: int) -> void:
 	"""Handle window resize events."""
 	if what == NOTIFICATION_WM_SIZE_CHANGED:
-		# Ensure WebView fills viewport
+		# Ensure WebView fills viewport (defer to avoid potential conflicts)
 		var viewport_size: Vector2 = get_viewport().get_visible_rect().size
 		if web_view and web_view.has_method("set_size"):
-			web_view.set_size(Vector2i(int(viewport_size.x), int(viewport_size.y)))
+			call_deferred("_deferred_webview_resize", Vector2i(int(viewport_size.x), int(viewport_size.y)))
+
+func _deferred_webview_resize(size: Vector2i) -> void:
+	"""Deferred resize helper to avoid godot-rust borrowing conflicts."""
+	if web_view and web_view.has_method("set_size"):
+		web_view.set_size(size)
+		MythosLogger.debug("MainMenuWebController", "WebView resized", {"size": size})
+
+func _deferred_change_scene(scene_path: String) -> void:
+	"""Deferred scene change to allow progress overlay to render first."""
+	# Change scene (this will block, but overlay is already visible)
+	get_tree().change_scene_to_file(scene_path)
+	
+	# Hide progress overlay after scene change completes
+	# Note: This will be called after new scene's _ready() executes
+	call_deferred("_hide_progress_after_scene_change")
+
+func _hide_progress_after_scene_change() -> void:
+	"""Hide progress overlay after scene change completes."""
+	# Small delay to ensure new scene is fully initialized
+	await get_tree().create_timer(0.1).timeout
+	ProgressDialogWeb.hide_progress()
 

@@ -58,31 +58,46 @@ Alpine.data('worldBuilder', () => ({
         // Store instance for global access
         window.worldBuilderInstance = this;
         
-        // Check if steps data was stored before Alpine initialized
-        if (window._pendingStepsData && window._pendingStepsData.steps) {
-            this.steps = window._pendingStepsData.steps;
-            this._initializeParams();
-            delete window._pendingStepsData;
+        // Lazy initialization: defer heavy data requests until after DOM is ready
+        // This reduces blocking time during Alpine.js initialization
+        if (document.readyState === 'loading') {
+            // DOM not ready yet, wait for it
+            document.addEventListener('DOMContentLoaded', () => {
+                this._lazyInit();
+            });
         } else {
-            // Request step definitions from Godot
-            GodotBridge.requestData('step_definitions', (data) => {
-                if (data && data.steps) {
-                    this.steps = data.steps;
-                    // Initialize params with defaults from first step
-                    this._initializeParams();
-                }
+            // DOM already ready, but defer to next frame to allow Alpine to finish init
+            requestAnimationFrame(() => {
+                this._lazyInit();
             });
         }
         
-        // Request archetypes (already have names, but can request full data if needed)
-        // Archetype names are already set in archetypeNames array
-        
-        // Send initial step
+        // Send initial step (non-blocking)
         this.setStep(0);
     },
     
+    _lazyInit() {
+        // Lazy initialization: load step definitions and initialize params
+        // Check if steps data was stored before Alpine initialized
+        if (window._pendingStepsData && window._pendingStepsData.steps) {
+            this.steps = window._pendingStepsData.steps;
+            this._initializeParamsForStep(0); // Only init current step
+            delete window._pendingStepsData;
+        } else {
+            // Request step definitions from Godot (deferred)
+            GodotBridge.requestData('step_definitions', (data) => {
+                if (data && data.steps) {
+                    this.steps = data.steps;
+                    // Initialize params only for current step (chunked)
+                    this._initializeParamsForStep(this.currentStep);
+                }
+            });
+        }
+    },
+    
     _initializeParams() {
-        // Initialize params with default values from step definitions
+        // DEPRECATED: Use _initializeParamsForStep() instead for chunked initialization
+        // Initialize params with default values from step definitions (all steps)
         for (let step of this.steps) {
             if (step.parameters) {
                 for (let param of step.parameters) {
@@ -90,6 +105,24 @@ Alpine.data('worldBuilder', () => ({
                         this.params[param.azgaar_key] = param.default !== undefined ? param.default : 
                             (param.ui_type === 'CheckBox' ? false : 0);
                     }
+                }
+            }
+        }
+    },
+    
+    _initializeParamsForStep(stepIndex) {
+        // Chunked initialization: only initialize params for a specific step
+        // This reduces initial blocking time by spreading work across frames
+        if (!this.steps || stepIndex < 0 || stepIndex >= this.steps.length) {
+            return;
+        }
+        
+        var step = this.steps[stepIndex];
+        if (step && step.parameters) {
+            for (let param of step.parameters) {
+                if (!(param.azgaar_key in this.params)) {
+                    this.params[param.azgaar_key] = param.default !== undefined ? param.default : 
+                        (param.ui_type === 'CheckBox' ? false : 0);
                 }
             }
         }
@@ -113,6 +146,14 @@ Alpine.data('worldBuilder', () => ({
         if (index >= 0 && index < this.totalSteps) {
             this.currentStep = index;
             GodotBridge.postMessage('set_step', { step: index });
+            
+            // Chunked param initialization: initialize params for new step if not already done
+            if (this.steps && this.steps[index]) {
+                // Defer param initialization to avoid blocking step change
+                requestAnimationFrame(() => {
+                    this._initializeParamsForStep(index);
+                });
+            }
         }
     },
     

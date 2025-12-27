@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', function() {
     createWorldBtn.addEventListener('click', function() {
         console.log('World Creation button clicked');
         GodotBridge.postMessage('navigate', {
-            scene_path: 'res://core/scenes/world_root.tscn'
+            scene_path: 'res://ui/world_builder/WorldBuilderWeb.tscn'
         });
     });
     

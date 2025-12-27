@@ -50,15 +50,10 @@ func _ready() -> void:
 		MythosLogger.error("WorldBuilderWebController", "WebView node not found!")
 		return
 	
-	# Load step definitions from JSON
+	# Load step definitions from JSON (synchronous, but small file)
 	_load_step_definitions()
 	
-	# Load the World Builder HTML file
-	var html_url: String = "res://web_ui/world_builder/index.html"
-	web_view.load_url(html_url)
-	MythosLogger.info("WorldBuilderWebController", "Loaded World Builder HTML", {"url": html_url})
-	
-	# Connect IPC message signal for bidirectional communication
+	# Connect IPC message signal immediately (non-blocking)
 	if web_view.has_signal("ipc_message"):
 		web_view.ipc_message.connect(_on_ipc_message)
 		MythosLogger.info("WorldBuilderWebController", "Connected to WebView IPC message signal")
@@ -68,13 +63,23 @@ func _ready() -> void:
 	# Try to find WorldBuilderAzgaar in scene tree (for generation)
 	_find_azgaar_controller()
 	
+	# Defer WebView load to allow UI to render first (reduces perceived lag)
+	call_deferred("_deferred_load_web_ui")
+	
+	# Ensure WebView matches initial viewport size
+	_update_webview_size()
+
+func _deferred_load_web_ui() -> void:
+	"""Deferred WebView load to allow overlay to render first."""
+	# Load the World Builder HTML file
+	var html_url: String = "res://web_ui/world_builder/index.html"
+	web_view.load_url(html_url)
+	MythosLogger.info("WorldBuilderWebController", "Loaded World Builder HTML (deferred)", {"url": html_url})
+	
 	# Wait for page to load, then send initial data
 	await get_tree().create_timer(1.5).timeout
 	_send_step_definitions()
 	_send_archetypes()
-	
-	# Ensure WebView matches initial viewport size
-	_update_webview_size()
 
 
 func _find_azgaar_controller() -> void:
@@ -150,11 +155,18 @@ func _send_step_definitions() -> void:
 	# Send step definitions as JSON string
 	var json_string: String = JSON.stringify(step_definitions)
 	var script: String = """
+		// Store in pending data if Alpine not ready, otherwise use instance
 		if (window.worldBuilderInstance) {
 			window.worldBuilderInstance.steps = %s.steps || [];
-			window.worldBuilderInstance._initializeParams();
+			// Chunked initialization: only init params for current step (step 0)
+			if (window.worldBuilderInstance._initializeParamsForStep) {
+				window.worldBuilderInstance._initializeParamsForStep(0);
+			}
+		} else {
+			// Alpine not ready yet, store for lazy init
+			window._pendingStepsData = %s;
 		}
-	""" % json_string
+	""" % [json_string, json_string]
 	
 	if web_view.has_method("execute_js"):
 		web_view.execute_js(script)
