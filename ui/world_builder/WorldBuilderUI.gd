@@ -328,10 +328,6 @@ func _on_azgaar_generation_failed(reason: String) -> void:
 	gen_elapsed_time = 0.0
 	set_process(false)
 	MythosLogger.error("UI/WorldBuilder", "Azgaar generation failed", {"reason": reason})
-	
-	# Hide progress dialog on failure
-	if ProgressDialogWeb:
-		ProgressDialogWeb.hide_progress()
 
 
 func _update_step_ui() -> void:
@@ -632,9 +628,6 @@ func _randomize_seed() -> void:
 
 func _generate_azgaar() -> void:
 	"""Generate world with Azgaar using JS injection."""
-	# Show progress dialog
-	if ProgressDialogWeb:
-		ProgressDialogWeb.show_progress("Generating World", "Syncing parameters...")
 	_update_status("Syncing parameters...", 10)
 	
 	# Get WorldBuilderAzgaar script reference (it's attached to CenterContent)
@@ -689,9 +682,6 @@ func _process(delta: float) -> void:
 
 func _bake_to_3d() -> void:
 	"""Bake to 3D - export heightmap from Azgaar and feed to Terrain3D."""
-	# Show progress dialog for baking
-	if ProgressDialogWeb:
-		ProgressDialogWeb.show_progress("Baking to 3D", "Exporting heightmap from Azgaar...")
 	_update_status("Exporting heightmap from Azgaar...", 10)
 	
 	# Get WorldBuilderAzgaar script reference
@@ -739,19 +729,12 @@ func _bake_to_3d() -> void:
 
 func _update_status(text: String, progress: float) -> void:
 	"""Update status and progress."""
-	# Use WebView progress dialog if available, otherwise fallback to embedded progress bar
-	if ProgressDialogWeb and ProgressDialogWeb.visible:
-		# Convert progress (0-100) to 0.0-1.0 for WebView
-		var progress_normalized: float = progress / 100.0
-		ProgressDialogWeb.update_progress(progress_normalized, text)
+	status_label.text = text
+	if progress >= 0:
+		progress_bar.value = progress
+		progress_bar.visible = true
 	else:
-		# Fallback to embedded progress bar for backwards compatibility
-		status_label.text = text
-		if progress >= 0:
-			progress_bar.value = progress
-			progress_bar.visible = true
-		else:
-			progress_bar.visible = false
+		progress_bar.visible = false
 
 
 func set_terrain_manager(manager: Node) -> void:
