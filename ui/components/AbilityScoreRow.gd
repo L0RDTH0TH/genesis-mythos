@@ -85,16 +85,11 @@ func _refresh() -> void:
 	var mod: int = floor((final - 10) / 2.0)
 	if mod_label:
 		mod_label.text = "%+d" % mod
-		# Color coding for modifiers from theme
-		var theme: Theme = get_theme()
-		if theme:
-			var pos_color: Color = Color.WHITE
-			var neg_color: Color = Color(0.9, 0.4, 0.4, 1.0)
-			if theme.has_color("positive_modifier", "Label"):
-				pos_color = theme.get_color("positive_modifier", "Label")
-			if theme.has_color("negative_modifier", "Label"):
-				neg_color = theme.get_color("negative_modifier", "Label")
-			mod_label.add_theme_color_override("font_color", pos_color if mod >= 0 else neg_color)
+		# GUI Performance Fix: Use modulate instead of theme override for color coding
+		if mod >= 0:
+			mod_label.modulate = Color.WHITE
+		else:
+			mod_label.modulate = Color(0.9, 0.4, 0.4, 1.0)  # Red tint for negative
 	
 	_update_button_states()
 

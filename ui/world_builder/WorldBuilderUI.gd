@@ -16,9 +16,9 @@ const TOTAL_STEPS: int = 8
 
 # UI References
 @onready var step_buttons: Array[Button] = []
-@onready var archetype_option: OptionButton = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/GlobalControls/ArchetypeOption
-@onready var seed_spin: SpinBox = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/GlobalControls/SeedHBox/SeedSpin
-@onready var randomize_btn: Button = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/GlobalControls/SeedHBox/RandomizeBtn
+@onready var archetype_option: OptionButton = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/ArchetypeOption
+@onready var seed_spin: SpinBox = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/SeedHBox/SeedSpin
+@onready var randomize_btn: Button = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/SeedHBox/RandomizeBtn
 @onready var step_title: Label = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/StepTitle
 @onready var active_params: VBoxContainer = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/ActiveParams
 @onready var bottom_hbox: HBoxContainer = $MainVBox/BottomBar/BottomContent
@@ -28,6 +28,10 @@ const TOTAL_STEPS: int = 8
 @onready var bake_to_3d_btn: Button = $MainVBox/BottomBar/BottomContent/BakeTo3DBtn
 @onready var progress_bar: ProgressBar = $MainVBox/BottomBar/BottomContent/ProgressBar
 @onready var status_label: Label = $MainVBox/BottomBar/BottomContent/StatusLabel
+
+# GUI Performance Fix: Object pool for parameter rows
+var parameter_row_pool: Array[ParameterRow] = []
+const MAX_PARAM_ROWS: int = 30  # Maximum expected parameters per step
 # DIAGNOSTIC: WebView nodes temporarily removed to test presentation throttling
 # @onready var webview_margin: MarginContainer = $MainVBox/MainHSplit/CenterPanel/CenterContent/WebViewMargin
 # @onready var azgaar_webview: Node = $MainVBox/MainHSplit/CenterPanel/CenterContent/WebViewMargin/AzgaarWebView
@@ -89,9 +93,8 @@ func _ready() -> void:
 	gen_btn.pressed.connect(_generate_azgaar)
 	bake_to_3d_btn.pressed.connect(_bake_to_3d)
 	
-	# Initialize parameter row pool separation (apply once to all rows)
-	# Use theme constant via script since we can't use per-node overrides
-	# This will be applied when rows are created in _populate_params()
+	# GUI Performance Fix: Pre-create parameter row pool
+	_create_parameter_row_pool()
 	
 	# Initialize with first step
 	_load_archetype_params(0)
@@ -128,8 +131,8 @@ func _apply_ui_constants() -> void:
 	bottom_bar.custom_minimum_size = Vector2(0, UIConstants.BOTTOM_BAR_HEIGHT)
 	
 	# WebView margin for bottom bar space (reserve space for bottom overlay bar)
-	# Note: MarginContainer margins should be set via theme or direct property, not theme overrides
-	# This is handled in _update_responsive_layout() if needed
+	if webview_margin:
+		webview_margin.add_theme_constant_override("margin_bottom", UIConstants.BOTTOM_BAR_HEIGHT)
 	
 	# Buttons
 	back_btn.custom_minimum_size = Vector2(UIConstants.BUTTON_WIDTH_SMALL, 0)
@@ -144,6 +147,37 @@ func _apply_ui_constants() -> void:
 	# Progress bar and status
 	progress_bar.custom_minimum_size = Vector2(UIConstants.PROGRESS_BAR_WIDTH, 0)
 	status_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_STANDARD, 0)
+	
+	# GUI Performance Fix: Apply separation constants via script (not theme overrides)
+	var main_vbox: VBoxContainer = $MainVBox
+	main_vbox.add_theme_constant_override("separation", 0)
+	
+	var left_content: VBoxContainer = $MainVBox/MainHSplit/LeftPanel/LeftContent
+	left_content.add_theme_constant_override("separation", UIConstants.SPACING_MEDIUM)
+	
+	var step_sidebar_vbox: VBoxContainer = $MainVBox/MainHSplit/LeftPanel/LeftContent/StepSidebar
+	step_sidebar_vbox.add_theme_constant_override("separation", UIConstants.SPACING_SMALL)
+	
+	var right_vbox: VBoxContainer = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox
+	right_vbox.add_theme_constant_override("separation", UIConstants.SPACING_LARGE)
+	
+	var seed_hbox: HBoxContainer = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/SeedHBox
+	seed_hbox.add_theme_constant_override("separation", UIConstants.SPACING_MEDIUM)
+	
+	var active_params_vbox: VBoxContainer = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/ActiveParams
+	active_params_vbox.add_theme_constant_override("separation", UIConstants.SPACING_LARGE)
+	
+	var bottom_content: HBoxContainer = $MainVBox/BottomBar/BottomContent
+	bottom_content.add_theme_constant_override("separation", UIConstants.SPACING_LARGE)
+	
+	# GUI Performance Fix: Apply title styling via modulate (not theme overrides)
+	var title_label: Label = $MainVBox/TopBar/TopBarContent/TitleLabel
+	if title_label:
+		title_label.modulate = Color(1.0, 0.843, 0.0, 1.0)  # Gold color
+	
+	var step_title_label: Label = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/StepTitle
+	if step_title_label:
+		step_title_label.modulate = Color(1.0, 0.843, 0.0, 1.0)  # Gold color
 	
 	# Set initial split offset
 	var main_hsplit: HSplitContainer = $MainVBox/MainHSplit
@@ -293,12 +327,12 @@ func _on_azgaar_generation_failed(reason: String) -> void:
 
 func _update_step_ui() -> void:
 	"""Update UI for current step."""
-	# Update step button highlights - use modulate only (no theme overrides)
+	# Update step button highlights
 	for i in range(step_buttons.size()):
 		var btn: Button = step_buttons[i]
 		if i == current_step:
-			# Active step - orange highlight via modulate
-			btn.modulate = Color(1.0, 0.843, 0.0, 1.0)  # Gold tint
+			# Active step - orange highlight (GUI Performance Fix: use modulate instead of theme overrides)
+			btn.modulate = Color(1.0, 0.7, 0.3, 1.0)  # Orange tint
 		else:
 			# Inactive step - dim
 			btn.modulate = Color(0.6, 0.6, 0.6, 1.0)  # Dimmed
@@ -331,146 +365,69 @@ func _update_step_ui() -> void:
 	_populate_params()
 
 
-# GUI Performance Fix: Object pool for parameter rows to avoid runtime creation/destruction
-var _param_row_pool: Array[Control] = []
-var _active_param_rows: Array[Control] = []
+func _create_parameter_row_pool() -> void:
+	"""Pre-create parameter row pool for object pooling (GUI Performance Fix)."""
+	var row_scene: PackedScene = load("res://ui/components/ParameterRow.tscn")
+	if not row_scene:
+		MythosLogger.error("UI/WorldBuilder", "Failed to load ParameterRow.tscn")
+		return
+	
+	for i in range(MAX_PARAM_ROWS):
+		var row: ParameterRow = row_scene.instantiate() as ParameterRow
+		if row:
+			row.parameter_changed.connect(_on_parameter_changed)
+			row.visible = false
+			active_params.add_child(row)
+			parameter_row_pool.append(row)
+	
+	MythosLogger.debug("UI/WorldBuilder", "Created parameter row pool", {"size": parameter_row_pool.size()})
+
 
 func _populate_params() -> void:
-	"""Populate parameter controls for current step using object pooling."""
-	# GUI Performance Fix: Hide existing rows instead of destroying them
-	for row in _active_param_rows:
-		row.visible = false
-	_active_param_rows.clear()
+	"""Populate parameter controls for current step using object pooling (GUI Performance Fix)."""
+	# Hide all rows in pool (reuse instead of destroy)
+	for row in parameter_row_pool:
+		row.hide_row()
 	
 	var step_def: Dictionary = STEP_DEFINITIONS.get(current_step, {})
 	var params_list: Array = step_def.get("params", [])
 	
 	if params_list.is_empty():
-		# Reuse or create empty label
-		var empty_label: Label = null
-		for child in active_params.get_children():
-			if child is Label and child.text.begins_with("No parameters"):
-				empty_label = child
-				break
-		if not empty_label:
-			empty_label = Label.new()
-			empty_label.text = "No parameters for this step"
-			empty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			active_params.add_child(empty_label)
-		empty_label.visible = true
-		_active_param_rows.append(empty_label)
+		# Show empty message if available, otherwise skip
+		MythosLogger.debug("UI/WorldBuilder", "No parameters for step", {"step": current_step})
 		return
 	
-	# Hide empty label if it exists
-	for child in active_params.get_children():
-		if child is Label and child.text.begins_with("No parameters"):
-			child.visible = false
-	
-	# Reuse or create parameter rows
-	var pool_idx: int = 0
+	# Reuse rows from pool
+	var pool_index: int = 0
 	for param in params_list:
-		var param_name: String = param.get("name", "")
-		var azgaar_key: String = param.get("azgaar_key", param_name)
-		var param_type: String = param.get("type", "HSlider")
+		if pool_index >= parameter_row_pool.size():
+			MythosLogger.warn("UI/WorldBuilder", "Parameter pool exhausted, need more rows", {
+				"requested": params_list.size(),
+				"pool_size": parameter_row_pool.size()
+			})
+			break
 		
-		# Get or create row from pool
-		var row: HBoxContainer
-		if pool_idx < _param_row_pool.size():
-			row = _param_row_pool[pool_idx] as HBoxContainer
-			row.visible = true
+		var row: ParameterRow = parameter_row_pool[pool_index]
+		row.setup(param)
+		
+		# Set initial value from current_params if available
+		var azgaar_key: String = param.get("azgaar_key", param.get("name", ""))
+		if current_params.has(azgaar_key):
+			row.update_value(current_params[azgaar_key])
 		else:
-			row = HBoxContainer.new()
-			# Use theme constant via MarginContainer or set separation in script
-			# Note: separation is set via theme_override_constants in _ready() for all rows
-			active_params.add_child(row)
-			_param_row_pool.append(row)
-		pool_idx += 1
+			# Use default from param
+			var default_val = param.get("default")
+			if default_val != null:
+				row.update_value(default_val)
+				current_params[azgaar_key] = default_val
 		
-		# Set row separation via theme constant (applied once)
-		row.add_theme_constant_override("separation", UIConstants.SPACING_SMALL)
-		
-		# Update row content
-		_update_param_row(row, param, param_name, azgaar_key, param_type)
-		_active_param_rows.append(row)
-	
-	# Hide unused pool rows
-	for i in range(pool_idx, _param_row_pool.size()):
-		_param_row_pool[i].visible = false
+		pool_index += 1
 
 
-func _update_param_row(row: HBoxContainer, param: Dictionary, param_name: String, azgaar_key: String, param_type: String) -> void:
-	"""Update a parameter row with new data (reuses row container, recreates controls)."""
-	# Clear row children - free them since we'll recreate controls as needed
-	# This is acceptable because we're reusing the row container itself (the main performance win)
-	for child in row.get_children():
-		child.queue_free()
-	
-	# Create label
-	var label: Label = Label.new()
-	label.text = param_name.capitalize() + ":"
-	label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_STANDARD, 0)
-	row.add_child(label)
-	
-	# Create control based on type
-	var control: Control
-	var value_label: Label = null
-	
-	match param_type:
-		"OptionButton":
-			control = OptionButton.new()
-			if param.has("options"):
-				for opt in param.options:
-					control.add_item(opt)
-				var default_val = param.get("default", "")
-				var default_idx: int = param.options.find(default_val)
-				if default_idx >= 0:
-					control.selected = default_idx
-			control.item_selected.connect(func(idx: int): 
-				current_params[azgaar_key] = control.get_item_text(idx)
-			)
-		
-		"HSlider":
-			control = HSlider.new()
-			if param.has("min"):
-				control.min_value = param.min
-			if param.has("max"):
-				control.max_value = param.max
-			if param.has("step"):
-				control.step = param.step
-			control.value = current_params.get(azgaar_key, param.get("default", 0.0))
-			control.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			
-			value_label = Label.new()
-			value_label.text = str(control.value)
-			value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
-			control.value_changed.connect(func(val: float): 
-				value_label.text = str(val)
-				current_params[azgaar_key] = val
-			)
-			
-			row.add_child(control)
-			row.add_child(value_label)
-			return  # Early return for HSlider (has value_label)
-		
-		"CheckBox":
-			control = CheckBox.new()
-			control.button_pressed = current_params.get(azgaar_key, param.get("default", false))
-			control.toggled.connect(func(on: bool): current_params[azgaar_key] = on)
-		
-		"SpinBox":
-			control = SpinBox.new()
-			if param.has("min"):
-				control.min_value = param.min
-			if param.has("max"):
-				control.max_value = param.max
-			if param.has("step"):
-				control.step = param.step
-			control.value = current_params.get(azgaar_key, param.get("default", 0))
-			control.value_changed.connect(func(val: float): current_params[azgaar_key] = int(val))
-	
-	control.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, UIConstants.BUTTON_HEIGHT_SMALL)
-	control.tooltip_text = "Controls " + param_name
-	row.add_child(control)
+func _on_parameter_changed(azgaar_key: String, value: Variant) -> void:
+	"""Handle parameter value change from parameter row."""
+	current_params[azgaar_key] = value
+	MythosLogger.debug("UI/WorldBuilder", "Parameter changed", {"key": azgaar_key, "value": value})
 
 
 func _on_step_button_pressed(step_idx: int) -> void:

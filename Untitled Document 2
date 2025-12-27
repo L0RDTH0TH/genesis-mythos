@@ -1,0 +1,81 @@
+Full-Screen Root (Control, anchors_full_rect, theme=dark_fantasy_theme.tres)
+
+├── Main HSplitContainer (left ~15-20%, center ~60-65%, right ~20-25%)
+
+│   ├── Left Panel (Step Navigation – Fixed width, vertical layout)
+
+│   │   └── VBoxContainer
+
+│   │       ├── Title Label ("World Builder – Forging the World", centered, bold, thematic font)
+
+│   │       └── VBoxContainer (list of step buttons/tabs, styled as vertical sidebar)
+
+│   │           ├── 1. Map Generation & Editing (highlighted when active)
+
+│   │           ├── 2. Terrain
+
+│   │           ├── 3. Climate
+
+│   │           ├── 4. Biomes
+
+│   │           ├── 5. Structures & Civilizations
+
+│   │           ├── 6. Environment
+
+│   │           ├── 7. Resources & Magic
+
+│   │           └── 8. Export
+
+│   │               (Buttons dim when inactive, orange highlight on current step)
+
+│   ├── Center Panel (Map Display – Largest area, expand_fill)
+
+│   │   └── Azgaar WebView (GDCef – full embedded browser showing live Azgaar map)
+
+│   │       ├── Displays the complete interactive Azgaar Fantasy Map Generator interface/map
+
+│   │       ├── No local overlays, no custom painting tools (all editing happens inside Azgaar via its own UI/tools)
+
+│   │       ├── Supports all native Azgaar layer views (user can switch inside Azgaar: heightmap, biomes, temperature, precipitation, population, political, rivers, religions, etc.)
+
+│   │       ├── (Future: possible toggle/switch to a separate 3D Terrain preview after bake, but primary view remains Azgaar)
+
+│   └── Right Panel (Active Step Controls – Scrollable, populated dynamically)
+
+│       └── VBoxContainer inside ScrollContainer
+
+│           ├── Section Title Label (updates with active left step, e.g., "Map Generation & Editing")
+
+│           ├── Parameter controls for current step (loaded from Azgaar options relevant to the step)
+
+│           │   ├── All "global" inputs (seed, template, map size, etc.) appear here in the first step
+
+│           │   ├── Subsequent steps show their respective Azgaar-configurable options (e.g., climate settings in Climate step)
+
+│           │   ├── Controls are standard Godot inputs (sliders, checkboxes, dropdowns, etc.) that send commands to Azgaar via available JS injection or URL params
+
+│           └── Tooltips on hover + optional performance notes
+
+└── Bottom HBoxContainer (full width, dark bar, overlaid on lower part of center panel)
+
+    ├── (Centered over the bottom of the map viewport)
+
+    │   ├── Generate / Apply Changes Button (large, orange/gold-accented – triggers Azgaar regeneration)
+
+    │   └── Bake to 3D Button (appears later, disabled until map is finalized – exports heightmap/data for 3D conversion)
+
+    ├── Back Button (left-aligned, dim if at first step)
+
+    ├── Next Button (right-aligned, orange/gold highlighted, primary navigation)
+
+    └── Status Label (center or near buttons – e.g., "Ready", "Generating...", or Azgaar progress messages)
+
+[CURSORS GUI GOAL]
+
+
+
+
+
+We need to instruct Cursor through a Prompt to investigate the code base and generate a report named: GUI_update_integration_investigation_audit.md dir: audit in root.
+
+The report should cover everything needed to perform the migration to the proper render approach.

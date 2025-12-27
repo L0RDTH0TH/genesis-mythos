@@ -71,6 +71,11 @@ func _apply_ui_constants() -> void:
 	# Apply spacing to containers
 	if options_container != null:
 		options_container.add_theme_constant_override("separation", UIConstants.SPACING_MEDIUM)
+	
+	# GUI Performance Fix: Apply title styling via modulate (not theme overrides)
+	var title_label: Label = $MainContainer/TitleArea/TitleLabel
+	if title_label:
+		title_label.modulate = Color(1.0, 0.843, 0.0, 1.0)  # Gold color
 
 
 func _setup_navigation() -> void:

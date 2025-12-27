@@ -49,7 +49,9 @@ func _ready() -> void:
 	polling_timer.one_shot = false
 	polling_timer.timeout.connect(_on_polling_timer_timeout)
 	add_child(polling_timer)
-	polling_timer.start()
+	# DIAGNOSTIC TEST: Disable timer polling
+	# polling_timer.start()
+	MythosLogger.info("AzgaarServer", "DIAGNOSTIC: Polling timer disabled for FPS testing")
 	
 	# Disable _process() - use timer instead
 	set_process(false)

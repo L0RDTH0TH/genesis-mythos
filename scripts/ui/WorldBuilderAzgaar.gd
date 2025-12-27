@@ -30,11 +30,15 @@ func _initialize_webview() -> void:
 	# TEMPORARY DIAGNOSTIC: Azgaar WebView disabled to test custom GUI layout visibility
 	if DEBUG_DISABLE_AZGAAR:
 		MythosLogger.info("WorldBuilderAzgaar", "DIAGNOSTIC: Azgaar WebView initialization disabled")
-		# Hide the WebView node and its container
+		# Remove the WebView node from scene tree to prevent godot_wry from initializing
 		var web_view_node = get_node_or_null("WebViewMargin/AzgaarWebView")
 		if web_view_node:
-			web_view_node.visible = false
-			# Don't set size to ZERO as it might break layout - just hide it
+			# Remove from parent to prevent initialization, then queue_free to clean up
+			var parent = web_view_node.get_parent()
+			if parent:
+				parent.remove_child(web_view_node)
+			web_view_node.queue_free()
+			MythosLogger.info("WorldBuilderAzgaar", "DIAGNOSTIC: WebView node removed to prevent godot_wry initialization")
 		var web_view_margin = get_node_or_null("WebViewMargin")
 		if web_view_margin:
 			web_view_margin.visible = false

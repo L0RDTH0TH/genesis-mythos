@@ -1,0 +1,199 @@
+Perfect — got it loud and clear. We're aligned, and the tweak is straightforward and improves usability even more.
+
+### Final Confirmed GUI Layout (Updated with Your Corrections)
+
+```
+Full-Screen Root (Control, anchors_full_rect, theme=bg3_theme.tres)
+├── Main HSplitContainer (left ~20-25%, center ~55-60%, right ~20-25%)
+│   ├── Left Panel (Category Navigation – Fixed width)
+│   │   └── VBoxContainer
+│   │       ├── Title Label ("Azgaar World Generator")
+│   │       └── TabContainer (VERTICAL tabs – one per category)
+│   │           ├── Terrain & Heightmap
+│   │           ├── Climate & Environment
+│   │           ├── Societies & Politics
+│   │           ├── Settlements & Scale
+│   │           └── (Future: Advanced / Visual)
+│   ├── Center Panel (Map Display – Largest, expand_fill)
+│   │   └── Azgaar WebView (GDCef – full embedded browser showing live Azgaar map)
+│   │       (Future toggle: switch to mini 3D Terrain3D preview after bake)
+│   └── Right Panel (Active Controls & Global Inputs – Dynamic population)
+│       └── ScrollContainer (for long groups)
+│           ├── Archetype Preset OptionButton (top – always visible)
+│           ├── Seed Input (SpinBox – always visible, with randomize button)
+│           ├── Section Title Label (e.g., "Terrain & Heightmap" – updates with selected tab)
+│           ├── Parameter rows (only for currently selected category)
+│           │   ├── templateInput (OptionButton)
+│           │   ├── pointsInput (HSlider + value label)
+│           │   ├── heightExponentInput (HSlider)
+│           │   ├── allowErosion (CheckBox)
+│           │   └── etc. (dynamically populated based on left tab)
+│           ├── Separator / Spacer
+│           └── (Tooltips, performance warning icons per control)
+└── Bottom HBoxContainer (full wide, centered)
+    ├── Generate with Azgaar Button (large, gold-accented)
+    ├── Bake to 3D Button (disabled until complete)
+    └── Status Label / Progress Bar (updates during generation)
+```
+
+### Why This Works Even Better
+- **Left:** Pure navigation — clean, minimal, focused on categories only. No clutter.
+- **Right:** Always shows the **global controls** (Archetype + Seed) at the top, then the **selected category's parameters** below. This keeps essential inputs always accessible without forcing the user to hunt for them.
+- **Center:** Still the hero — the live map preview dominates the screen.
+- **Flow remains intuitive:** Pick category on left → see/tweak its params on right → archetype/seed always handy on right → generate → watch center → bake.
+
+### User Flow (Quick Recap with Changes)
+1. Open World Builder → three-panel layout loads.
+2. Select archetype preset (top of right panel) → all category parameters auto-populate (clamped by hardware).
+3. Enter/customize seed (right panel, just below archetype).
+4. Click a category tab on left → right panel updates to show only that group's controls.
+5. Tweak parameters in right panel.
+6. Hit "Generate with Azgaar" → options.json written → reload → center shows generation → polling detects completion.
+7. Bake to 3D → center (future) toggles to 3D preview.
+
+No other changes needed — this is clean, thematic, responsive, and fully matches your vision.
+
+We're locked in. Ready to move forward?
+
+Next step: Cursor prompt to refactor `WorldBuilderUI.tscn` and `WorldBuilderUI.gd` into this exact three-section layout:
+- Move Archetype OptionButton and Seed SpinBox to right panel (always visible).
+- Left: Only vertical TabContainer for categories.
+- Right: Dynamic population of selected tab's parameters below the global inputs.
+- Center: Full WebView.
+- All sizing/spacing via UIConstants, no magic numbers.
+
+Shall I write and send that prompt now? Or any last micro-tweaks (e.g., exact widths, button text, icons)?
+[END GROK OUTPUT]
+
+
+
+Direct js calls is not available I have confirmed this already. I have provided the audits we generated before attempting to migrate, again we gave up on the migration, but they should still assist in understanding the problem.
+
+=== GDCef Bridge Test Start ===
+Found WebView node: AzgaarWebView (GDCef)
+=== TOTAL METHODS COUNT: 205 ===
+=== GDCef-SPECIFIC METHODS (143 found) ===
+GDCef methods: ["initialize", "get_full_version", "get_version_part", "create_browser", "shutdown", "is_alive", "get_error", "set_owner", "get_owner", "get_index", "print_tree", "print_tree_pretty", "get_tree_string", "get_tree_string_pretty", "set_scene_file_path", "get_scene_file_path", "propagate_notification", "propagate_call", "set_physics_process", "get_physics_process_delta_time", "is_physics_processing", "get_process_delta_time", "set_process", "set_process_priority", "get_process_priority", "set_physics_process_priority", "get_physics_process_priority", "is_processing", "set_process_input", "is_processing_input", "set_process_shortcut_input", "is_processing_shortcut_input", "set_process_unhandled_input", "is_processing_unhandled_input", "set_process_unhandled_key_input", "is_processing_unhandled_key_input", "set_process_mode", "get_process_mode", "can_process", "set_process_thread_group", "get_process_thread_group", "set_process_thread_messages", "get_process_thread_messages", "set_process_thread_group_order", "get_process_thread_group_order", "queue_accessibility_update", "get_accessibility_element", "set_display_folded", "is_displayed_folded", "set_process_internal", "is_processing_internal", "set_physics_process_internal", "is_physics_processing_internal", "set_physics_interpolation_mode", "get_physics_interpolation_mode", "is_physics_interpolated", "is_physics_interpolated_and_enabled", "reset_physics_interpolation", "set_auto_translate_mode", "get_auto_translate_mode", "can_auto_translate", "set_translation_domain_inherited", "get_window", "get_last_exclusive_window", "get_tree", "create_tween", "duplicate", "replace_by", "set_scene_instance_load_placeholder", "get_scene_instance_load_placeholder", "set_editable_instance", "is_editable_instance", "get_viewport", "queue_free", "request_ready", "is_node_ready", "set_multiplayer_authority", "get_multiplayer_authority", "is_multiplayer_authority", "get_multiplayer", "rpc_config", "get_node_rpc_config", "set_unique_name_in_owner", "is_unique_name_in_owner", "atr", "atr_n", "rpc", "rpc_id", "update_configuration_warnings", "call_deferred_thread_group", "set_deferred_thread_group", "notify_deferred_thread_group", "call_thread_safe", "set_thread_safe", "notify_thread_safe", "free", "get_class", "is_class", "set", "get", "set_indexed", "get_indexed", "get_property_list", "get_method_list", "property_can_revert", "property_get_revert", "notification", "to_string", "get_instance_id", "set_meta", "remove_meta", "get_meta", "has_meta", "get_meta_list", "add_user_signal", "has_user_signal", "remove_user_signal", "emit_signal", "call", "call_deferred", "set_deferred", "callv", "has_method", "get_method_argument_count", "has_signal", "get_signal_list", "get_signal_connection_list", "get_incoming_connections", "connect", "disconnect", "is_connected", "has_connections", "set_block_signals", "is_blocking_signals", "notify_property_list_changed", "set_message_translation", "can_translate_messages", "tr", "tr_n", "get_translation_domain", "set_translation_domain", "is_queued_for_deletion", "cancel_free"]
+=== JAVASCRIPT-RELATED METHODS ===
+No methods containing 'js' or 'javascript' found.
+=== SCRIPT EXECUTION METHODS (non-standard) ===
+Script methods: ["set_editor_description", "get_editor_description"]
+=== BROWSER/WEBVIEW METHODS ===
+Browser methods: ["create_browser"]
+=== OTHER INTERESTING METHODS (load/navigate/url/html/dom) ===
+Interesting methods: ["set_translation_domain_inherited", "set_scene_instance_load_placeholder", "get_scene_instance_load_placeholder", "get_translation_domain", "set_translation_domain"]
+=== ALL PROPERTIES ===
+Total properties: 23
+All property names (first 30): ["GDCef", "Node", "_import_path", "name", "unique_name_in_owner", "scene_file_path", "owner", "multiplayer", "Process", "process_mode", "process_priority", "process_physics_priority", "Thread Group", "process_thread_group", "process_thread_group_order", "process_thread_messages", "Physics Interpolation", "physics_interpolation_mode", "Auto Translate", "auto_translate_mode", "Editor Description", "editor_description", "script"]
+No interesting properties found.
+=== INSPECTING create_browser METHOD ===
+create_browser found:
+  Method info keys: ["name", "args", "default_args", "flags", "id", "return"]
+  Arguments: 3
+    arg[0]: name=_unnamed_arg0, type=4
+    arg[1]: name=_unnamed_arg1, type=24
+    arg[2]: name=_unnamed_arg2, type=27
+  Return type: 24
+  Attempting to call create_browser()...
+  Type 24 = Variant.Type.OBJECT (likely)
+  Type 4 = Variant.Type.INT (likely)
+  Type 27 = Variant.Type.STRING (likely)
+  Note: Browser is created as a child node (typically 'browser_0')
+  WARNING: CEF must be initialized before creating browsers
+  Found initialize() method - checking if CEF is initialized...
+  is_alive() = false
+  CEF not initialized.
+  WARNING: initialize() requires a Dictionary argument and cannot be safely called in EditorScript
+  Skipping initialization - will only inspect existing browser nodes if any exist
+  Current children before create_browser: []
+  CEF not initialized - cannot create browser in EditorScript context
+  Skipping browser creation - test will only work with existing browsers
+  No browser child nodes found. Checking all children...
+=== BROWSER GETTER METHODS ===
+No browser getter methods found.
+=== TESTING COMMON METHOD NAMES ===
+No common JS execution method names found.
+=== SIGNALS ===
+Browser-related signals: ["ready"]
+=== GDCef Bridge Test End ===
+[END TEST RESULTS]
+ 
+Here are all the available options I can find.
+[END JS AVAILABILITY CONFIRMATION]
+
+
+
+Perfect — got it loud and clear. We're aligned, and the tweak is straightforward and improves usability even more.
+
+### Final Confirmed GUI Layout (Updated with Your Corrections)
+
+```
+Full-Screen Root (Control, anchors_full_rect, theme=bg3_theme.tres)
+├── Main HSplitContainer (left ~20-25%, center ~55-60%, right ~20-25%)
+│   ├── Left Panel (Category Navigation – Fixed width)
+│   │   └── VBoxContainer
+│   │       ├── Title Label ("Azgaar World Generator")
+│   │       └── TabContainer (VERTICAL tabs – one per category)
+│   │           ├── Terrain & Heightmap
+│   │           ├── Climate & Environment
+│   │           ├── Societies & Politics
+│   │           ├── Settlements & Scale
+│   │           └── (Future: Advanced / Visual)
+│   ├── Center Panel (Map Display – Largest, expand_fill)
+│   │   └── Azgaar WebView (GDCef – full embedded browser showing live Azgaar map)
+│   │       (Future toggle: switch to mini 3D Terrain3D preview after bake)
+│   └── Right Panel (Active Controls & Global Inputs – Dynamic population)
+│       └── ScrollContainer (for long groups)
+│           ├── Archetype Preset OptionButton (top – always visible)
+│           ├── Seed Input (SpinBox – always visible, with randomize button)
+│           ├── Section Title Label (e.g., "Terrain & Heightmap" – updates with selected tab)
+│           ├── Parameter rows (only for currently selected category)
+│           │   ├── templateInput (OptionButton)
+│           │   ├── pointsInput (HSlider + value label)
+│           │   ├── heightExponentInput (HSlider)
+│           │   ├── allowErosion (CheckBox)
+│           │   └── etc. (dynamically populated based on left tab)
+│           ├── Separator / Spacer
+│           └── (Tooltips, performance warning icons per control)
+└── Bottom HBoxContainer (full wide, centered)
+    ├── Generate with Azgaar Button (large, gold-accented)
+    ├── Bake to 3D Button (disabled until complete)
+    └── Status Label / Progress Bar (updates during generation)
+```
+
+### Why This Works Even Better
+- **Left:** Pure navigation — clean, minimal, focused on categories only. No clutter.
+- **Right:** Always shows the **global controls** (Archetype + Seed) at the top, then the **selected category's parameters** below. This keeps essential inputs always accessible without forcing the user to hunt for them.
+- **Center:** Still the hero — the live map preview dominates the screen.
+- **Flow remains intuitive:** Pick category on left → see/tweak its params on right → archetype/seed always handy on right → generate → watch center → bake.
+
+### User Flow (Quick Recap with Changes)
+1. Open World Builder → three-panel layout loads.
+2. Select archetype preset (top of right panel) → all category parameters auto-populate (clamped by hardware).
+3. Enter/customize seed (right panel, just below archetype).
+4. Click a category tab on left → right panel updates to show only that group's controls.
+5. Tweak parameters in right panel.
+6. Hit "Generate with Azgaar" → options.json written → reload → center shows generation → polling detects completion.
+7. Bake to 3D → center (future) toggles to 3D preview.
+
+No other changes needed — this is clean, thematic, responsive, and fully matches your vision.
+
+We're locked in. Ready to move forward?
+
+Next step: Cursor prompt to refactor `WorldBuilderUI.tscn` and `WorldBuilderUI.gd` into this exact three-section layout:
+- Move Archetype OptionButton and Seed SpinBox to right panel (always visible).
+- Left: Only vertical TabContainer for categories.
+- Right: Dynamic population of selected tab's parameters below the global inputs.
+- Center: Full WebView.
+- All sizing/spacing via UIConstants, no magic numbers.
+
+Shall I write and send that prompt now? Or any last micro-tweaks (e.g., exact widths, button text, icons)?
+
+
+
+
+
+
+
+
+

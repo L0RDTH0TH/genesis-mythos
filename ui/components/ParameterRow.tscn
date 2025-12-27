@@ -1,0 +1,28 @@
+[gd_scene load_steps=2 format=3 uid="uid://parameter_row_template"]
+
+[ext_resource type="Script" path="res://ui/components/ParameterRow.gd" id="1_paramrow"]
+[ext_resource type="Theme" path="res://themes/bg3_theme.tres" id="2_theme"]
+
+[node name="ParameterRow" type="HBoxContainer"]
+theme = ExtResource("2_theme")
+script = ExtResource("1_paramrow")
+
+[node name="NameLabel" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Parameter:"
+custom_minimum_size = Vector2(150, 0)
+
+[node name="ControlContainer" type="HBoxContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ValueLabel" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+text = "0"
+custom_minimum_size = Vector2(80, 0)
+horizontal_alignment = 1
+visible = false
+

@@ -17,6 +17,10 @@ func _ready() -> void:
 	"""Instantiate and add the Performance Monitor overlay to the scene tree."""
 	MythosLogger.debug("PerformanceMonitorSingleton", "_ready() called - instantiating global overlay")
 	
+	# DIAGNOSTIC TEST: Prevent instantiation entirely
+	MythosLogger.info("PerformanceMonitorSingleton", "DIAGNOSTIC: PerformanceMonitor instantiation disabled for FPS testing")
+	return
+	
 	# Instantiate the Performance Monitor scene
 	monitor_instance = monitor_scene.instantiate() as PerformanceMonitor
 	if monitor_instance == null:

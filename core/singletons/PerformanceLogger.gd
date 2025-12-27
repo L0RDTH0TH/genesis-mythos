@@ -57,10 +57,17 @@ func _ready() -> void:
 	
 	# Emit signal for initial state
 	logging_state_changed.emit(is_logging_enabled)
+	
+	# DIAGNOSTIC TEST: Disable _process() entirely for testing
+	set_process(false)
+	MythosLogger.info("PerformanceLogger", "DIAGNOSTIC: _process() disabled for FPS testing")
 
 
 func _process(_delta: float) -> void:
 	"""Process per-frame logic: handle interval logging."""
+	# DIAGNOSTIC TEST: Disabled entirely - return immediately
+	return
+	
 	# If logging is enabled but file not open, start new log file
 	if is_logging_enabled and log_file == null:
 		_start_log_file()

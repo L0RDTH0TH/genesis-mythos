@@ -70,6 +70,10 @@ func _ready() -> void:
 	_load_config()
 	_apply_config()
 	
+	# DIAGNOSTIC TEST: Force disable profiling regardless of config
+	is_profiling_enabled = false
+	MythosLogger.info("FlameGraphProfiler", "DIAGNOSTIC: Flame graph profiling force-disabled for FPS testing")
+	
 	if is_profiling_enabled:
 		# Setup timers directly since config says enabled
 		var sampling_mode: String = config.get("sampling_mode", "sampling")
