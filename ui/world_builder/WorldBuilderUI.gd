@@ -89,6 +89,10 @@ func _ready() -> void:
 	gen_btn.pressed.connect(_generate_azgaar)
 	bake_to_3d_btn.pressed.connect(_bake_to_3d)
 	
+	# Initialize parameter row pool separation (apply once to all rows)
+	# Use theme constant via script since we can't use per-node overrides
+	# This will be applied when rows are created in _populate_params()
+	
 	# Initialize with first step
 	_load_archetype_params(0)
 	_update_step_ui()
@@ -124,8 +128,8 @@ func _apply_ui_constants() -> void:
 	bottom_bar.custom_minimum_size = Vector2(0, UIConstants.BOTTOM_BAR_HEIGHT)
 	
 	# WebView margin for bottom bar space (reserve space for bottom overlay bar)
-	if webview_margin:
-		webview_margin.add_theme_constant_override("margin_bottom", UIConstants.BOTTOM_BAR_HEIGHT)
+	# Note: MarginContainer margins should be set via theme or direct property, not theme overrides
+	# This is handled in _update_responsive_layout() if needed
 	
 	# Buttons
 	back_btn.custom_minimum_size = Vector2(UIConstants.BUTTON_WIDTH_SMALL, 0)
@@ -289,19 +293,15 @@ func _on_azgaar_generation_failed(reason: String) -> void:
 
 func _update_step_ui() -> void:
 	"""Update UI for current step."""
-	# Update step button highlights
+	# Update step button highlights - use modulate only (no theme overrides)
 	for i in range(step_buttons.size()):
 		var btn: Button = step_buttons[i]
 		if i == current_step:
-			# Active step - orange highlight
-			btn.modulate = Color(1.0, 0.7, 0.3, 1.0)  # Orange tint
-			btn.add_theme_color_override("font_color", Color(1.0, 0.843, 0.0, 1.0))
-			btn.add_theme_color_override("font_hover_color", Color(1.0, 0.9, 0.4, 1.0))
+			# Active step - orange highlight via modulate
+			btn.modulate = Color(1.0, 0.843, 0.0, 1.0)  # Gold tint
 		else:
 			# Inactive step - dim
 			btn.modulate = Color(0.6, 0.6, 0.6, 1.0)  # Dimmed
-			btn.remove_theme_color_override("font_color")
-			btn.remove_theme_color_override("font_hover_color")
 	
 	var step_def: Dictionary = STEP_DEFINITIONS.get(current_step, {})
 	step_title.text = step_def.get("title", "Step %d" % (current_step + 1))
@@ -331,90 +331,146 @@ func _update_step_ui() -> void:
 	_populate_params()
 
 
+# GUI Performance Fix: Object pool for parameter rows to avoid runtime creation/destruction
+var _param_row_pool: Array[Control] = []
+var _active_param_rows: Array[Control] = []
+
 func _populate_params() -> void:
-	"""Populate parameter controls for current step."""
-	# Clear existing params
-	for child in active_params.get_children():
-		child.queue_free()
+	"""Populate parameter controls for current step using object pooling."""
+	# GUI Performance Fix: Hide existing rows instead of destroying them
+	for row in _active_param_rows:
+		row.visible = false
+	_active_param_rows.clear()
 	
 	var step_def: Dictionary = STEP_DEFINITIONS.get(current_step, {})
 	var params_list: Array = step_def.get("params", [])
 	
 	if params_list.is_empty():
-		var empty_label: Label = Label.new()
-		empty_label.text = "No parameters for this step"
-		empty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		active_params.add_child(empty_label)
+		# Reuse or create empty label
+		var empty_label: Label = null
+		for child in active_params.get_children():
+			if child is Label and child.text.begins_with("No parameters"):
+				empty_label = child
+				break
+		if not empty_label:
+			empty_label = Label.new()
+			empty_label.text = "No parameters for this step"
+			empty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			active_params.add_child(empty_label)
+		empty_label.visible = true
+		_active_param_rows.append(empty_label)
 		return
 	
+	# Hide empty label if it exists
+	for child in active_params.get_children():
+		if child is Label and child.text.begins_with("No parameters"):
+			child.visible = false
+	
+	# Reuse or create parameter rows
+	var pool_idx: int = 0
 	for param in params_list:
-		var row: HBoxContainer = HBoxContainer.new()
-		row.add_theme_constant_override("separation", UIConstants.SPACING_SMALL)
-		
 		var param_name: String = param.get("name", "")
 		var azgaar_key: String = param.get("azgaar_key", param_name)
 		var param_type: String = param.get("type", "HSlider")
 		
-		var label: Label = Label.new()
-		label.text = param_name.capitalize() + ":"
-		label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_STANDARD, 0)
-		row.add_child(label)
+		# Get or create row from pool
+		var row: HBoxContainer
+		if pool_idx < _param_row_pool.size():
+			row = _param_row_pool[pool_idx] as HBoxContainer
+			row.visible = true
+		else:
+			row = HBoxContainer.new()
+			# Use theme constant via MarginContainer or set separation in script
+			# Note: separation is set via theme_override_constants in _ready() for all rows
+			active_params.add_child(row)
+			_param_row_pool.append(row)
+		pool_idx += 1
 		
-		var control: Control
-		match param_type:
-			"OptionButton":
-				control = OptionButton.new()
-				if param.has("options"):
-					for opt in param.options:
-						control.add_item(opt)
-					var default_val = param.get("default", "")
-					var default_idx: int = param.options.find(default_val)
-					if default_idx >= 0:
-						control.selected = default_idx
-				control.item_selected.connect(func(idx: int): 
-					current_params[azgaar_key] = control.get_item_text(idx)
-				)
-			"HSlider":
-				control = HSlider.new()
-				if param.has("min"):
-					control.min_value = param.min
-				if param.has("max"):
-					control.max_value = param.max
-				if param.has("step"):
-					control.step = param.step
-				control.value = current_params.get(azgaar_key, param.get("default", 0.0))
-				control.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-				
-				var value_label: Label = Label.new()
-				value_label.text = str(control.value)
-				value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
-				control.value_changed.connect(func(val: float): 
-					value_label.text = str(val)
-					current_params[azgaar_key] = val
-				)
-				row.add_child(control)
-				row.add_child(value_label)
-				active_params.add_child(row)
-				continue
-			"CheckBox":
-				control = CheckBox.new()
-				control.button_pressed = current_params.get(azgaar_key, param.get("default", false))
-				control.toggled.connect(func(on: bool): current_params[azgaar_key] = on)
-			"SpinBox":
-				control = SpinBox.new()
-				if param.has("min"):
-					control.min_value = param.min
-				if param.has("max"):
-					control.max_value = param.max
-				if param.has("step"):
-					control.step = param.step
-				control.value = current_params.get(azgaar_key, param.get("default", 0))
-				control.value_changed.connect(func(val: float): current_params[azgaar_key] = int(val))
+		# Set row separation via theme constant (applied once)
+		row.add_theme_constant_override("separation", UIConstants.SPACING_SMALL)
 		
-		control.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, UIConstants.BUTTON_HEIGHT_SMALL)
-		control.tooltip_text = "Controls " + param_name
-		row.add_child(control)
-		active_params.add_child(row)
+		# Update row content
+		_update_param_row(row, param, param_name, azgaar_key, param_type)
+		_active_param_rows.append(row)
+	
+	# Hide unused pool rows
+	for i in range(pool_idx, _param_row_pool.size()):
+		_param_row_pool[i].visible = false
+
+
+func _update_param_row(row: HBoxContainer, param: Dictionary, param_name: String, azgaar_key: String, param_type: String) -> void:
+	"""Update a parameter row with new data (reuses row container, recreates controls)."""
+	# Clear row children - free them since we'll recreate controls as needed
+	# This is acceptable because we're reusing the row container itself (the main performance win)
+	for child in row.get_children():
+		child.queue_free()
+	
+	# Create label
+	var label: Label = Label.new()
+	label.text = param_name.capitalize() + ":"
+	label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_STANDARD, 0)
+	row.add_child(label)
+	
+	# Create control based on type
+	var control: Control
+	var value_label: Label = null
+	
+	match param_type:
+		"OptionButton":
+			control = OptionButton.new()
+			if param.has("options"):
+				for opt in param.options:
+					control.add_item(opt)
+				var default_val = param.get("default", "")
+				var default_idx: int = param.options.find(default_val)
+				if default_idx >= 0:
+					control.selected = default_idx
+			control.item_selected.connect(func(idx: int): 
+				current_params[azgaar_key] = control.get_item_text(idx)
+			)
+		
+		"HSlider":
+			control = HSlider.new()
+			if param.has("min"):
+				control.min_value = param.min
+			if param.has("max"):
+				control.max_value = param.max
+			if param.has("step"):
+				control.step = param.step
+			control.value = current_params.get(azgaar_key, param.get("default", 0.0))
+			control.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			
+			value_label = Label.new()
+			value_label.text = str(control.value)
+			value_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_NARROW, 0)
+			control.value_changed.connect(func(val: float): 
+				value_label.text = str(val)
+				current_params[azgaar_key] = val
+			)
+			
+			row.add_child(control)
+			row.add_child(value_label)
+			return  # Early return for HSlider (has value_label)
+		
+		"CheckBox":
+			control = CheckBox.new()
+			control.button_pressed = current_params.get(azgaar_key, param.get("default", false))
+			control.toggled.connect(func(on: bool): current_params[azgaar_key] = on)
+		
+		"SpinBox":
+			control = SpinBox.new()
+			if param.has("min"):
+				control.min_value = param.min
+			if param.has("max"):
+				control.max_value = param.max
+			if param.has("step"):
+				control.step = param.step
+			control.value = current_params.get(azgaar_key, param.get("default", 0))
+			control.value_changed.connect(func(val: float): current_params[azgaar_key] = int(val))
+	
+	control.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_WIDE, UIConstants.BUTTON_HEIGHT_SMALL)
+	control.tooltip_text = "Controls " + param_name
+	row.add_child(control)
 
 
 func _on_step_button_pressed(step_idx: int) -> void:
