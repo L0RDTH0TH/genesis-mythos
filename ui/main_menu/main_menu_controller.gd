@@ -73,9 +73,13 @@ func _on_create_character_pressed() -> void:
 	get_tree().change_scene_to_file(CHARACTER_CREATION_SCENE)
 
 func _on_create_world_pressed() -> void:
-	"""Stub - old world generation disabled (preparing for Azgaar integration)."""
-	print("World Builder: Old generator disabled – Azgaar integration in progress")
-	push_warning("MainMenuController._on_create_world_pressed() called but old generation is disabled – Azgaar integration in progress")
+	"""Transition to world builder with loading overlay."""
+	# Show loading overlay immediately for instant visual feedback
+	LoadingOverlay.show_loading("Entering World Builder...", 0.0)
+	
+	# Critical: yield to ensure overlay draws before any blocking work
+	await get_tree().process_frame
+	
 	# Transition to world scene (UI still works, just generation is disabled)
 	get_tree().change_scene_to_file(WORLD_CREATION_SCENE)
 

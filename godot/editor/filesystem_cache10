@@ -1,10 +1,11 @@
 72322a848ab928aa5c89f0cb78209805
-::res://::1766799727
+::res://::1766857133
 Fantasy archetypes _251206_024005.txt::TextFile::-1::1765006861::0::1::::<><><>0<>0<><>::
 flame_graph_freeze_audit.md::TextFile::-1::1766297260::0::1::::<><><>0<>0<><>::
 FORENSIC_DEBUG_SCRIPT.txt::TextFile::-1::1764612538::0::1::::<><><>0<>0<><>::
 icon.png::CompressedTexture2D::557325075131260776::1743421832::1765424551::1::::<><><>0<>0<>d64e49bb3c5547d967251bf56759ba11<>res://godot/imported/icon.png-487276ed1e3a0c39cad0279d744ee560.bptc.ctex<*>res://godot/imported/icon.png-487276ed1e3a0c39cad0279d744ee560.astc.ctex::
 README.md::TextFile::-1::1766209791::0::1::::<><><>0<>0<><>::
+system_specs.md::TextFile::-1::1766818403::0::1::::<><><>0<>0<><>::
 test_scrollcontainer_bug.tscn::PackedScene::-1::1764567677::0::1::::<><><>0<>0<><>::
 theme.res::Theme::4225037749892648109::1766785082::0::1::::<><><>0<>0<><>::
 ::res://addons/::1766554787
@@ -630,7 +631,7 @@ parchment_stain_overlay.png::CompressedTexture2D::7820103648329580427::161110828
 ::res://assets/themes/::1764867475
 dark_fantasy_theme.tres::Theme::-1::1764867830::0::1::::<><><>0<>0<><>::
 ::res://assets/ui/::1765173111
-::res://audit/::1766796514
+::res://audit/::1766856815
 ABILITY_SCORE_PREVIEW_ANALYSIS.md::TextFile::-1::1765229909::0::1::::<><><>0<>0<><>::
 audit-ability-score-tab-logging.md::TextFile::-1::1765229909::0::1::::<><><>0<>0<><>::
 audit_report.md::TextFile::-1::1764979789::0::1::::<><><>0<>0<><>::
@@ -666,6 +667,7 @@ gui_spec_evaluation_v2.md::TextFile::-1::1765926107::0::1::::<><><>0<>0<><>::
 gui_spec_v3.md::TextFile::-1::1765953578::0::1::::<><><>0<>0<><>::
 GUI_update_integration_investigation_audit.md::TextFile::-1::1766553214::0::1::::<><><>0<>0<><>::
 GUI_update_integration_investigation_audit_v2.md::TextFile::-1::1766559540::0::1::::<><><>0<>0<><>::
+lag_investigation_create_world_button_2025-12-27.md::TextFile::-1::1766820597::0::1::::<><><>0<>0<><>::
 LATEST_LOG_ANALYSIS.md::TextFile::-1::1765592848::0::1::::<><><>0<>0<><>::
 LAYOUT_ANALYSIS.md::TextFile::-1::1764605661::0::1::::<><><>0<>0<><>::
 LAYOUT_INSPECTION_REPORT.md::TextFile::-1::1765229909::0::1::::<><><>0<>0<><>::
@@ -710,6 +712,7 @@ threadms_zero_diagnostic_report.md::TextFile::-1::1766291508::0::1::::<><><>0<>0
 THREE_COLUMN_DIAGNOSTIC_REPORT.md::TextFile::-1::1764562858::0::1::::<><><>0<>0<><>::
 TRANSITION_FLOW_ANALYSIS.md::TextFile::-1::1764638284::0::1::::<><><>0<>0<><>::
 TRANSITION_IMPROVEMENTS_IMPLEMENTED.md::TextFile::-1::1764637690::0::1::::<><><>0<>0<><>::
+ui_performance_audit.md::TextFile::-1::1766802938::0::1::::<><><>0<>0<><>::
 ui_sizing_positioning_audit.md::TextFile::-1::1765826000::0::1::::<><><>0<>0<><>::
 UI_TESTING_AUDIT_REPORT.md::TextFile::-1::1765090012::0::1::::<><><>0<>0<><>::
 updated_test_coverage_report.md::TextFile::-1::1765701453::0::1::::<><><>0<>0<><>::
@@ -717,6 +720,8 @@ VALIDATION_REPORT_ALL_CHANGES.md::TextFile::-1::1765780398::0::1::::<><><>0<>0<>
 VISUAL_REFERENCE_ANALYSIS.md::TextFile::-1::1764709110::0::1::::<><><>0<>0<><>::
 WASD_INPUT_DIAGNOSTIC_REPORT.md::TextFile::-1::1764824987::0::1::::<><><>0<>0<><>::
 WATERFALL_VIEW_V3_EVALUATION.md::TextFile::-1::1766799561::0::1::::<><><>0<>0<><>::
+webview_ui_migration_phase3_alternative_preparation_report.md::TextFile::-1::1766814607::0::1::::<><><>0<>0<><>::
+webview_ui_migration_phase3_preparation_report.md::TextFile::-1::1766814186::0::1::::<><><>0<>0<><>::
 WORLD_BUILDER_AUDIT_REPORT.md::TextFile::-1::1764964433::0::1::::<><><>0<>0<><>::
 world_builder_idle_performance_audit_v2.md::TextFile::-1::1766126300::0::1::::<><><>0<>0<><>::
 world_builder_idle_performance_audit_v3.md::TextFile::-1::1766127668::0::1::::<><><>0<>0<><>::
@@ -849,7 +854,7 @@ Enemy.gd::GDScript::7370805193197605382::1743421832::0::1::::<>CharacterBody3D<>
 Player.gd::GDScript::8074929128578252780::1743421832::0::1::::<>CharacterBody3D<><>0<>0<><>::
 RuntimeNavigationBaker.gd::GDScript::4493644474770165996::1743421832::0::1::::<>Node<><>0<>0<><>::
 UI.gd::GDScript::7901117421551593189::1743421832::0::1::::<>Control<><>0<>0<><>::
-::res://docs/::1766794877
+::res://docs/::1766802892
 2d map maker.txt::TextFile::-1::1765437788::0::1::::<><><>0<>0<><>::
 CHANGELOG.md::TextFile::-1::1765433210::0::1::::<><><>0<>0<><>::
 CODING_STANDARDS.md::TextFile::-1::1765525065::0::1::::<><><>0<>0<><>::
@@ -904,6 +909,7 @@ RACE_TAB_RENDERING_FIX.md::TextFile::-1::1764570159::0::1::::<><><>0<>0<><>::
 SCENE_PROPERTIES_SUMMARY.md::TextFile::-1::1764575582::0::1::::<><><>0<>0<><>::
 TAB_COMPLETED_MIGRATION_FIX.md::TextFile::-1::1764639848::0::1::::<><><>0<>0<><>::
 TEST_SUITE_EXPANSION_SUMMARY.md::TextFile::-1::1765089118::0::1::::<><><>0<>0<><>::
+::res://docs/audit/::1766806026
 ::res://docs/dev/::1765257626
 contributing.md::TextFile::-1::1765257780::0::1::::<><><>0<>0<><>::
 ::res://docs/gui/::1766794877
@@ -935,7 +941,7 @@ TESTING_PLAN_SUMMARY.md::TextFile::-1::1765652242::0::1::::<><><>0<>0<><>::
 TEST_COVERAGE_MATRIX.md::TextFile::-1::1765148600::0::1::::<><><>0<>0<><>::
 WORLD_GENERATION_COVERAGE.md::TextFile::-1::1765148600::0::1::::<><><>0<>0<><>::
 ::res://docs/testing/audiences/::1766183285
-::res://docs/ui/::1766197860
+::res://docs/ui/::1766809247
 GUI_SPECIFICATION.md::TextFile::-1::1766034797::0::1::::<><><>0<>0<><>::
 WATERFALL_VIEW_V4_SPECIFICATION.md::TextFile::-1::1766197867::0::1::::<><><>0<>0<><>::
 ::res://materials/::1764986951
@@ -944,7 +950,7 @@ blue_glow.tres::ShaderMaterial::-1::1764988084::0::1::::<><><>0<>0<><>::res://sh
 ::res://res:/addons/::0
 ::res://res:/addons/gdai_mcp/::0
 ::res://resources/::1765327318
-::res://scenes/::1766003381
+::res://scenes/::1766856817
 main.tscn::PackedScene::-1::1765958690::0::1::::<><><>0<>0<><>::res://scripts/main_controller.gd
 Main.tscn::PackedScene::-1::1766799561::0::1::::<><><>0<>0<><>::res://scripts/Main.gd
 MainMenu.tscn::PackedScene::5937787784009831585::1766796522::0::1::::<><><>0<>0<><>::uid://dtvclsmx1ok2n::::res://ui/main_menu/main_menu_controller.gd<>uid://dpiqolc47bhf4::::res://themes/bg3_theme.tres
@@ -957,7 +963,7 @@ BackgroundTab.tscn::PackedScene::-1::1766004827::0::1::::<><><>0<>0<><>::res://s
 ClassTab.tscn::PackedScene::-1::1766004827::0::1::::<><><>0<>0<><>::res://scripts/character_creation/tabs/ClassTab.gd<>uid://dpiqolc47bhf4::::res://themes/bg3_theme.tres
 NameConfirmTab.tscn::PackedScene::-1::1766004827::0::1::::<><><>0<>0<><>::res://scripts/character_creation/tabs/NameConfirmTab.gd<>uid://dpiqolc47bhf4::::res://themes/bg3_theme.tres
 RaceTab.tscn::PackedScene::-1::1766004827::0::1::::<><><>0<>0<><>::res://scripts/character_creation/tabs/RaceTab.gd<>uid://dpiqolc47bhf4::::res://themes/bg3_theme.tres
-::res://scenes/ui/::1766106990
+::res://scenes/ui/::1766856805
 DebugOverlay.tscn::PackedScene::-1::1766082153::0::1::::<><><>0<>0<><>::
 progress_dialog.tscn::PackedScene::-1::1765958690::0::1::::<><><>0<>0<><>::res://themes/bg3_theme.tres<>res://scripts/ui/progress_dialog.gd
 ::res://scenes/ui/components/::1764783572
@@ -985,16 +991,16 @@ RaceTab.gd::GDScript::8247954558629900238::1766004827::0::1::::<>VBoxContainer<>
 ::res://scripts/editor/::1765663509
 auto_configure_parchment_textures.gd::GDScript::1711483961759385958::1766799561::0::1::::<>EditorPlugin<><>0<>1<><>::
 set_parchment_import_settings.gd::GDScript::6711794163723174771::1765938238::0::1::::<>EditorScript<><>0<>1<><>::
-::res://scripts/managers/::1766790698
+::res://scripts/managers/::1766856800
 AzgaarIntegrator.gd::GDScript::4248457192998527187::1766625651::0::1::::<>Node<><>0<>0<><>::
-AzgaarServer.gd::GDScript::1394242482151490158::1766799562::0::1::::<>Node<><>0<>0<><>::
+AzgaarServer.gd::GDScript::1394242482151490158::1766856800::0::1::::<>Node<><>0<>0<><>::
 ::res://scripts/preview/::1765663509
 PreviewManager.gd::GDScript::1161500945953968570::1765070942::0::1::::PreviewManager<>Node<><>0<>0<><>::
 ::res://scripts/singletons/::1765327687
-::res://scripts/ui/::1766454156
+::res://scripts/ui/::1766856914
 progress_dialog.gd::GDScript::2565764471291712936::1766012913::0::1::::<>Window<><>0<>0<><>::
 UIConstants.gd::GDScript::6503700145817242455::1766612897::0::1::::UIConstants<>RefCounted<><>0<>0<><>::
-WorldBuilderAzgaar.gd::GDScript::4113175012340539943::1766791549::0::1::::<>Control<><>0<>0<><>::
+WorldBuilderAzgaar.gd::GDScript::4113175012340539943::1766821515::0::1::::<>Control<><>0<>0<><>::
 ::res://scripts/ui/overlays/::1766790698
 FlameGraphControl.gd::GDScript::2811263733947477910::1766636317::0::1::::FlameGraphControl<>Control<><>0<>0<><>::
 GraphControl.gd::GDScript::1460755751572151070::1766643460::0::1::::GraphControl<>Control<><>0<>0<><>::
@@ -1009,6 +1015,17 @@ parchment.gdshader::Shader::5420266297849100274::1765613386::0::1::::<><><>0<>0<
 ::res://shaders/compute/::1765179829
 ::res://shaders/compute/noise/::1765180177
 ::res://shaders/compute/shapes/::1765180177
+::res://singleton-text/::1766800355
+AzgaarIntegrator.gd.txt::TextFile::-1::1766800362::0::1::::<><><>0<>0<><>::
+AzgaarServer.gd.txt::TextFile::-1::1766800362::0::1::::<><><>0<>0<><>::
+entity_sim.gd.txt::TextFile::-1::1766800362::0::1::::<><><>0<>0<><>::
+eryndor.gd.txt::TextFile::-1::1766800362::0::1::::<><><>0<>0<><>::
+faction_economy.gd.txt::TextFile::-1::1766800362::0::1::::<><><>0<>0<><>::
+FlameGraphProfiler.gd.txt::TextFile::-1::1766800362::0::1::::<><><>0<>0<><>::
+Logger.gd.txt::TextFile::-1::1766800362::0::1::::<><><>0<>0<><>::
+PerformanceLogger.gd.txt::TextFile::-1::1766800362::0::1::::<><><>0<>0<><>::
+PerformanceMonitorSingleton.gd.txt::TextFile::-1::1766800362::0::1::::<><><>0<>0<><>::
+world_streamer.gd.txt::TextFile::-1::1766800362::0::1::::<><><>0<>0<><>::
 ::res://singletons/::1764391705
 ::res://terrain_data/::1765424610
 ::res://tests/::1766555526
@@ -1622,15 +1639,15 @@ README_GameGUI_Migration.md::TextFile::-1::1766799562::0::1::::<><><>0<>0<><>::
 ::res://ui/components/::1766796534
 AbilityScoreRow.gd::GDScript::985453137650868522::1766796522::0::1::::AbilityScoreRow<>HBoxContainer<><>0<>0<><>::
 AbilityScoreRow.tscn::PackedScene::-1::1765958690::0::1::::<><><>0<>0<><>::res://ui/components/AbilityScoreRow.gd<>res://themes/bg3_theme.tres
-ParameterRow.gd::GDScript::7450295581090046616::1766796522::0::1::::ParameterRow<>HBoxContainer<><>0<>0<><>::
+ParameterRow.gd::GDScript::7450295581090046616::1766807255::0::1::::ParameterRow<>HBoxContainer<><>0<>0<><>::
 ParameterRow.tscn::PackedScene::-1::1766796522::0::1::::<><><>0<>0<><>::res://ui/components/ParameterRow.gd<>res://themes/bg3_theme.tres
 ::res://ui/main_menu/::1766030451
 main_menu_controller.gd::GDScript::8536344055793938363::1766796523::0::1::::MainMenuController<>Control<><>0<>0<><>::
 ::res://ui/theme/::1764874104
 global_theme.tres::Theme::-1::1764874104::0::1::::<><><>0<>0<><>::
-::res://ui/world_builder/::1766787764
+::res://ui/world_builder/::1766856807
 IconNode.gd::GDScript::3286018589780588594::1765351842::0::1::::IconNode<>Node2D<><>0<>0<><>::
 MapMakerModule.gd::GDScript::7292487333858961152::1766643460::0::1::::MapMakerModule<>Control<><>0<>0<><>::
-WorldBuilderUI.gd::GDScript::8775718590233939086::1766796522::0::1::::WorldBuilderUI<>Control<><>0<>0<><>::
-WorldBuilderUI.tscn::PackedScene::3095168197548427215::1766796522::0::1::::<><><>0<>0<><>::res://ui/world_builder/WorldBuilderUI.gd<>res://themes/bg3_theme.tres<>res://scripts/ui/WorldBuilderAzgaar.gd
+WorldBuilderUI.gd::GDScript::8775718590233939086::1766856805::0::1::::WorldBuilderUI<>Control<><>0<>0<><>::
+WorldBuilderUI.tscn::PackedScene::3095168197548427215::1766807813::0::1::::<><><>0<>0<><>::res://ui/world_builder/WorldBuilderUI.gd<>res://themes/bg3_theme.tres<>res://scripts/ui/WorldBuilderAzgaar.gd
 WorldBuilderUIPerfTest.gd::GDScript::7159438739580213512::1766636317::0::1::::<>Control<><>0<>0<><>::

@@ -30,6 +30,7 @@ PerformanceLogger="*res://core/singletons/PerformanceLogger.gd"
 FlameGraphProfiler="*res://core/singletons/FlameGraphProfiler.gd"
 AzgaarIntegrator="*res://scripts/managers/AzgaarIntegrator.gd"
 AzgaarServer="*res://scripts/managers/AzgaarServer.gd"
+LoadingOverlay="*res://core/singletons/LoadingOverlay.gd"
 
 [debug]
 
