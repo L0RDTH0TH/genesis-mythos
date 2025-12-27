@@ -37,6 +37,10 @@ const TOTAL_STEPS: int = 8
 
 # GUI Performance Fix: Tree storage for parameter metadata (for value updates)
 var param_tree_items: Dictionary = {}  # Maps azgaar_key -> TreeItem
+
+# UI Parameter Tree Cache: Cache parameter data per step to avoid rebuilding
+var cached_trees: Dictionary = {}  # step_index -> { "params": Array, "values": Dictionary }
+var tree_dirty: bool = false  # Set to true when parameters are modified
 # DIAGNOSTIC: WebView nodes temporarily removed to test presentation throttling
 # @onready var webview_margin: MarginContainer = $MainVBox/MainHSplit/CenterPanel/CenterContent/WebViewMargin
 # @onready var azgaar_webview: Node = $MainVBox/MainHSplit/CenterPanel/CenterContent/WebViewMargin/AzgaarWebView
@@ -99,6 +103,9 @@ func _ready() -> void:
 	
 	# GUI Performance Fix: Setup Tree for parameters
 	_setup_param_tree()
+	
+	# Log DataCache stats after initialization
+	MythosLogger.info("UI/WorldBuilder", "DataCache stats", {"stats": DataCache.get_stats()})
 	
 	# Initialize with first step
 	_load_archetype_params(0)
@@ -391,16 +398,47 @@ func _populate_param_tree() -> void:
 	if not param_tree:
 		return
 	
-	# Clear existing items
-	param_tree.clear()
-	param_tree_items.clear()
+	# Check if we can use cached tree data
+	var use_cache: bool = cached_trees.has(current_step) and not tree_dirty
+	var cached_data: Dictionary = {}
+	var params_list: Array = []
+	var cached_values: Dictionary = {}
 	
-	var step_def: Dictionary = STEP_DEFINITIONS.get(current_step, {})
-	var params_list: Array = step_def.get("params", [])
+	if use_cache:
+		cached_data = cached_trees[current_step]
+		params_list = cached_data.get("params", [])
+		cached_values = cached_data.get("values", {})
+		MythosLogger.debug("UI/WorldBuilder", "Using cached tree data for step", {"step": current_step})
+	else:
+		# Load fresh data from STEP_DEFINITIONS
+		var step_def: Dictionary = STEP_DEFINITIONS.get(current_step, {})
+		params_list = step_def.get("params", [])
+		
+		# Build cached_values from current_params for this step's parameters
+		for param in params_list:
+			var azgaar_key: String = param.get("azgaar_key", param.get("name", ""))
+			var cached_value: Variant = current_params.get(azgaar_key)
+			if cached_value == null:
+				cached_value = param.get("default", 0)
+				current_params[azgaar_key] = cached_value
+			cached_values[azgaar_key] = cached_value
+		
+		# Cache the data for future use
+		cached_trees[current_step] = {
+			"params": params_list.duplicate(true),  # Deep copy
+			"values": cached_values.duplicate()
+		}
+		MythosLogger.debug("UI/WorldBuilder", "Cached tree data for step", {"step": current_step})
 	
 	if params_list.is_empty():
 		MythosLogger.debug("UI/WorldBuilder", "No parameters for step", {"step": current_step})
+		param_tree.clear()
+		param_tree_items.clear()
 		return
+	
+	# Clear existing items
+	param_tree.clear()
+	param_tree_items.clear()
 	
 	# Create root (hidden)
 	var root: TreeItem = param_tree.create_item()
@@ -419,10 +457,18 @@ func _populate_param_tree() -> void:
 		
 		# Column 1: Control (slider, option, checkbox, etc.)
 		# Column 2: Value display
-		var current_value: Variant = current_params.get(azgaar_key)
-		if current_value == null:
-			current_value = param.get("default", 0)
+		var current_value: Variant
+		if use_cache:
+			# Use cached value
+			current_value = cached_values.get(azgaar_key, param.get("default", 0))
+			# Update current_params to match cached value
 			current_params[azgaar_key] = current_value
+		else:
+			# Use current_params or default
+			current_value = current_params.get(azgaar_key)
+			if current_value == null:
+				current_value = param.get("default", 0)
+				current_params[azgaar_key] = current_value
 		
 		match param_type:
 			"HSlider":
@@ -487,9 +533,13 @@ func _populate_param_tree() -> void:
 		# Store mapping for quick lookup
 		param_tree_items[azgaar_key] = item
 	
+	# Reset tree_dirty flag after successful rebuild
+	tree_dirty = false
+	
 	MythosLogger.debug("UI/WorldBuilder", "Populated ParamTree", {
 		"step": current_step,
-		"param_count": params_list.size()
+		"param_count": params_list.size(),
+		"cached": use_cache
 	})
 
 
@@ -533,6 +583,11 @@ func _on_tree_item_edited() -> void:
 			edited_item.set_text(2, "Yes" if bool(new_value) else "No")
 	
 	if new_value != null:
+		# Mark tree as dirty when user modifies a parameter
+		tree_dirty = true
+		# Invalidate cache for current step since values changed
+		if cached_trees.has(current_step):
+			cached_trees[current_step].values[azgaar_key] = new_value
 		_on_parameter_changed(azgaar_key, new_value)
 
 
@@ -544,6 +599,10 @@ func _on_tree_cell_selected() -> void:
 func _on_parameter_changed(azgaar_key: String, value: Variant) -> void:
 	"""Handle parameter value change (from Tree or other sources)."""
 	current_params[azgaar_key] = value
+	
+	# Update cached values if cache exists for current step
+	if cached_trees.has(current_step):
+		cached_trees[current_step].values[azgaar_key] = value
 	
 	# Update Tree display if item exists (for programmatic updates)
 	if param_tree_items.has(azgaar_key):
@@ -600,6 +659,10 @@ func _load_archetype_params(idx: int) -> void:
 	for key in current_params:
 		if key == "points":
 			current_params[key] = UIConstants.get_clamped_points(current_params[key])
+	# Mark tree as dirty since parameters changed
+	tree_dirty = true
+	# Clear cache for all steps since archetype affects all steps
+	cached_trees.clear()
 	_populate_param_tree()
 
 

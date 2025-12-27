@@ -46,21 +46,15 @@ func _apply_ui_constants() -> void:
 func _load_races_data() -> void:
 	"""Load races data from JSON file."""
 	var file_path: String = "res://data/races.json"
-	var file: FileAccess = FileAccess.open(file_path, FileAccess.READ)
-	if file == null:
+	var data: Variant = DataCache.get_json_data(file_path)
+	if data == null:
 		MythosLogger.error("UI/CharacterCreation/RaceTab", "Failed to load races.json")
 		return
 	
-	var json_string: String = file.get_as_text()
-	file.close()
-	
-	var json: JSON = JSON.new()
-	var parse_result: Error = json.parse(json_string)
-	if parse_result != OK:
-		MythosLogger.error("UI/CharacterCreation/RaceTab", "Failed to parse races.json: %s" % json.get_error_message())
+	if not data is Dictionary:
+		MythosLogger.error("UI/CharacterCreation/RaceTab", "Invalid races.json format")
 		return
 	
-	var data: Dictionary = json.data
 	races_data = data.get("races", [])
 	MythosLogger.debug("UI/CharacterCreation/RaceTab", "Loaded %d races" % races_data.size())
 

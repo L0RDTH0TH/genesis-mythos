@@ -1,4 +1,3 @@
-res://core/singletons/LoadingOverlay.gd
-res://scripts/ui/LoadingOverlay.gd
-res://core/scenes/world_root.gd
-res://ui/main_menu/main_menu_controller.gd
+res://scripts/managers/AzgaarIntegrator.gd
+res://ui/world_builder/WorldBuilderUI.gd
+res://core/singletons/DataCache.gd

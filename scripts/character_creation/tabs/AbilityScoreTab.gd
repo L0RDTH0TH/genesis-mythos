@@ -55,21 +55,15 @@ func _apply_ui_constants() -> void:
 func _load_abilities_data() -> void:
 	"""Load abilities data from JSON file."""
 	var file_path: String = "res://data/abilities.json"
-	var file: FileAccess = FileAccess.open(file_path, FileAccess.READ)
-	if file == null:
+	var data: Variant = DataCache.get_json_data(file_path)
+	if data == null:
 		MythosLogger.error("UI/CharacterCreation/AbilityScoreTab", "Failed to load abilities.json")
 		return
 	
-	var json_string: String = file.get_as_text()
-	file.close()
-	
-	var json: JSON = JSON.new()
-	var parse_result: Error = json.parse(json_string)
-	if parse_result != OK:
-		MythosLogger.error("UI/CharacterCreation/AbilityScoreTab", "Failed to parse abilities.json: %s" % json.get_error_message())
+	if not data is Dictionary:
+		MythosLogger.error("UI/CharacterCreation/AbilityScoreTab", "Invalid abilities.json format")
 		return
 	
-	var data: Dictionary = json.data
 	abilities_data = data.get("abilities", [])
 	MythosLogger.debug("UI/CharacterCreation/AbilityScoreTab", "Loaded %d abilities" % abilities_data.size())
 

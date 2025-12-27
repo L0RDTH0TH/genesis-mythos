@@ -46,21 +46,15 @@ func _apply_ui_constants() -> void:
 func _load_backgrounds_data() -> void:
 	"""Load backgrounds data from JSON file."""
 	var file_path: String = "res://data/backgrounds.json"
-	var file: FileAccess = FileAccess.open(file_path, FileAccess.READ)
-	if file == null:
+	var data: Variant = DataCache.get_json_data(file_path)
+	if data == null:
 		MythosLogger.error("UI/CharacterCreation/BackgroundTab", "Failed to load backgrounds.json")
 		return
 	
-	var json_string: String = file.get_as_text()
-	file.close()
-	
-	var json: JSON = JSON.new()
-	var parse_result: Error = json.parse(json_string)
-	if parse_result != OK:
-		MythosLogger.error("UI/CharacterCreation/BackgroundTab", "Failed to parse backgrounds.json: %s" % json.get_error_message())
+	if not data is Dictionary:
+		MythosLogger.error("UI/CharacterCreation/BackgroundTab", "Invalid backgrounds.json format")
 		return
 	
-	var data: Dictionary = json.data
 	backgrounds_data = data.get("backgrounds", [])
 	MythosLogger.debug("UI/CharacterCreation/BackgroundTab", "Loaded %d backgrounds" % backgrounds_data.size())
 

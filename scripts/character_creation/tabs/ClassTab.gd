@@ -46,21 +46,15 @@ func _apply_ui_constants() -> void:
 func _load_classes_data() -> void:
 	"""Load classes data from JSON file."""
 	var file_path: String = "res://data/classes.json"
-	var file: FileAccess = FileAccess.open(file_path, FileAccess.READ)
-	if file == null:
+	var data: Variant = DataCache.get_json_data(file_path)
+	if data == null:
 		MythosLogger.error("UI/CharacterCreation/ClassTab", "Failed to load classes.json")
 		return
 	
-	var json_string: String = file.get_as_text()
-	file.close()
-	
-	var json: JSON = JSON.new()
-	var parse_result: Error = json.parse(json_string)
-	if parse_result != OK:
-		MythosLogger.error("UI/CharacterCreation/ClassTab", "Failed to parse classes.json: %s" % json.get_error_message())
+	if not data is Dictionary:
+		MythosLogger.error("UI/CharacterCreation/ClassTab", "Invalid classes.json format")
 		return
 	
-	var data: Dictionary = json.data
 	classes_data = data.get("classes", [])
 	MythosLogger.debug("UI/CharacterCreation/ClassTab", "Loaded %d classes" % classes_data.size())
 
