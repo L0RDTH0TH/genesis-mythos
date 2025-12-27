@@ -16,11 +16,11 @@ const TOTAL_STEPS: int = 8
 
 # UI References
 @onready var step_buttons: Array[Button] = []
-@onready var archetype_option: OptionButton = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/ArchetypeOption
-@onready var seed_spin: SpinBox = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/SeedHBox/SeedSpin
-@onready var randomize_btn: Button = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/SeedHBox/RandomizeBtn
-@onready var step_title: Label = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/RightScroll/RightVBox/StepTitle
-@onready var param_tree: Tree = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/RightScroll/RightVBox/ParamTree
+@onready var archetype_option: OptionButton = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/ArchetypeOption
+@onready var seed_spin: SpinBox = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/SeedHBox/SeedSpin
+@onready var randomize_btn: Button = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/SeedHBox/RandomizeBtn
+@onready var step_title: Label = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/StepTitle
+@onready var param_tree: Tree = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/ParamTree
 @onready var bottom_hbox: HBoxContainer = $MainVBox/BottomBar/BottomContent
 @onready var back_btn: Button = $MainVBox/BottomBar/BottomContent/BackBtn
 @onready var next_btn: Button = $MainVBox/BottomBar/BottomContent/NextBtn
@@ -32,9 +32,8 @@ const TOTAL_STEPS: int = 8
 @onready var step_sidebar: VBoxContainer = $MainVBox/MainHSplit/LeftPanel/LeftContent/StepSidebar
 @onready var center_panel: PanelContainer = $MainVBox/MainHSplit/CenterPanel
 @onready var right_panel: PanelContainer = $MainVBox/MainHSplit/RightPanel
-@onready var right_outer_vbox: VBoxContainer = $MainVBox/MainHSplit/RightPanel/RightOuterVBox
-@onready var right_scroll: ScrollContainer = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/RightScroll
-@onready var right_vbox: VBoxContainer = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/RightScroll/RightVBox
+@onready var right_scroll: ScrollContainer = $MainVBox/MainHSplit/RightPanel/RightScroll
+@onready var right_vbox: VBoxContainer = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox
 
 # GUI Performance Fix: Tree storage for parameter metadata (for value updates)
 var param_tree_items: Dictionary = {}  # Maps azgaar_key -> TreeItem
@@ -143,7 +142,7 @@ func _apply_ui_constants() -> void:
 	gen_btn.custom_minimum_size = Vector2(UIConstants.BUTTON_WIDTH_LARGE, 0)
 	bake_to_3d_btn.custom_minimum_size = Vector2(UIConstants.BUTTON_WIDTH_MEDIUM, 0)
 	
-	# Seed controls (now in RightOuterVBox, always visible)
+	# Seed controls (now in RightVBox, always visible)
 	seed_spin.custom_minimum_size = Vector2(UIConstants.SEED_SPIN_WIDTH, 0)
 	randomize_btn.custom_minimum_size = UIConstants.RANDOMIZE_BTN_SIZE
 	
@@ -163,11 +162,9 @@ func _apply_ui_constants() -> void:
 	
 	step_sidebar.add_theme_constant_override("separation", UIConstants.SPACING_SMALL)
 	
-	right_outer_vbox.add_theme_constant_override("separation", UIConstants.SPACING_SMALL)
+	right_vbox.add_theme_constant_override("separation", UIConstants.SPACING_MEDIUM)
 	
-	right_vbox.add_theme_constant_override("separation", UIConstants.SPACING_LARGE)
-	
-	var seed_hbox: HBoxContainer = $MainVBox/MainHSplit/RightPanel/RightOuterVBox/SeedHBox
+	var seed_hbox: HBoxContainer = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/SeedHBox
 	seed_hbox.add_theme_constant_override("separation", UIConstants.SPACING_MEDIUM)
 	
 	# Tree node doesn't need separation override (uses built-in item spacing)
