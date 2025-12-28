@@ -41,62 +41,63 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 });
 
-// Alpine.js data component
-Alpine.data('worldBuilder', () => ({
-    currentStep: 0,
-    totalSteps: 8,
-    steps: [],
-    params: {},
-    archetype: 'High Fantasy',
-    archetypeNames: ['High Fantasy', 'Low Fantasy', 'Dark Fantasy', 'Realistic', 'Custom'],
-    seed: Math.floor(Math.random() * 1e9),
-    isGenerating: false,
-    progressValue: 0,
-    statusText: '',
-    updateDebounceTimer: null,
-    
-    init() {
-        // Store instance for global access
-        window.worldBuilderInstance = this;
-        console.log('[WorldBuilder] Alpine.js init() called, steps:', this.steps.length);
+// Register the worldBuilder component only after Alpine is fully initialized
+document.addEventListener('alpine:init', () => {
+    Alpine.data('worldBuilder', () => ({
+        currentStep: 0,
+        totalSteps: 8,
+        steps: [],
+        params: {},
+        archetype: 'High Fantasy',
+        archetypeNames: ['High Fantasy', 'Low Fantasy', 'Dark Fantasy', 'Realistic', 'Custom'],
+        seed: Math.floor(Math.random() * 1e9),
+        isGenerating: false,
+        progressValue: 0,
+        statusText: '',
+        updateDebounceTimer: null,
         
-        // Notify Godot that Alpine.js is ready via IPC
-        if (window.GodotBridge && window.GodotBridge.postMessage) {
-            window.GodotBridge.postMessage('alpine_ready', {});
-            console.log('[WorldBuilder] Sent alpine_ready IPC message to Godot');
-        } else {
-            console.warn('[WorldBuilder] GodotBridge.postMessage not available - cannot notify Godot');
-        }
-        
-        // Check if steps data was stored before Alpine initialized
-        if (window._pendingStepsData && window._pendingStepsData.steps) {
-            console.log('[WorldBuilder] Loading pending steps data:', window._pendingStepsData.steps.length);
-            this.steps = window._pendingStepsData.steps;
-            this._initializeParams();
-            delete window._pendingStepsData;
-        } else {
-            // Request step definitions from Godot (fallback if direct injection fails)
-            console.log('[WorldBuilder] Requesting step definitions from Godot');
-            if (window.GodotBridge && window.GodotBridge.requestData) {
-                GodotBridge.requestData('step_definitions', (data) => {
-                    if (data && data.steps) {
-                        console.log('[WorldBuilder] Received steps via requestData:', data.steps.length);
-                        this.steps = data.steps;
-                        this._initializeParams();
-                    }
-                });
+        init() {
+            // Store instance for global access
+            window.worldBuilderInstance = this;
+            console.log('[WorldBuilder] Alpine.js init() called, steps:', this.steps.length);
+            
+            // Notify Godot that Alpine.js is ready via IPC
+            if (window.GodotBridge && window.GodotBridge.postMessage) {
+                window.GodotBridge.postMessage('alpine_ready', {});
+                console.log('[WorldBuilder] Sent alpine_ready IPC message to Godot');
             } else {
-                console.warn('[WorldBuilder] GodotBridge.requestData not available');
+                console.warn('[WorldBuilder] GodotBridge.postMessage not available - cannot notify Godot');
             }
-        }
-        
-        // Request archetypes (already have names, but can request full data if needed)
-        // Archetype names are already set in archetypeNames array
-        
-        // Send initial step
-        this.setStep(0);
-        console.log('[WorldBuilder] Initialized, current step:', this.currentStep, 'total steps:', this.steps.length);
-    },
+            
+            // Check if steps data was stored before Alpine initialized
+            if (window._pendingStepsData && window._pendingStepsData.steps) {
+                console.log('[WorldBuilder] Loading pending steps data:', window._pendingStepsData.steps.length);
+                this.steps = window._pendingStepsData.steps;
+                this._initializeParams();
+                delete window._pendingStepsData;
+            } else {
+                // Request step definitions from Godot (fallback if direct injection fails)
+                console.log('[WorldBuilder] Requesting step definitions from Godot');
+                if (window.GodotBridge && window.GodotBridge.requestData) {
+                    GodotBridge.requestData('step_definitions', (data) => {
+                        if (data && data.steps) {
+                            console.log('[WorldBuilder] Received steps via requestData:', data.steps.length);
+                            this.steps = data.steps;
+                            this._initializeParams();
+                        }
+                    });
+                } else {
+                    console.warn('[WorldBuilder] GodotBridge.requestData not available');
+                }
+            }
+            
+            // Request archetypes (already have names, but can request full data if needed)
+            // Archetype names are already set in archetypeNames array
+            
+            // Send initial step
+            this.setStep(0);
+            console.log('[WorldBuilder] Initialized, current step:', this.currentStep, 'total steps:', this.steps.length);
+        },
     
     _initializeParams() {
         // Initialize params with default values from step definitions (only curated parameters)
@@ -263,5 +264,6 @@ Alpine.data('worldBuilder', () => ({
         this.statusText = 'Generating...';
         GodotBridge.postMessage('generate', { params: this.params });
     }
-}));
+    }));
+});
 
