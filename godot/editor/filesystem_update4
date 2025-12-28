@@ -1,3 +1,2 @@
-res://scripts/managers/AzgaarIntegrator.gd
-res://ui/world_builder/WorldBuilderUI.gd
-res://core/singletons/DataCache.gd
+res://ui/world_builder/modules/WorldBuilderRightControls.gd
+res://ui/world_builder/submodules/ParameterSubcategory.gd

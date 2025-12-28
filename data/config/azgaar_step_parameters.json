@@ -9,9 +9,43 @@
           "name": "templateInput",
           "azgaar_key": "templateInput",
           "ui_type": "OptionButton",
-          "options": ["pangea", "continents", "archipelago", "highIsland", "lowIsland", "mediterranean", "peninsula", "isthmus", "atoll", "volcano", "shattered", "world", "europe", "africa-centric", "arabia", "atlantics", "britain", "caribbean", "east-asia", "eurasia", "europe-accented", "europe-and-central-asia", "europe-central", "europe-north", "greenland", "hellenica", "iceland", "indian-ocean", "mediterranean-sea", "middle-east", "north-america", "us-centric", "us-mainland", "world-from-pacific"],
-          "default": "continents",
-          "category": "Terrain & Heightmap"
+          "options": [
+            "pangea",
+            "continents",
+            "archipelago",
+            "highIsland",
+            "lowIsland",
+            "mediterranean",
+            "peninsula",
+            "isthmus",
+            "atoll",
+            "volcano",
+            "shattered",
+            "world",
+            "europe",
+            "africa-centric",
+            "arabia",
+            "atlantics",
+            "britain",
+            "caribbean",
+            "east-asia",
+            "eurasia",
+            "europe-accented",
+            "europe-and-central-asia",
+            "europe-central",
+            "europe-north",
+            "greenland",
+            "hellenica",
+            "iceland",
+            "indian-ocean",
+            "mediterranean-sea",
+            "middle-east",
+            "north-america",
+            "us-centric",
+            "us-mainland",
+            "world-from-pacific"
+          ],
+          "default": "continents"
         },
         {
           "name": "pointsInput",
@@ -21,7 +55,6 @@
           "max": 13,
           "step": 1,
           "default": 5,
-          "category": "Terrain & Heightmap",
           "description": "Cell density (1=1K cells, 13=100K cells)"
         },
         {
@@ -31,7 +64,6 @@
           "min": 1,
           "max": 999999999,
           "default": 12345,
-          "category": "General",
           "description": "Map seed number"
         },
         {
@@ -42,7 +74,6 @@
           "max": 3840,
           "step": 10,
           "default": 960,
-          "category": "General",
           "description": "Canvas width in pixels"
         },
         {
@@ -53,7 +84,6 @@
           "max": 2160,
           "step": 10,
           "default": 540,
-          "category": "General",
           "description": "Canvas height in pixels"
         },
         {
@@ -64,7 +94,6 @@
           "max": 100,
           "step": 1,
           "default": 50,
-          "category": "General",
           "description": "Map size relative to world (1-100%)"
         }
       ]
@@ -82,7 +111,6 @@
           "max": 2.2,
           "step": 0.1,
           "default": 1.8,
-          "category": "Terrain & Heightmap",
           "description": "Height exponent for altitude sharpness"
         },
         {
@@ -90,7 +118,6 @@
           "azgaar_key": "allowErosion",
           "ui_type": "CheckBox",
           "default": true,
-          "category": "Terrain & Heightmap",
           "description": "Allow water erosion"
         },
         {
@@ -101,7 +128,6 @@
           "max": 500,
           "step": 10,
           "default": 250,
-          "category": "Terrain & Heightmap",
           "description": "Max iterations for depression filling"
         },
         {
@@ -112,7 +138,6 @@
           "max": 80,
           "step": 1,
           "default": 20,
-          "category": "Terrain & Heightmap",
           "description": "Depression depth threshold for lakes"
         }
       ]
@@ -130,7 +155,6 @@
           "max": 500,
           "step": 10,
           "default": 100,
-          "category": "Climate & Environment",
           "description": "Precipitation percentage (0-500%)"
         },
         {
@@ -141,8 +165,7 @@
           "max": 50,
           "step": 1,
           "default": 28,
-          "category": "Climate & Environment",
-          "description": "Temperature at equator (°C)"
+          "description": "Temperature at equator (\u00b0C)"
         },
         {
           "name": "temperatureNorthPole",
@@ -152,8 +175,7 @@
           "max": 50,
           "step": 1,
           "default": -25,
-          "category": "Climate & Environment",
-          "description": "Temperature at North Pole (°C)"
+          "description": "Temperature at North Pole (\u00b0C)"
         },
         {
           "name": "temperatureSouthPole",
@@ -163,8 +185,7 @@
           "max": 50,
           "step": 1,
           "default": -20,
-          "category": "Climate & Environment",
-          "description": "Temperature at South Pole (°C)"
+          "description": "Temperature at South Pole (\u00b0C)"
         }
       ]
     },
@@ -187,7 +208,6 @@
           "max": 100,
           "step": 1,
           "default": 18,
-          "category": "Societies & Politics",
           "description": "Number of states/countries"
         },
         {
@@ -198,16 +218,23 @@
           "max": 32,
           "step": 1,
           "default": 12,
-          "category": "Societies & Politics",
           "description": "Number of cultures"
         },
         {
           "name": "culturesSet",
           "azgaar_key": "culturesSet",
           "ui_type": "OptionButton",
-          "options": ["world", "european", "oriental", "english", "antique", "highFantasy", "darkFantasy", "random"],
+          "options": [
+            "world",
+            "european",
+            "oriental",
+            "english",
+            "antique",
+            "highFantasy",
+            "darkFantasy",
+            "random"
+          ],
           "default": "world",
-          "category": "Societies & Politics",
           "description": "Culture set for names"
         },
         {
@@ -218,7 +245,6 @@
           "max": 50,
           "step": 1,
           "default": 6,
-          "category": "Societies & Politics",
           "description": "Number of organized religions"
         },
         {
@@ -229,7 +255,6 @@
           "max": 1000,
           "step": 10,
           "default": 1000,
-          "category": "Settlements & Scale",
           "description": "Number of towns to place (0-1000, 1000=auto)"
         },
         {
@@ -240,7 +265,6 @@
           "max": 100,
           "step": 1,
           "default": 20,
-          "category": "Societies & Politics",
           "description": "Burgs percentage to form province"
         }
       ]
@@ -258,7 +282,6 @@
           "max": 10000,
           "step": 10,
           "default": 1000,
-          "category": "Population",
           "description": "People per population point"
         },
         {
@@ -269,7 +292,6 @@
           "max": 5.0,
           "step": 0.01,
           "default": 1.0,
-          "category": "Population",
           "description": "Urbanization rate"
         },
         {
@@ -280,7 +302,6 @@
           "max": 200,
           "step": 1,
           "default": 10,
-          "category": "Population",
           "description": "Urban density (average population per building)"
         }
       ]
@@ -299,4 +320,3 @@
     }
   ]
 }
-

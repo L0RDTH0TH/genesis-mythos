@@ -1,1004 +1,1160 @@
 # GUI Update Integration Investigation Audit
-
-**Generated:** 2025-01-20  
-**Purpose:** Comprehensive analysis and migration plan for transitioning World Builder UI from current local procedural implementation to Azgaar Fantasy Map Generator-driven workflow with fully responsive GUI per Section 11 specifications.
+**Date:** 2025-12-27  
+**Target:** World Builder UI Migration to Modular Render Approach  
+**Scope:** Complete investigation of current implementation and migration plan for performance-optimized modular UI trees
 
 ---
 
-## 1. Current Implementation Analysis
+## Executive Summary
 
-### 1.1 Relevant Files and Scripts
+### Current State
+The World Builder UI (`WorldBuilderUI.tscn` and `WorldBuilderUI.gd`) is a monolithic full-screen Control with **43 nodes** organized in a deep hierarchy. The structure uses an `HSplitContainer` dividing the screen into left navigation (step buttons), center WebView (Azgaar map display via godot_wry), and right controls (dynamic parameters). Performance issues are documented with ~5 FPS in debug mode, primarily from rendering overhead in large node trees, though the audit reveals additional bottlenecks in performance monitoring overlays.
+
+### Desired State
+Migrate to a **modular UI architecture** with small, self-contained `.tscn` scenes (5-20 nodes each) that are dynamically instanced and managed. This approach reduces draw calls, tree traversal overhead, and enables visibility culling for inactive sections. The target layout maintains the same 8-step wizard workflow but with improved performance through modularization.
+
+### Migration Feasibility
+**Estimated Effort:** 15-25 hours  
+**Reusability:** ~70% of existing code (logic, data structures, signals) can be preserved  
+**Main Effort:** Breaking monolithic scene into modular components, refactoring node paths, and establishing communication patterns between modules
+
+**Key Findings:**
+- ✅ **WebView Integration:** Uses `godot_wry` (not GDCef) with full JavaScript execution support via `execute_js()`/`eval()` and bidirectional IPC via `ipc_message` signal
+- ✅ **Parameter Sync:** Currently uses direct JS injection (not file-based `options.json` reloading as initially assumed)
+- ⚠️ **Performance:** Current structure has 43 nodes in a single scene; modularization should reduce per-frame overhead
+- ✅ **Data-Driven:** Parameters loaded from JSON (`azgaar_step_parameters.json`), making refactoring easier
+- ✅ **Theme System:** Centralized theme (`bg3_theme.tres`) and constants (`UIConstants.gd`) support modular approach
+
+---
+
+## Codebase Investigation
+
+### Relevant Files and Scripts
 
 #### Core UI Files
-- **Scene:** `res://ui/world_builder/WorldBuilderUI.tscn` (354 lines)
-- **Script:** `res://ui/world_builder/WorldBuilderUI.gd` (344 lines)
-- **Supporting Script:** `res://scripts/ui/WorldBuilderAzgaar.gd` (280 lines)
-- **Manager:** `res://scripts/managers/AzgaarIntegrator.gd` (111 lines)
-- **Helper Module:** `res://ui/world_builder/MapMakerModule.gd` (872 lines - partially deprecated for Azgaar migration)
+1. **`ui/world_builder/WorldBuilderUI.tscn`** (275 lines, 43 nodes)
+   - Main scene file with full node hierarchy
+   - Root: `Control` with `PRESET_FULL_RECT` anchors
+   - Structure: `MainVBox` → `HSplitContainer` → 3 panels (Left, Center, Right) + `BottomBar`
 
-#### Configuration Files
-- `res://data/config/world_builder_ui.json` (248 lines) - Legacy tab-based config (Terrain, Biomes, Structures, Environment, Export)
-- `res://data/config/azgaar_parameter_mapping.json` - Azgaar parameter mappings
-- `res://data/config/archetype_azgaar_presets.json` - Preset archetype configurations
-- `res://themes/bg3_theme.tres` - Current unified theme (374+ lines)
+2. **`ui/world_builder/WorldBuilderUI.gd`** (795 lines)
+   - Main controller script
+   - Handles step navigation, parameter management, generation triggers
+   - Uses `@onready var` with deep node paths (e.g., `$MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/ArchetypeOption`)
 
-#### Constants and Utilities
-- `res://scripts/ui/UIConstants.gd` (101 lines) - ✅ **EXISTS** with proper semantic constants
+3. **`scripts/ui/WorldBuilderAzgaar.gd`** (401 lines)
+   - WebView controller for Azgaar integration
+   - Handles WebView initialization, JS execution, parameter syncing
+   - Currently has `DEBUG_DISABLE_AZGAAR = true` (diagnostic flag)
 
-#### Addons and Dependencies
-- **GDCef:** `res://cef_artifacts/` directory exists with `gdcef.gdextension`, libraries (`.so`, `.dll`, `.dylib`), and required artifacts
-- **Terrain3D:** `res://addons/terrain_3d/` (128 files) - ✅ Installed
-- **ProceduralWorldMap:** `res://addons/procedural_world_map/` (18 files) - ✅ Installed but being phased out for Azgaar
+#### Integration Scripts
+4. **`scripts/managers/AzgaarIntegrator.gd`** (137 lines)
+   - Manages Azgaar asset copying from `res://tools/azgaar/` to `user://azgaar/`
+   - Provides URL generation (HTTP server or file:// fallback)
+   - Handles `options.json` file writing (currently unused - JS injection preferred)
 
-#### Azgaar Assets
-- `res://tools/azgaar/` - Full Azgaar Fantasy Map Generator bundle (701 files including HTML, JS, CSS, images, heightmaps)
-- **Entry Point:** `tools/azgaar/index.html`
+5. **`scripts/managers/AzgaarServer.gd`** (295 lines)
+   - Embedded HTTP server for serving Azgaar files
+   - Listens on port 8080+ (tries multiple ports)
+   - Currently disabled when `DEBUG_DISABLE_AZGAAR = true`
 
-### 1.2 Current WorldBuilderUI.tscn Node Tree Structure
+#### Supporting Files
+6. **`scripts/ui/UIConstants.gd`** (111 lines)
+   - Semantic UI sizing constants
+   - Used throughout for responsive layouts
+   - Supports modular approach
 
+7. **`themes/bg3_theme.tres`** (475 lines)
+   - Centralized theme resource
+   - Dark fantasy aesthetic with gold/orange accents
+   - Applied to all UI elements
+
+8. **`data/config/azgaar_step_parameters.json`**
+   - Step definitions and parameter configurations
+   - Data-driven approach supports modular refactoring
+
+### Current Node Hierarchy Analysis
+
+#### Full Tree Structure
 ```
-WorldBuilderUI (Control, anchors_full_rect, theme=bg3_theme.tres)
-├── Background (ColorRect, full rect, dark brown)
-├── TopToolbar (HBoxContainer, anchored top, height=80px)
-│   ├── ToolbarContent (HBoxContainer)
-│   │   ├── ViewMenuLabel + ViewMenu (OptionButton)
-│   │   ├── ToolsLabel + RaiseBtn, LowerBtn, SmoothBtn, RegenerateBtn
-│   │   └── Generate3DBtn (Button, 180px width)
-├── MainHSplit (HSplitContainer, anchored full rect with top/bottom offsets)
-│   │   split_offset = 220 (left panel width)
-│   ├── LeftPanel (VBoxContainer, custom_minimum_size=220px width)
-│   │   ├── LeftPanelBg (ColorRect, parchment beige)
-│   │   └── LeftContent (VBoxContainer)
-│   │       ├── TitleLabel ("World Generation Wizard")
-│   │       └── StepTabs (TabContainer) ← **ISSUE: Uses TabContainer instead of vertical sidebar buttons**
-│   │           ├── Step1Terrain (VBoxContainer, empty)
-│   │           ├── Step2Climate (VBoxContainer, empty)
-│   │           ├── Step3Biomes (VBoxContainer, empty)
-│   │           ├── Step4Structures (VBoxContainer, empty)
-│   │           ├── Step5Environment (VBoxContainer, empty)
-│   │           ├── Step6Resources (VBoxContainer, empty)
-│   │           ├── Step7Export (VBoxContainer, empty)
-│   │           └── Step8Bake (VBoxContainer, empty)
-│   ├── CenterPanel (PanelContainer, expand_fill)
-│   │   ├── CenterPanelBg (ColorRect, light beige)
-│   │   └── CenterContent (VBoxContainer)
-│   │       ├── AzgaarWebView (GDCef node) ← **PARTIAL: GDCef node exists but integration incomplete**
-│   │       └── OverlayPlaceholder (TextureRect, hidden, for future use)
-│   └── RightPanel (ScrollContainer, custom_minimum_size=240px width)
-│       ├── RightPanelBg (ColorRect, parchment beige)
-│       └── RightVBox (VBoxContainer)
-│           ├── GlobalControls (VBoxContainer)
-│           │   ├── ArchetypeOption (OptionButton)
-│           │   └── SeedHBox (HBoxContainer)
-│           │       ├── SeedSpin (SpinBox, 200px width)
-│           │       └── RandomizeBtn (Button, 64x50px)
-│           ├── SectionSep (HSeparator)
-│           ├── StepTitle (Label, dynamic)
-│           └── ActiveParams (VBoxContainer) ← **DYNAMIC: Populated per step**
-└── BottomHBox (HBoxContainer, anchored bottom, height=50px)
-    ├── BottomBg (ColorRect, parchment beige)
-    └── BottomContent (HBoxContainer, centered)
-        ├── SpacerLeft (Control, expand)
-        ├── BackBtn (Button, 120px width)
-        ├── NextBtn (Button, 120px width)
-        ├── GenBtn (Button, 250px width, "✨ Generate with Azgaar")
-        ├── ProgressBar (ProgressBar, 200px width, hidden by default)
-        ├── StatusLabel (Label, 150px width)
-        └── SpacerRight (Control, expand)
+WorldBuilderUI (Control, anchors_full_rect)
+├── Background (ColorRect, full rect, mouse_filter=IGNORE)
+└── MainVBox (VBoxContainer, full rect)
+    ├── TopBar (PanelContainer)
+    │   └── TopBarContent (CenterContainer)
+    │       └── TitleLabel (Label, "World Builder – Forging the World")
+    ├── MainHSplit (HSplitContainer)
+    │   ├── LeftPanel (PanelContainer, ~15-20% width)
+    │   │   └── LeftContent (VBoxContainer)
+    │   │       └── StepSidebar (VBoxContainer)
+    │   │           ├── Step1Btn (Button, "1. Map Generation & Editing")
+    │   │           ├── Step2Btn (Button, "2. Terrain")
+    │   │           ├── Step3Btn (Button, "3. Climate")
+    │   │           ├── Step4Btn (Button, "4. Biomes")
+    │   │           ├── Step5Btn (Button, "5. Structures & Civilizations")
+    │   │           ├── Step6Btn (Button, "6. Environment")
+    │   │           ├── Step7Btn (Button, "7. Resources & Magic")
+    │   │           └── Step8Btn (Button, "8. Export")
+    │   ├── CenterPanel (PanelContainer, ~60-65% width)
+    │   │   └── CenterContent (Control, WorldBuilderAzgaar script)
+    │   │       └── OverlayPlaceholder (TextureRect, visible=false)
+    │   │           └── [WebViewMargin/AzgaarWebView - removed when DEBUG_DISABLE_AZGAAR]
+    │   └── RightPanel (PanelContainer, ~20-25% width)
+    │       └── RightScroll (ScrollContainer)
+    │           └── RightVBox (VBoxContainer)
+    │               ├── ArchetypeLabel (Label)
+    │               ├── ArchetypeOption (OptionButton)
+    │               ├── SeedLabel (Label)
+    │               ├── SeedHBox (HBoxContainer)
+    │               │   ├── SeedSpin (SpinBox)
+    │               │   └── RandomizeBtn (Button, "🎲")
+    │               ├── SectionSep (HSeparator)
+    │               ├── StepTitle (Label)
+    │               └── ParamTree (Tree, 3 columns, hide_root=true)
+    └── BottomBar (PanelContainer)
+        └── BottomContent (HBoxContainer)
+            ├── SpacerLeft (Control, expand)
+            ├── BackBtn (Button, "← Back")
+            ├── GenBtn (Button, "✨ Generate / Apply Changes")
+            ├── BakeTo3DBtn (Button, "🎨 Bake to 3D", disabled, hidden)
+            ├── NextBtn (Button, "Next →")
+            ├── ProgressBar (ProgressBar, hidden)
+            ├── StatusLabel (Label, "Ready")
+            └── SpacerRight (Control, expand)
 ```
 
-**Current Step Definitions (from WorldBuilderUI.gd):**
+#### Node Count Breakdown
+- **Total Nodes:** 43
+- **Left Panel:** 11 nodes (1 PanelContainer + 1 VBoxContainer + 1 VBoxContainer + 8 Buttons)
+- **Center Panel:** 3 nodes (1 PanelContainer + 1 Control + 1 TextureRect)
+- **Right Panel:** 10 nodes (1 PanelContainer + 1 ScrollContainer + 1 VBoxContainer + 7 controls)
+- **Bottom Bar:** 8 nodes (1 PanelContainer + 1 HBoxContainer + 6 controls)
+- **Top Bar:** 3 nodes (1 PanelContainer + 1 CenterContainer + 1 Label)
+- **Root/Background:** 2 nodes
+
+### Bottleneck Identification
+
+#### 1. Node Tree Traversal
+**Issue:** Deep node paths in `@onready var` declarations require traversal on every access
 ```gdscript
-0: "Step 1: Terrain & Heightmap" - params: template, points, heightExponent, allowErosion, plateCount
-1: "Step 2: Climate & Environment" - params: precip, temperatureEquator, temperatureNorthPole
-2: "Step 3: Biomes & Ecosystems" - params: [] (empty)
-3: "Step 4: Structures & Civilizations" - params: statesNumber, culturesSet, religionsNumber
-4: "Step 5: Environment & Atmosphere" - params: [] (empty)
-5: "Step 6: Resources & Magic" - params: [] (empty)
-6: "Step 7: Export & Preview" - params: [] (empty)
-7: "Step 8: Bake to 3D" - params: [] (empty)
+@onready var archetype_option: OptionButton = $MainVBox/MainHSplit/RightPanel/RightScroll/RightVBox/ArchetypeOption
+```
+**Impact:** Each `@onready var` assignment traverses the tree once at `_ready()`, but subsequent property access is cached. However, the deep hierarchy still impacts initial load and makes refactoring difficult.
+
+**Current Count:** 18 `@onready var` declarations with paths 4-7 levels deep
+
+#### 2. Dynamic Parameter Tree
+**Issue:** `ParamTree` is rebuilt on every step change via `_populate_param_tree()`
+- Clears and recreates all TreeItems
+- Iterates through parameter definitions
+- Creates controls (sliders, option buttons, checkboxes) as TreeItem cells
+- **Current optimization:** Caching system (`cached_trees`) reduces rebuilds, but still requires tree manipulation
+
+**Impact:** Tree manipulation is expensive, especially with many parameters (some steps have 10+ parameters)
+
+#### 3. WebView Rendering
+**Issue:** WebView (godot_wry) renders in the center panel, adding rendering overhead
+- WebView is a native component that renders independently
+- Currently disabled for diagnostics (`DEBUG_DISABLE_AZGAAR = true`)
+- When active, adds significant rendering cost
+
+**Impact:** WebView rendering is separate from Godot's rendering pipeline, but still impacts overall FPS
+
+#### 4. Layout Recalculation
+**Issue:** `_update_responsive_layout()` recalculates panel widths on resize
+- Called via `call_deferred()` with throttling (`_resize_pending` flag)
+- Recalculates panel widths as percentages of viewport
+- Updates `custom_minimum_size` on multiple panels
+
+**Impact:** Acceptable with current throttling, but could be optimized further
+
+### godot_wry Integration Details
+
+#### Current Implementation
+- **Addon:** `res://addons/godot_wry/` (GDExtension-based WebView)
+- **Node Type:** `WebView` (not a built-in Godot node)
+- **Initialization:** WebView node must exist in scene tree, then accessed via `get_node()`
+
+#### Key Methods Available
+```gdscript
+web_view.load_url(url: String)                    # Load URL
+web_view.execute_js(code: String) -> Variant      # Execute JS, returns result
+web_view.eval(code: String) -> void                # Execute JS, no return
+web_view.post_message(message: String)             # Send IPC message
+web_view.reload()                                   # Reload current page
 ```
 
-**Desired Step Definitions (from user requirements):**
-```
-1. Map Generation & Editing
-2. Terrain
-3. Climate
-4. Biomes
-5. Structures & Civilizations
-6. Environment
-7. Resources & Magic
-8. Export
+#### Key Signals
+```gdscript
+web_view.ipc_message(message: String)              # Receive IPC messages from web
 ```
 
-### 1.3 Current Script Logic Analysis
+#### Current Parameter Sync Method
+**NOT file-based reloading** - Uses direct JavaScript injection:
+```gdscript
+func _sync_parameters_to_azgaar(params: Dictionary) -> void:
+    for azgaar_key in params:
+        var value = params[azgaar_key]
+        var js_code = "if (typeof azgaar !== 'undefined' && azgaar.options) { azgaar.options.%s = %s; }" % [azgaar_key, js_value]
+        _execute_azgaar_js(js_code)
+```
 
-#### WorldBuilderUI.gd Key Functions
+**Advantages:**
+- ✅ No file I/O overhead
+- ✅ Immediate parameter updates
+- ✅ No reload delays
 
-**Initialization:**
-- `_ready()`: Sets up UI, populates archetypes, connects signals, initializes Azgaar default
-- `_initialize_azgaar_default()`: Calls `azgaar_webview.load_url(UIConstants.AZGAAR_BASE_URL)` - **ISSUE: Uses online URL instead of local bundled Azgaar**
+**Limitations:**
+- ⚠️ Requires Azgaar to be fully loaded (checks for `typeof azgaar !== 'undefined'`)
+- ⚠️ JS execution may fail silently if Azgaar not ready
+- ⚠️ No direct return values from parameter setting (fire-and-forget)
 
-**Step Management:**
-- `_update_step_ui()`: Updates TabContainer current tab, title, navigation buttons, parameter controls
-- `_populate_params()`: Dynamically creates controls (HSlider, OptionButton, CheckBox, SpinBox) from STEP_DEFINITIONS
-- `_on_step_changed()`: Handler for TabContainer tab change
+#### Generation Flow
+1. User clicks "Generate / Apply Changes"
+2. `_generate_azgaar()` called
+3. `trigger_generation_with_options()` on `WorldBuilderAzgaar`
+4. `_sync_parameters_to_azgaar()` injects all parameters via JS
+5. `_execute_azgaar_js("azgaar.generate()")` triggers generation
+6. Bridge script (injected on page load) monitors completion
+7. IPC message sent when generation complete
+8. `_on_ipc_message()` receives completion signal
+9. `generation_complete` signal emitted
 
-**Generation Flow:**
-- `_generate_azgaar()`: Writes `current_params` to `user://azgaar/options.json`, reloads WebView
-- `_process()`: Polls for generation completion by checking page title (heuristic: checks if title contains "[" and "x")
-- `_bake_to_3d()`: Calls `terrain_manager.create_terrain()` and `configure_terrain()` - **STUB: TODO comments indicate incomplete**
-
-**Parameter Management:**
-- `_load_archetype_params()`: Loads preset params from ARCHETYPES dictionary (High Fantasy, Low Fantasy, Dark Fantasy, Realistic, Custom)
-- `current_params: Dictionary` stores all active parameters
-
-#### WorldBuilderAzgaar.gd Key Functions
-
-**WebView Initialization:**
-- `_initialize_webview()`: Attempts to get GDCef node, checks class name, initializes CEF if needed, creates browser
-- `_create_azgaar_browser()`: Calls `create_browser(url, null, {})` on GDCef node
-- **ISSUES:**
-  - Fallback methods (`_try_direct_url_loading`, `_try_fallback_url_loading`) indicate uncertainty about GDCef API
-  - No JavaScript execution methods called (no `execute_javascript()` or equivalent)
-  - No event listeners for page load or generation completion
-
-**Generation Triggering:**
-- `trigger_generation_with_options()`: Writes options via `AzgaarIntegrator.write_options()`, reloads WebView, starts polling/timeout timers
-- `_on_poll_timeout()`: **STUB** - TODO comment indicates completion detection not implemented
-- `_on_generation_timeout()`: Emits `generation_failed` signal after 60 seconds
-
-#### AzgaarIntegrator.gd Functions
-
-- `copy_azgaar_to_user()`: Recursively copies `res://tools/azgaar/` to `user://azgaar/` for writability
-- `write_options()`: Writes JSON options to `user://azgaar/options.json`
-- `get_azgaar_url()`: Returns `file://` URL to `user://azgaar/index.html` - **CORRECT: Uses local bundled version**
-
-### 1.4 Integration Points with Addons
-
-#### Terrain3D Integration
-- **Status:** ✅ Addon installed at `res://addons/terrain_3d/`
-- **Current Usage:** `_bake_to_3d()` calls `terrain_manager.create_terrain()` and `configure_terrain()`
-- **Gap:** No heightmap export/import logic from Azgaar → Terrain3D implemented
-- **Required:** Parse Azgaar heightmap export (PNG/EXR) and feed to Terrain3D heightmap system
-
-#### ProceduralWorldMap Integration
-- **Status:** ⚠️ Addon installed but being phased out
-- **Current Usage:** `MapMakerModule.gd` references old procedural generation (disabled with stubs)
-- **Migration Note:** Old procedural code should be removed entirely once Azgaar integration is complete
-
-#### GDCef Integration
-- **Status:** ⚠️ **Partially Implemented**
-- **Evidence:**
-  - `cef_artifacts/` directory exists with all required files
-  - `gdcef.gdextension` configured for Linux/Windows/macOS
-  - `WorldBuilderUI.tscn` declares `AzgaarWebView` as `type="GDCef"`
-  - `WorldBuilderAzgaar.gd` attempts initialization but has multiple fallback paths
-- **Gaps:**
-  - ❌ No JavaScript execution (no `execute_javascript()` calls)
-  - ❌ No bidirectional communication (cannot query Azgaar state)
-  - ❌ No event listeners (page load, generation complete signals)
-  - ⚠️ Completion detection relies on heuristic (page title parsing) instead of proper events
-
-### 1.5 Identified Issues
-
-#### Magic Numbers and Non-Responsive Elements
-
-**From `WorldBuilderUI.tscn` grep results:**
-- `offset_bottom = 80.0` (TopToolbar) - **Should use UIConstants or calculate from toolbar height**
-- `custom_minimum_size = Vector2(150, 0)` (ViewMenu) - **Should use UIConstants.LABEL_WIDTH_WIDE or semantic constant**
-- `custom_minimum_size = Vector2(180, 0)` (Generate3DBtn) - **Should use UIConstants or theme-driven sizing**
-- `offset_top = 80.0` and `offset_bottom = -50.0` (MainHSplit) - **Should use anchors or calculated offsets**
-- `custom_minimum_size = Vector2(220, 0)` (LeftPanel) - **Should use UIConstants.LEFT_PANEL_WIDTH** (exists: 220, but should reference constant)
-- `custom_minimum_size = Vector2(240, 0)` (RightPanel) - **Should use UIConstants.RIGHT_PANEL_WIDTH** (exists: 240, but should reference constant)
-- `custom_minimum_size = Vector2(200, 0)` (SeedSpin) - **Should use UIConstants.LABEL_WIDTH_WIDE**
-- `custom_minimum_size = Vector2(64, 50)` (RandomizeBtn) - **Should use UIConstants.BUTTON_HEIGHT_SMALL for height**
-- `offset_top = -50.0` and `custom_minimum_size = Vector2(0, 50)` (BottomHBox) - **Should use UIConstants.BOTTOM_BAR_HEIGHT** (exists: 50)
-- Multiple button widths (120px, 250px, 200px, 150px) - **Should use UIConstants semantic sizes**
-
-**Total Magic Numbers Found:** 18 instances in `.tscn` file alone
-
-#### Layout Structure Issues
-
-1. **Left Panel Uses TabContainer Instead of Vertical Sidebar:**
-   - Current: `StepTabs (TabContainer)` with 8 tab pages
-   - Desired: Vertical list of buttons/tabs styled as sidebar
-   - **Impact:** Requires complete restructuring of left panel
-
-2. **Center Panel Not Fully Responsive:**
-   - `AzgaarWebView` uses `size_flags_horizontal = 3` and `size_flags_vertical = 3` ✅ (correct)
-   - But parent `MainHSplit` uses fixed `split_offset = 220` ⚠️ (should be dynamic or use UIConstants)
-
-3. **Top Toolbar Fixed Height:**
-   - `offset_bottom = 80.0` hardcoded
-   - Should calculate from toolbar's actual height or use UIConstants
-
-4. **Bottom Bar Fixed Height:**
-   - `custom_minimum_size = Vector2(0, 50)` and `offset_top = -50.0`
-   - UIConstants.BOTTOM_BAR_HEIGHT exists (50) but not used
-
-#### Performance Bottlenecks
-
-1. **Low FPS (3-7 FPS in debug mode):**
-   - Likely causes:
-     - GDCef rendering overhead (embedded browser is expensive)
-     - No viewport culling or optimization for hidden elements
-     - Potential memory leaks in WebView (if not properly managed)
-
-2. **Generation Polling:**
-   - `_process()` polls every 0.5 seconds checking page title
-   - **Better approach:** Use GDCef events/signals if available, or reduce polling frequency
-
-3. **Azgaar File Copying:**
-   - `copy_azgaar_to_user()` runs on every `_ready()` if files don't exist
-   - **Optimization:** Check if files already exist before copying
-
-#### Compliance Check with GUI Philosophy & Structural Guidelines (Section 11)
-
-**✅ Compliant:**
-- Uses theme (`bg3_theme.tres`) ✅
-- Uses containers (HSplitContainer, VBoxContainer, HBoxContainer) ✅
-- Some size flags set (expand/fill on center panel) ✅
-- UIConstants.gd exists with proper constants ✅
-
-**❌ Violations:**
-- **18 magic numbers** in `.tscn` file (hard-coded pixels) ❌
-- Fixed `split_offset` instead of using UIConstants ❌
-- TabContainer for steps instead of vertical sidebar buttons ❌
-- No resize handling (`_notification(NOTIFICATION_RESIZED)`) ❌
-- Fixed offsets (`offset_top = 80.0`, `offset_bottom = -50.0`) instead of anchors ❌
-- Some controls don't use UIConstants (e.g., button widths) ❌
+**No file-based reloading** - All communication is via JavaScript execution and IPC messages.
 
 ---
 
-## 2. Desired Implementation Overview
+## Gap Analysis
 
-### 2.1 Key Changes from Current to Desired
+### Differences: Current vs. Desired Layout
 
-#### Layout Transformation
+#### Current Layout
+- **Left Panel:** Vertical list of 8 step buttons (always visible)
+- **Center Panel:** WebView for Azgaar (interactive, full Azgaar UI)
+- **Right Panel:** ScrollContainer with:
+  - Archetype preset (always visible)
+  - Seed controls (always visible)
+  - Step title (dynamic)
+  - Parameter Tree (dynamic, changes per step)
+- **Bottom Bar:** Navigation buttons, progress, status (always visible)
 
-**Current Structure:**
-```
-[TopToolbar: 80px fixed]
-[HSplitContainer: Left(220px) | Center(expand) | Right(240px)]
-[BottomHBox: 50px fixed]
-```
+#### Desired Layout (from requirements)
+- **Left Panel:** Vertical navigation with step buttons (same)
+- **Center Panel:** WebView (same, but note: "no local overlays—all edits via Azgaar's native UI")
+- **Right Panel:** Dynamic controls with:
+  - Globals (seed/template) in first step OR always visible (current: always visible ✅)
+  - Step-specific parameters (current: dynamic ✅)
+- **Bottom Bar:** Generate/Apply, Bake to 3D, Back/Next, Status (same)
 
-**Desired Structure:**
-```
-[HSplitContainer: Left(~15-20%) | Center(~60-65%) | Right(~20-25%)]
-  ├── Left: Vertical sidebar with step buttons (fixed ~15-20% width)
-  ├── Center: Azgaar WebView (expand_fill)
-  └── Right: Dynamic step controls (ScrollContainer, ~20-25% width)
-[BottomHBox: Overlaid on center panel bottom, full width, dark bar]
-  ├── Generate/Apply Changes Button (centered, large, orange)
-  ├── Bake to 3D Button (centered, appears after map finalized)
-  ├── Back Button (left-aligned)
-  ├── Next Button (right-aligned, orange highlighted)
-  └── Status Label (center or near buttons)
-```
+**Conclusion:** Current layout **already matches desired layout** in structure. The migration focus should be on **modularization**, not layout changes.
 
-**Key Differences:**
-1. **No Top Toolbar** - All tools integrated into Azgaar's native UI
-2. **Percentage-based widths** instead of fixed pixels (15-20% / 60-65% / 20-25%)
-3. **Bottom bar overlaid** on center panel instead of separate row
-4. **Vertical sidebar buttons** instead of TabContainer
-5. **All editing in Azgaar** - no local painting tools (Raise/Lower/Smooth removed)
+### Missing Features
 
-#### Step Definitions Update
+1. **Tooltips**
+   - Current: No tooltips on parameters
+   - Desired: Tooltips for parameter descriptions (from JSON `description` field)
+   - **Impact:** Low priority, can be added during modularization
 
-**Current Steps (8):**
-1. Terrain & Heightmap
-2. Climate & Environment
-3. Biomes & Ecosystems
-4. Structures & Civilizations
-5. Environment & Atmosphere
-6. Resources & Magic
-7. Export & Preview
-8. Bake to 3D
+2. **3D Preview Toggle**
+   - Current: `BakeTo3DBtn` exists but only visible on step 7 (Export)
+   - Desired: Toggle to switch between 2D WebView and 3D Terrain3D preview
+   - **Impact:** Medium priority, requires SubViewport setup
 
-**Desired Steps (8, aligned with Azgaar workflow):**
-1. **Map Generation & Editing** - Global params (seed, template, map size, landmass type), Azgaar map generation
-2. **Terrain** - Heightmap parameters, erosion, elevation
-3. **Climate** - Temperature, precipitation, wind patterns
-4. **Biomes** - Biome distribution, vegetation, ecosystem settings
-5. **Structures & Civilizations** - States, cultures, religions, cities, routes
-6. **Environment** - Atmosphere, fog, lighting (for 3D preview)
-7. **Resources & Magic** - Resource distribution, magical zones
-8. **Export** - Export options, bake to 3D trigger
+3. **Performance Notes**
+   - Current: No performance warnings for high point counts
+   - Desired: Warnings when `pointsInput` exceeds hardware capabilities
+   - **Impact:** Low priority, `UIConstants.get_clamped_points()` already handles clamping
 
-**Mapping Note:** Steps align better with Azgaar's native parameter categories.
+4. **Progress Indicators**
+   - Current: ProgressBar and StatusLabel exist but basic
+   - Desired: More detailed progress (e.g., "Generating heightmap... 45%")
+   - **Impact:** Low priority, can be enhanced incrementally
 
-### 2.2 Benefits of Azgaar-Driven Approach
+### Integration Risks
 
-1. **Enhanced Procedural Capabilities:**
-   - Azgaar handles complex noise generation, biome distribution, civilization placement
-   - Sophisticated algorithms for rivers, routes, state borders, culture spread
-   - Pre-built fantasy templates and heightmap presets
+#### 1. Azgaar Reload Times
+**Risk:** WebView reload can take 2-5 seconds for full Azgaar initialization  
+**Current Mitigation:** Uses HTTP server (faster than file://) and JS injection (no reload needed)  
+**Modular Impact:** None - WebView remains in center panel module
 
-2. **Interactive Editing:**
-   - Users can edit directly in Azgaar (paint terrain, place markers, adjust states)
-   - Real-time preview of all layers (heightmap, biomes, temperature, population, political, religions, rivers)
-   - No need to reimplement painting tools in Godot
+#### 2. File I/O Reliability
+**Risk:** `options.json` writing could fail on some systems  
+**Current Status:** Not used - JS injection preferred  
+**Modular Impact:** None - file-based approach not needed
 
-3. **Alignment with Fantasy World-Building:**
-   - Azgaar is purpose-built for fantasy maps (cultures, religions, states, routes, names)
-   - Supports fantasy archetypes (high fantasy, dark fantasy, etc.)
-   - Extensive customization options for fantasy settings
+#### 3. Cross-Platform WebView Support
+**Risk:** godot_wry may have platform-specific limitations  
+**Current Status:** Works on Windows/Linux/Mac (GDExtension)  
+**Modular Impact:** Low - WebView module can be swapped if needed
 
-4. **Data Export:**
-   - Azgaar can export heightmaps (PNG), biomes (JSON), political maps, etc.
-   - Well-documented export formats suitable for Terrain3D import
+#### 4. JavaScript Execution Reliability
+**Risk:** JS execution may fail if Azgaar not fully loaded  
+**Current Mitigation:** Checks for `typeof azgaar !== 'undefined'` before execution  
+**Modular Impact:** None - JS execution logic remains in `WorldBuilderAzgaar` module
 
-### 2.3 Potential Challenges
-
-#### CEF Integration Complexity
-
-**Challenge:** GDCef API uncertainty
-- Current code has multiple fallback paths indicating uncertainty
-- Need to verify actual GDCef API: `create_browser()`, `execute_javascript()`, event signals
-- **Mitigation:** Check GDCef documentation, test with minimal example, add error handling
-
-**Challenge:** JavaScript Injection for Parameter Syncing
-- Need to inject parameters into Azgaar via JS (e.g., `azgaar.setOption('points', 600000)`)
-- Azgaar must expose API for external control (check `main.js` for global functions)
-- **Mitigation:** Use Azgaar's URL parameters or modify bundled Azgaar to accept `options.json` on load
-
-**Challenge:** Export/Import Data Flow
-- Export heightmap from Azgaar (via JS: `azgaar.exportMap('png')` or download button)
-- Parse exported PNG/EXR for Terrain3D heightmap format
-- **Mitigation:** Use Azgaar's export functions, parse with Godot's Image API
-
-#### Performance Overhead
-
-**Challenge:** Embedded Browser Resource Usage
-- GDCef/CEF is heavy (memory, CPU for rendering)
-- **Mitigation:**
-  - Lazy load: Only initialize GDCef when World Builder UI is opened
-  - Use viewport culling: Hide WebView when not visible
-  - Optimize Azgaar settings: Reduce cell density for preview, increase for final export
-
-#### Compatibility
-
-**Challenge:** Godot 4.5.1 Compatibility
-- Current `project.godot` shows `godot_version="4.3.stable"` - **NEEDS UPDATE** to 4.5.1
-- GDCef extension compatibility with 4.5.1 must be verified
-- **Mitigation:** Test GDCef with 4.5.1, update project version, check for breaking changes
+#### 5. Signal Communication Between Modules
+**Risk:** Modular scenes need reliable signal communication  
+**Current Status:** Uses direct signal connections  
+**Modular Solution:** Use autoload singleton (EventBus) or parent-child signal forwarding
 
 ---
 
-## 3. Migration Plan
+## Modularization Plan
 
-### 3.1 Phased Approach
+### Target Architecture
 
-#### Phase 1: Setup and Foundation (Priority: HIGH)
+Break the monolithic `WorldBuilderUI.tscn` into **7 modular scenes**:
 
-**Objective:** Ensure GDCef is working, update project version, create responsive layout foundation
+1. **`WorldBuilderRoot.tscn`** (5-8 nodes)
+   - Root Control with background
+   - MainVBox container
+   - Instances and manages child modules
 
-**Tasks:**
-1. **Verify GDCef Installation:**
-   - Test `create_browser()` with simple HTML page
-   - Verify `execute_javascript()` method exists and works
-   - Check for event signals (page loaded, URL changed)
-   - **Files:** Create `res://tests/gdcef_verification_test.gd` (EditorScript)
+2. **`WorldBuilderTopBar.tscn`** (3-4 nodes)
+   - TopBar PanelContainer
+   - TitleLabel
+   - Self-contained, minimal
 
-2. **Update Project Version:**
-   - Change `project.godot` line 57: `godot_version="4.5.1.stable"`
-   - Test project loads correctly
-   - **Files:** `res://project.godot`
+3. **`WorldBuilderLeftNav.tscn`** (10-12 nodes)
+   - LeftPanel PanelContainer
+   - StepSidebar with 8 step buttons
+   - Emits signals for step changes
 
-3. **Replace Magic Numbers with UIConstants:**
-   - Update `WorldBuilderUI.tscn`: Replace all `custom_minimum_size` and `offset_*` with UIConstants references
-   - Use `UIConstants.LEFT_PANEL_WIDTH` (220), `UIConstants.RIGHT_PANEL_WIDTH` (240), `UIConstants.BOTTOM_BAR_HEIGHT` (50)
-   - Replace button widths with `UIConstants.BUTTON_HEIGHT_MEDIUM` or semantic constants
-   - **Files:** `res://ui/world_builder/WorldBuilderUI.tscn`
+4. **`WorldBuilderCenterWebView.tscn`** (3-5 nodes)
+   - CenterPanel PanelContainer
+   - WebView container (WorldBuilderAzgaar script)
+   - Handles WebView initialization and communication
 
-4. **Add Resize Handling:**
-   - Add `_notification(NOTIFICATION_RESIZED)` to `WorldBuilderUI.gd`
-   - Recalculate panel widths as percentages (15-20% / 60-65% / 20-25%)
-   - Clamp to min/max from UIConstants
-   - **Files:** `res://ui/world_builder/WorldBuilderUI.gd`
+5. **`WorldBuilderRightControls.tscn`** (12-15 nodes)
+   - RightPanel PanelContainer
+   - ScrollContainer with RightVBox
+   - Archetype, Seed, StepTitle, ParamTree
+   - Emits signals for parameter changes
 
-**Estimated Effort:** 4-6 hours  
-**Testing:** Run project, verify UI scales on window resize, check FPS
+6. **`WorldBuilderBottomBar.tscn`** (8-10 nodes)
+   - BottomBar PanelContainer
+   - Navigation buttons, progress, status
+   - Emits signals for button presses
 
-#### Phase 2: Restructure Left Panel to Vertical Sidebar (Priority: HIGH)
+7. **`WorldBuilderParamRow.tscn`** (3-5 nodes) [Optional - for future Tree replacement]
+   - Reusable parameter row (Label + Control + Value)
+   - Can replace Tree with VBoxContainer of rows
 
-**Objective:** Replace TabContainer with vertical button list
+### Proposed Scene Structure
 
-**Tasks:**
-1. **Remove TabContainer:**
-   - Delete `StepTabs` node and all child tab pages
-   - **Files:** `res://ui/world_builder/WorldBuilderUI.tscn`
+```
+res://scenes/ui/world_builder/
+├── WorldBuilderRoot.tscn          # Main container
+├── WorldBuilderTopBar.tscn      # Title bar
+├── WorldBuilderLeftNav.tscn       # Step navigation
+├── WorldBuilderCenterWebView.tscn  # Azgaar WebView
+├── WorldBuilderRightControls.tscn  # Parameter controls
+├── WorldBuilderBottomBar.tscn     # Navigation bar
+└── components/
+    ├── StepButton.tscn            # Reusable step button (optional)
+    └── ParamRow.tscn              # Reusable parameter row (optional)
+```
 
-2. **Create Vertical Sidebar:**
-   - Add `VBoxContainer` named `StepSidebar` to `LeftContent`
-   - Create 8 `Button` nodes (one per step) with text matching desired step names
-   - Style buttons: Dim when inactive, orange highlight on current step
-   - Use `theme_override_colors/font_color` and `theme_override_styles/normal` for styling
-   - **Files:** `res://ui/world_builder/WorldBuilderUI.tscn`
+### Module Communication Pattern
 
-3. **Update Script Logic:**
-   - Remove `step_tabs: TabContainer` reference
-   - Add `@onready var step_buttons: Array[Button] = []` to store button references
-   - Update `_update_step_ui()`: Set button pressed state, update highlights
-   - Connect button `pressed` signals to `_on_step_button_pressed(step_idx: int)`
-   - **Files:** `res://ui/world_builder/WorldBuilderUI.gd`
+#### Option 1: Autoload EventBus (Recommended)
+```gdscript
+# autoload/EventBus.gd
+extends Node
 
-4. **Update Step Definitions:**
-   - Update `STEP_DEFINITIONS` dictionary with new step titles matching desired structure
-   - Align parameter lists with Azgaar's actual parameter categories
-   - **Files:** `res://ui/world_builder/WorldBuilderUI.gd`
+signal step_changed(step_index: int)
+signal parameter_changed(azgaar_key: String, value: Variant)
+signal generate_requested(options: Dictionary)
+signal generation_complete()
+signal generation_failed(reason: String)
+```
 
-**Estimated Effort:** 3-4 hours  
-**Testing:** Click step buttons, verify highlights update, verify step content changes
+**Advantages:**
+- ✅ Decouples modules completely
+- ✅ Easy to add new modules
+- ✅ No parent-child dependencies
 
-#### Phase 3: Integrate Azgaar JavaScript Communication (Priority: HIGH)
+**Disadvantages:**
+- ⚠️ Requires autoload setup
+- ⚠️ Global namespace pollution (mitigated by namespaced signals)
 
-**Objective:** Enable bidirectional communication between Godot and Azgaar
+#### Option 2: Parent-Child Signal Forwarding
+```gdscript
+# WorldBuilderRoot.gd
+func _ready():
+    left_nav.step_changed.connect(_on_step_changed)
+    right_controls.parameter_changed.connect(_on_parameter_changed)
+    bottom_bar.generate_pressed.connect(_on_generate_pressed)
+    
+    # Forward to other modules
+    func _on_step_changed(step: int):
+        right_controls.update_step(step)
+        # ... other updates
+```
 
-**Tasks:**
-1. **Research Azgaar API:**
-   - Inspect `tools/azgaar/main.js` for global functions (e.g., `azgaar.generate()`, `azgaar.setOption()`, `azgaar.exportMap()`)
-   - Document available functions in `tools/azgaar/AZGAAR_PARAMETERS.md` (already exists - review it)
-   - **Files:** `res://tools/azgaar/main.js`, `res://tools/azgaar/AZGAAR_PARAMETERS.md`
+**Advantages:**
+- ✅ No autoload needed
+- ✅ Clear ownership (parent manages children)
 
-2. **Implement JavaScript Execution:**
-   - Add `_execute_azgaar_js(code: String) -> Variant` method to `WorldBuilderAzgaar.gd`
-   - Use GDCef's `execute_javascript()` or equivalent method
-   - Add error handling for JS execution failures
-   - **Files:** `res://scripts/ui/WorldBuilderAzgaar.gd`
+**Disadvantages:**
+- ⚠️ Parent must know all child signals
+- ⚠️ Tighter coupling
 
-3. **Sync Parameters to Azgaar:**
-   - Update `_generate_azgaar()`: Instead of writing `options.json`, inject parameters via JS
-   - Example: `_execute_azgaar_js("azgaar.setOption('points', %d)" % current_params.points)`
-   - Map `current_params` keys to Azgaar parameter names (use `azgaar_parameter_mapping.json`)
-   - **Files:** `res://ui/world_builder/WorldBuilderUI.gd`, `res://scripts/ui/WorldBuilderAzgaar.gd`
+#### Option 3: Hybrid (Recommended for Migration)
+- Use **EventBus** for cross-module communication (step changes, generation events)
+- Use **direct parent references** for UI updates (e.g., parent updates child visibility)
 
-4. **Implement Completion Detection:**
-   - Replace `_process()` polling with event-based detection
-   - Option A: Use GDCef page load event → check if generation complete
-   - Option B: Inject JS callback: `azgaar.onGenerationComplete(() => { window.godotGenerationComplete() })`
-   - Option C: Poll Azgaar state via JS: `_execute_azgaar_js("azgaar.getState()")`
-   - **Files:** `res://scripts/ui/WorldBuilderAzgaar.gd`
+### Step-by-Step Refactor Plan
 
-5. **Remove Top Toolbar:**
-   - Delete `TopToolbar` node and all children
-   - Update `MainHSplit` anchors: Remove `offset_top = 80.0`, set to full rect
-   - **Files:** `res://ui/world_builder/WorldBuilderUI.tscn`
+#### Phase 1: Extract Bottom Bar (2-3 hours)
+1. Create `WorldBuilderBottomBar.tscn` with BottomBar structure
+2. Create `WorldBuilderBottomBar.gd` script
+3. Move button logic to script
+4. Replace in `WorldBuilderUI.tscn` with instance
+5. Connect signals via parent or EventBus
+6. Test navigation and generation
 
-**Estimated Effort:** 6-8 hours  
-**Testing:** Generate map, verify parameters sync to Azgaar, verify completion detection works
+**Node Count:** 8-10 nodes (isolated)
 
-#### Phase 4: Update Right Panel for Dynamic Step Controls (Priority: MEDIUM)
+#### Phase 2: Extract Top Bar (1 hour)
+1. Create `WorldBuilderTopBar.tscn` with TopBar structure
+2. Create `WorldBuilderTopBar.gd` script (minimal, just title)
+3. Replace in `WorldBuilderUI.tscn` with instance
+4. Test display
 
-**Objective:** Populate right panel with Azgaar-relevant parameters per step
+**Node Count:** 3-4 nodes (isolated)
 
-**Tasks:**
-1. **Create Step Parameter Configurations:**
-   - Create `res://data/config/azgaar_step_parameters.json` mapping step indices to Azgaar parameter groups
-   - Example structure:
-     ```json
-     {
-       "0": {
-         "title": "Map Generation & Editing",
-         "parameters": ["templateInput", "pointsInput", "worldSize", "landmassType"],
-         "category": "global"
-       },
-       "1": {
-         "title": "Terrain",
-         "parameters": ["heightExponent", "erosion", "seaLevel"],
-         "category": "terrain"
-       }
-     }
-     ```
-   - **Files:** `res://data/config/azgaar_step_parameters.json` (new)
+#### Phase 3: Extract Left Navigation (2-3 hours)
+1. Create `WorldBuilderLeftNav.tscn` with LeftPanel structure
+2. Create `WorldBuilderLeftNav.gd` script
+3. Move step button logic to script
+4. Emit `step_changed` signal
+5. Replace in `WorldBuilderUI.tscn` with instance
+6. Connect signals
+7. Test step navigation
 
-2. **Load Parameters from Config:**
-   - Update `_populate_params()`: Load from `azgaar_step_parameters.json` instead of hard-coded `STEP_DEFINITIONS`
-   - Map Azgaar parameter names to UI controls using `azgaar_parameter_mapping.json`
-   - **Files:** `res://ui/world_builder/WorldBuilderUI.gd`
+**Node Count:** 10-12 nodes (isolated)
 
-3. **Update Parameter Controls:**
-   - Ensure controls update `current_params` dictionary
-   - On change, call `_execute_azgaar_js()` to sync to Azgaar in real-time (optional, or batch on "Apply" button)
-   - **Files:** `res://ui/world_builder/WorldBuilderUI.gd`
+#### Phase 4: Extract Right Controls (4-5 hours)
+1. Create `WorldBuilderRightControls.tscn` with RightPanel structure
+2. Create `WorldBuilderRightControls.gd` script
+3. Move parameter management logic
+4. Handle step updates via signal
+5. Emit `parameter_changed` signals
+6. Replace in `WorldBuilderUI.tscn` with instance
+7. Connect signals
+8. Test parameter editing and step changes
 
-**Estimated Effort:** 4-5 hours  
-**Testing:** Switch steps, verify correct parameters appear, verify changes sync to Azgaar
+**Node Count:** 12-15 nodes (isolated, but ParamTree adds complexity)
 
-#### Phase 5: Implement Export and 3D Bake (Priority: MEDIUM)
+#### Phase 5: Extract Center WebView (3-4 hours)
+1. Create `WorldBuilderCenterWebView.tscn` with CenterPanel structure
+2. Move `WorldBuilderAzgaar.gd` script reference
+3. Ensure WebView node exists in scene
+4. Handle WebView initialization in module
+5. Emit generation signals
+6. Replace in `WorldBuilderUI.tscn` with instance
+7. Connect signals
+8. Test WebView loading and generation
 
-**Objective:** Export heightmap from Azgaar and bake to Terrain3D
+**Node Count:** 3-5 nodes (isolated, but WebView is external component)
 
-**Tasks:**
-1. **Implement Heightmap Export:**
-   - Add `_export_heightmap() -> Image` method to `WorldBuilderAzgaar.gd`
-   - Execute JS: `_execute_azgaar_js("azgaar.exportMap('heightmap')")` or equivalent
-   - Receive exported data via callback or file read (Azgaar may save to `user://azgaar/downloads/`)
-   - Parse PNG/EXR to Godot `Image` using `Image.load_from_file()` or `Image.load_exr_from_buffer()`
-   - **Files:** `res://scripts/ui/WorldBuilderAzgaar.gd`
+#### Phase 6: Create Root Container (2-3 hours)
+1. Create `WorldBuilderRoot.tscn` with MainVBox structure
+2. Create `WorldBuilderRoot.gd` script
+3. Instance all child modules in `_ready()`
+4. Connect signals between modules
+5. Handle overall state management
+6. Replace `WorldBuilderUI.tscn` usage with `WorldBuilderRoot.tscn`
 
-2. **Implement Terrain3D Bake:**
-   - Update `_bake_to_3d()`: Call `_export_heightmap()`, then feed to Terrain3D
-   - Use Terrain3D's heightmap import API (check `addons/terrain_3d/` documentation)
-   - Example: `terrain_manager.generate_from_heightmap(heightmap_image, min_height, max_height, center_pos)`
-   - **Files:** `res://ui/world_builder/WorldBuilderUI.gd`
+**Node Count:** 5-8 nodes (container only, children are instances)
 
-3. **Add Bake Button to Bottom Bar:**
-   - Update bottom bar layout: Add "Bake to 3D" button (only visible/enabled on step 8)
-   - Style: Large, orange/gold, centered
-   - Connect to `_bake_to_3d()`
-   - **Files:** `res://ui/world_builder/WorldBuilderUI.tscn`, `res://ui/world_builder/WorldBuilderUI.gd`
+#### Phase 7: Optimize and Polish (2-3 hours)
+1. Add visibility culling (hide inactive modules)
+2. Optimize signal connections
+3. Profile performance before/after
+4. Test all workflows
+5. Update documentation
 
-4. **Update Bottom Bar Overlay:**
-   - Change `BottomHBox` from separate row to overlay on center panel
-   - Set anchors to bottom of center panel, use `z_index` to render above WebView
-   - Add dark background (`ColorRect` with dark color, semi-transparent)
-   - **Files:** `res://ui/world_builder/WorldBuilderUI.tscn`
+### Code Snippets: Module Instancing
 
-**Estimated Effort:** 5-6 hours  
-**Testing:** Export heightmap, verify image loads correctly, verify Terrain3D bake creates terrain
+#### Root Container Instancing
+```gdscript
+# WorldBuilderRoot.gd
+extends Control
 
-#### Phase 6: Remove Old Procedural Code and Cleanup (Priority: LOW)
+@onready var top_bar: Control = $MainVBox/TopBarInstance
+@onready var left_nav: Control = $MainVBox/MainHSplit/LeftNavInstance
+@onready var center_webview: Control = $MainVBox/MainHSplit/CenterWebViewInstance
+@onready var right_controls: Control = $MainVBox/MainHSplit/RightControlsInstance
+@onready var bottom_bar: Control = $MainVBox/BottomBarInstance
 
-**Objective:** Remove deprecated MapMakerModule and old procedural generation code
+func _ready():
+    # Instance modules (or load from PackedScene if needed)
+    # Modules are already in scene tree as instances
+    
+    # Connect signals
+    if left_nav.has_signal("step_changed"):
+        left_nav.step_changed.connect(_on_step_changed)
+    
+    if right_controls.has_signal("parameter_changed"):
+        right_controls.parameter_changed.connect(_on_parameter_changed)
+    
+    if bottom_bar.has_signal("generate_pressed"):
+        bottom_bar.generate_pressed.connect(_on_generate_pressed)
+    
+    if center_webview.has_signal("generation_complete"):
+        center_webview.generation_complete.connect(_on_generation_complete)
 
-**Tasks:**
-1. **Archive MapMakerModule:**
-   - Move `res://ui/world_builder/MapMakerModule.gd` to `res://ui/world_builder/_deprecated/` (or delete if no longer needed)
-   - Remove any references to `MapMakerModule` in `WorldBuilderUI.gd`
-   - **Files:** `res://ui/world_builder/MapMakerModule.gd`, `res://ui/world_builder/WorldBuilderUI.gd`
+func _on_step_changed(step_index: int):
+    right_controls.update_step(step_index)
+    # Update other modules as needed
+```
 
-2. **Remove Old Config Files:**
-   - Archive `res://data/config/world_builder_ui.json` (legacy tab-based config)
-   - Ensure `azgaar_step_parameters.json` replaces it
-   - **Files:** `res://data/config/world_builder_ui.json`
+#### Dynamic Instancing (Alternative)
+```gdscript
+# WorldBuilderRoot.gd
+const TOP_BAR_SCENE = preload("res://scenes/ui/world_builder/WorldBuilderTopBar.tscn")
+const LEFT_NAV_SCENE = preload("res://scenes/ui/world_builder/WorldBuilderLeftNav.tscn")
+# ... etc
 
-3. **Update Documentation:**
-   - Update README or docs to reflect Azgaar-driven workflow
-   - Document new step flow and parameter mapping
-   - **Files:** `res://README.md` or `res://docs/`
+func _ready():
+    var main_vbox = $MainVBox
+    
+    # Instance and add modules
+    var top_bar = TOP_BAR_SCENE.instantiate()
+    main_vbox.add_child(top_bar)
+    main_vbox.move_child(top_bar, 0)  # Move to top
+    
+    var main_hsplit = $MainVBox/MainHSplit
+    
+    var left_nav = LEFT_NAV_SCENE.instantiate()
+    main_hsplit.add_child(left_nav)
+    main_hsplit.move_child(left_nav, 0)
+    
+    # ... etc for other modules
+```
 
-**Estimated Effort:** 2-3 hours  
-**Testing:** Verify no broken references, project loads without errors
+### Signal Connection Examples
 
-### 3.2 Step-by-Step File Modifications
+#### Left Navigation Module
+```gdscript
+# WorldBuilderLeftNav.gd
+extends PanelContainer
 
-#### Files to Modify
+signal step_changed(step_index: int)
 
-1. **`res://project.godot`**
-   - Line 57: `godot_version="4.5.1.stable"` (update from 4.3)
+@onready var step_sidebar: VBoxContainer = $LeftContent/StepSidebar
+var step_buttons: Array[Button] = []
 
-2. **`res://ui/world_builder/WorldBuilderUI.tscn`**
-   - Remove `TopToolbar` node
-   - Replace `StepTabs` (TabContainer) with `StepSidebar` (VBoxContainer with Button children)
-   - Update all `custom_minimum_size` and `offset_*` to use calculated values or remove (use anchors)
-   - Update `MainHSplit`: Remove `offset_top` and `offset_bottom`, use percentage-based `split_offset` or anchors
-   - Update `BottomHBox`: Change to overlay (anchors to center panel bottom), add dark background
-   - Add "Bake to 3D" button to bottom bar
+func _ready():
+    for i in range(8):
+        var btn = step_sidebar.get_child(i) as Button
+        if btn:
+            step_buttons.append(btn)
+            btn.pressed.connect(func(): _on_step_button_pressed(i))
 
-3. **`res://ui/world_builder/WorldBuilderUI.gd`**
-   - Update `STEP_DEFINITIONS` with new step titles and Azgaar-aligned parameters
-   - Remove `step_tabs` reference, add `step_buttons: Array[Button]`
-   - Replace `_on_step_changed(tab_idx)` with `_on_step_button_pressed(step_idx)`
-   - Update `_populate_params()`: Load from `azgaar_step_parameters.json`
-   - Update `_generate_azgaar()`: Use JS injection instead of `options.json` file write
-   - Update `_bake_to_3d()`: Call `WorldBuilderAzgaar._export_heightmap()`, feed to Terrain3D
-   - Add `_notification(NOTIFICATION_RESIZED)`: Recalculate panel widths as percentages
-   - Remove references to `MapMakerModule`
+func _on_step_button_pressed(step_idx: int):
+    emit_signal("step_changed", step_idx)
+    _update_button_highlights(step_idx)
 
-4. **`res://scripts/ui/WorldBuilderAzgaar.gd`**
-   - Add `_execute_azgaar_js(code: String) -> Variant`: Execute JavaScript in Azgaar WebView
-   - Update `_initialize_webview()`: Use local Azgaar URL (`azgaar_integrator.get_azgaar_url()`) ✅ (already correct)
-   - Update `trigger_generation_with_options()`: Use JS injection instead of file write + reload
-   - Implement `_export_heightmap() -> Image`: Export heightmap from Azgaar, parse to Image
-   - Replace `_process()` polling with event-based completion detection
-   - Add event handlers for GDCef page load, generation complete (if available)
+func _update_button_highlights(active_step: int):
+    for i in range(step_buttons.size()):
+        if i == active_step:
+            step_buttons[i].modulate = Color(1.0, 0.7, 0.3, 1.0)  # Orange
+        else:
+            step_buttons[i].modulate = Color(0.6, 0.6, 0.6, 1.0)  # Dimmed
+```
 
-5. **`res://scripts/managers/AzgaarIntegrator.gd`**
-   - No changes required (already handles file copying and URL generation correctly)
+#### Right Controls Module
+```gdscript
+# WorldBuilderRightControls.gd
+extends PanelContainer
 
-#### Files to Create
+signal parameter_changed(azgaar_key: String, value: Variant)
 
-1. **`res://data/config/azgaar_step_parameters.json`** (new)
-   - JSON mapping step indices to parameter groups and Azgaar parameter names
+var current_step: int = 0
+var current_params: Dictionary = {}
+@onready var param_tree: Tree = $RightScroll/RightVBox/ParamTree
 
-2. **`res://tests/gdcef_verification_test.gd`** (new, optional)
-   - EditorScript to test GDCef API availability and functionality
+func update_step(step_index: int):
+    current_step = step_index
+    _populate_param_tree()
 
-#### Files to Archive/Delete
+func _on_tree_item_edited():
+    var edited_item = param_tree.get_selected()
+    if not edited_item:
+        return
+    
+    var metadata = edited_item.get_metadata(0)
+    if not metadata or not metadata.has("azgaar_key"):
+        return
+    
+    var azgaar_key = metadata.azgaar_key
+    var new_value = _get_edited_value(edited_item, metadata.param)
+    
+    current_params[azgaar_key] = new_value
+    emit_signal("parameter_changed", azgaar_key, new_value)
+```
 
-1. **`res://ui/world_builder/MapMakerModule.gd`** → Move to `_deprecated/` or delete
-2. **`res://data/config/world_builder_ui.json`** → Archive (legacy, replaced by `azgaar_step_parameters.json`)
+---
 
-### 3.3 UI Responsiveness Fixes
+## Implementation Steps
 
-#### Replace Magic Numbers
+### Detailed Migration Roadmap
 
-**Current Issues:**
-- 18 magic numbers in `.tscn` file
-- Fixed pixel sizes instead of semantic constants
-
-**Solution:**
-1. **Update UIConstants.gd (if needed):**
-   - Verify `LEFT_PANEL_WIDTH = 220`, `RIGHT_PANEL_WIDTH = 240`, `BOTTOM_BAR_HEIGHT = 50` exist ✅ (already exist)
-   - Add percentage-based constants if needed: `LEFT_PANEL_WIDTH_PERCENT = 0.18` (18%)
-
-2. **Update WorldBuilderUI.tscn:**
-   - Replace `custom_minimum_size = Vector2(220, 0)` with calculated value or use percentage-based split
-   - Replace `custom_minimum_size = Vector2(240, 0)` with calculated value or use percentage-based split
-   - Replace button widths with `UIConstants.BUTTON_HEIGHT_MEDIUM` or theme-driven sizes
-   - Remove `offset_top` and `offset_bottom`, use anchors instead
-
-3. **Add Resize Handler:**
-   ```gdscript
-   func _notification(what: int) -> void:
-       if what == NOTIFICATION_RESIZED:
-           _update_responsive_layout()
-   
-   func _update_responsive_layout() -> void:
-       var viewport_size: Vector2 = get_viewport().get_visible_rect().size
-       # Calculate panel widths as percentages
-       var left_width: float = viewport_size.x * 0.18  # 18% for left panel
-       var right_width: float = viewport_size.x * 0.22  # 22% for right panel
-       # Clamp to min/max from UIConstants
-       left_width = clamp(left_width, UIConstants.LEFT_PANEL_WIDTH * 0.5, UIConstants.LEFT_PANEL_WIDTH * 1.5)
-       right_width = clamp(right_width, UIConstants.RIGHT_PANEL_WIDTH * 0.5, UIConstants.RIGHT_PANEL_WIDTH * 1.5)
-       # Update HSplitContainer split_offset (if using fixed split, or use anchors)
+#### Step 1: Backup and Preparation (30 minutes)
+1. **Create backup branch:**
+   ```bash
+   git checkout -b backup/world-builder-ui-monolithic
+   git push origin backup/world-builder-ui-monolithic
    ```
 
-#### Add Size Flags and Anchors
+2. **Create feature branch:**
+   ```bash
+   git checkout -b feat/world-builder-modular-ui
+   ```
 
-**Current State:**
-- Center panel: ✅ `size_flags_horizontal = 3`, `size_flags_vertical = 3` (correct)
-- Left/Right panels: ⚠️ `size_flags_horizontal = 3` but fixed `custom_minimum_size` overrides
+3. **Create directory structure:**
+   ```bash
+   mkdir -p scenes/ui/world_builder/components
+   ```
 
-**Solution:**
-- Remove `custom_minimum_size` from left/right panels, use percentage-based `split_offset` on HSplitContainer
-- Or use anchors: Set left panel to `PRESET_LEFT_WIDE` with calculated margin, right to `PRESET_RIGHT_WIDE`
+4. **Document current FPS baseline:**
+   - Run project in debug mode
+   - Note FPS in World Builder UI (idle, with WebView, during generation)
+   - Record in migration notes
 
-### 3.4 Addon Handling
+#### Step 2: Create EventBus Autoload (1 hour)
+1. Create `autoload/EventBus.gd`:
+```gdscript
+# ╔═══════════════════════════════════════════════════════════
+# ║ EventBus.gd
+# ║ Desc: Central event bus for World Builder UI module communication
+# ║ Author: Lordthoth
+# ╚═══════════════════════════════════════════════════════════
 
-#### GDCef Status
+extends Node
 
-**Current:** ✅ GDCef artifacts present in `res://cef_artifacts/`
-- `gdcef.gdextension` configured
-- Libraries for Linux/Windows/macOS present
-- **Action Required:** Verify GDCef works with Godot 4.5.1, test `execute_javascript()` API
-
-**Recommendation:** 
-- Test GDCef with minimal HTML page first
-- If API differs from assumptions, update `WorldBuilderAzgaar.gd` accordingly
-- If GDCef doesn't work with 4.5.1, may need to update extension or find alternative (e.g., Godot WebView addon)
-
-#### Terrain3D Integration
-
-**Current:** ✅ Addon installed
-- **Action Required:** Research Terrain3D heightmap import API
-- Check `addons/terrain_3d/` documentation or examples for `generate_from_heightmap()` or equivalent method
-
-### 3.5 Data Flow: Parameter Syncing and Export
-
-#### Parameter Syncing: Godot → Azgaar
-
-**Current Flow (File-based):**
-```
-WorldBuilderUI._generate_azgaar()
-  → AzgaarIntegrator.write_options(options)  # Writes user://azgaar/options.json
-  → WorldBuilderAzgaar.reload_azgaar()       # Reloads WebView
-  → Azgaar reads options.json on page load
+# World Builder UI signals
+signal world_builder_step_changed(step_index: int)
+signal world_builder_parameter_changed(azgaar_key: String, value: Variant)
+signal world_builder_generate_requested(options: Dictionary)
+signal world_builder_generation_complete()
+signal world_builder_generation_failed(reason: String)
+signal world_builder_archetype_changed(archetype_name: String)
+signal world_builder_seed_changed(seed_value: int)
 ```
 
-**Desired Flow (JS Injection):**
+2. Add to `project.godot` autoloads:
 ```
-WorldBuilderUI._generate_azgaar()
-  → Map current_params to Azgaar parameter names (using azgaar_parameter_mapping.json)
-  → For each parameter:
-      WorldBuilderAzgaar._execute_azgaar_js("azgaar.setOption('%s', %s)" % [param_name, value])
-  → WorldBuilderAzgaar._execute_azgaar_js("azgaar.generate()")  # Trigger generation
+[autoload]
+EventBus="*res://autoload/EventBus.gd"
 ```
 
-**Challenges:**
-- Azgaar must expose `setOption()` and `generate()` functions (verify in `main.js`)
-- If not available, may need to modify bundled Azgaar to add these functions
-- Alternative: Use URL parameters: `index.html?points=600000&template=default#generate`
+3. Test signal emission/reception in existing code
 
-#### Export: Azgaar → Godot → Terrain3D
+#### Step 3: Extract Bottom Bar Module (2-3 hours)
+**Files to create:**
+- `scenes/ui/world_builder/WorldBuilderBottomBar.tscn`
+- `scripts/ui/world_builder/WorldBuilderBottomBar.gd`
 
-**Flow:**
+**Steps:**
+1. Open `WorldBuilderUI.tscn` in editor
+2. Select `BottomBar` node and all children
+3. Right-click → "Change Scene" → Save as `WorldBuilderBottomBar.tscn`
+4. Create script `WorldBuilderBottomBar.gd`:
+```gdscript
+# ╔═══════════════════════════════════════════════════════════
+# ║ WorldBuilderBottomBar.gd
+# ║ Desc: Bottom navigation bar for World Builder UI
+# ║ Author: Lordthoth
+# ╚═══════════════════════════════════════════════════════════
+
+extends PanelContainer
+
+signal back_pressed
+signal next_pressed
+signal generate_pressed
+signal bake_to_3d_pressed
+
+@onready var back_btn: Button = $BottomContent/BackBtn
+@onready var next_btn: Button = $BottomContent/NextBtn
+@onready var gen_btn: Button = $BottomContent/GenBtn
+@onready var bake_to_3d_btn: Button = $BottomContent/BakeTo3DBtn
+@onready var progress_bar: ProgressBar = $BottomContent/ProgressBar
+@onready var status_label: Label = $BottomContent/StatusLabel
+
+func _ready():
+    back_btn.pressed.connect(func(): emit_signal("back_pressed"))
+    next_btn.pressed.connect(func(): emit_signal("next_pressed"))
+    gen_btn.pressed.connect(func(): emit_signal("generate_pressed"))
+    bake_to_3d_btn.pressed.connect(func(): emit_signal("bake_to_3d_pressed"))
+    
+    # Apply UIConstants
+    var bottom_content = $BottomContent
+    bottom_content.add_theme_constant_override("separation", UIConstants.SPACING_LARGE)
+    back_btn.custom_minimum_size = Vector2(UIConstants.BUTTON_WIDTH_SMALL, 0)
+    next_btn.custom_minimum_size = Vector2(UIConstants.BUTTON_WIDTH_SMALL, 0)
+    gen_btn.custom_minimum_size = Vector2(UIConstants.BUTTON_WIDTH_LARGE, 0)
+    bake_to_3d_btn.custom_minimum_size = Vector2(UIConstants.BUTTON_WIDTH_MEDIUM, 0)
+    progress_bar.custom_minimum_size = Vector2(UIConstants.PROGRESS_BAR_WIDTH, 0)
+    status_label.custom_minimum_size = Vector2(UIConstants.LABEL_WIDTH_STANDARD, 0)
+
+func update_status(text: String, progress: float = -1.0):
+    status_label.text = text
+    if progress >= 0:
+        progress_bar.value = progress
+        progress_bar.visible = true
+    else:
+        progress_bar.visible = false
+
+func update_navigation(current_step: int, total_steps: int):
+    back_btn.disabled = (current_step == 0)
+    next_btn.disabled = (current_step == total_steps - 1)
+    
+    # Show/hide buttons based on step
+    if current_step == 6:  # Export step
+        gen_btn.visible = true
+        next_btn.visible = false
+        bake_to_3d_btn.visible = false
+    elif current_step == 7:  # Bake step
+        gen_btn.visible = false
+        next_btn.visible = false
+        bake_to_3d_btn.visible = true
+        bake_to_3d_btn.disabled = false
+    else:
+        gen_btn.visible = false
+        next_btn.visible = true
+        bake_to_3d_btn.visible = false
 ```
-User clicks "Bake to 3D"
-  → WorldBuilderUI._bake_to_3d()
-  → WorldBuilderAzgaar._export_heightmap()
-    → _execute_azgaar_js("azgaar.exportMap('heightmap')")
-    → Receive exported data (via callback or file read)
-    → Parse PNG/EXR to Image
-  → terrain_manager.generate_from_heightmap(heightmap_image, ...)
-    → Terrain3D creates 3D terrain mesh
+
+5. In `WorldBuilderUI.tscn`, replace `BottomBar` subtree with instance of `WorldBuilderBottomBar.tscn`
+6. Update `WorldBuilderUI.gd` to use module signals
+7. Test navigation and generation
+
+#### Step 4: Extract Remaining Modules (10-15 hours)
+Repeat Step 3 process for:
+- TopBar (1 hour)
+- LeftNav (2-3 hours)
+- RightControls (4-5 hours)
+- CenterWebView (3-4 hours)
+
+**Key considerations:**
+- **RightControls:** Most complex - handles ParamTree, parameter caching, step updates
+- **CenterWebView:** Requires WebView node in scene - ensure godot_wry addon is available
+- **LeftNav:** Simple but needs step highlighting logic
+
+#### Step 5: Create Root Container (2-3 hours)
+1. Create `WorldBuilderRoot.tscn` with minimal structure:
+```
+WorldBuilderRoot (Control, anchors_full_rect)
+├── Background (ColorRect)
+└── MainVBox (VBoxContainer)
+    ├── MainHSplit (HSplitContainer)
+    └── [Child module instances added via script or scene]
 ```
 
-**Export Format:**
-- Azgaar can export heightmap as PNG (grayscale) or EXR
-- Godot's `Image.load_from_file()` or `Image.load_exr_from_buffer()` can parse
-- May need to normalize height values (0-1 range) for Terrain3D
+2. Create `WorldBuilderRoot.gd` to manage modules:
+```gdscript
+# ╔═══════════════════════════════════════════════════════════
+# ║ WorldBuilderRoot.gd
+# ║ Desc: Root container for modular World Builder UI
+# ║ Author: Lordthoth
+# ╚═══════════════════════════════════════════════════════════
 
-### 3.6 Testing Steps
+extends Control
 
-#### Phase 1 Testing
-- [ ] Verify project loads with Godot 4.5.1
-- [ ] Verify GDCef initializes (check logs for "CEF initialized successfully")
-- [ ] Test window resize: UI scales proportionally, no clipping
-- [ ] Verify FPS remains acceptable (target: 30+ FPS with WebView)
+const TOP_BAR_SCENE = preload("res://scenes/ui/world_builder/WorldBuilderTopBar.tscn")
+const LEFT_NAV_SCENE = preload("res://scenes/ui/world_builder/WorldBuilderLeftNav.tscn")
+const CENTER_WEBVIEW_SCENE = preload("res://scenes/ui/world_builder/WorldBuilderCenterWebView.tscn")
+const RIGHT_CONTROLS_SCENE = preload("res://scenes/ui/world_builder/WorldBuilderRightControls.tscn")
+const BOTTOM_BAR_SCENE = preload("res://scenes/ui/world_builder/WorldBuilderBottomBar.tscn")
 
-#### Phase 2 Testing
-- [ ] Click step buttons: Highlights update correctly
-- [ ] Verify step content changes (right panel updates)
-- [ ] Test navigation: Back/Next buttons work correctly
+var top_bar: Control
+var left_nav: Control
+var center_webview: Control
+var right_controls: Control
+var bottom_bar: Control
 
-#### Phase 3 Testing
-- [ ] Generate map: Parameters sync to Azgaar (verify in browser DevTools)
-- [ ] Verify completion detection works (no 60s timeout)
-- [ ] Test parameter changes: Updates reflect in Azgaar map
+var current_step: int = 0
+var current_params: Dictionary = {}
+var terrain_manager: Node = null
 
-#### Phase 4 Testing
-- [ ] Switch steps: Correct parameters appear per step
-- [ ] Modify parameters: Changes sync to Azgaar (or batch on Apply)
-- [ ] Verify all 8 steps have appropriate parameter controls
+func _ready():
+    _setup_ui()
+    _connect_signals()
+    _initialize_defaults()
 
-#### Phase 5 Testing
-- [ ] Export heightmap: Image loads correctly in Godot
-- [ ] Bake to 3D: Terrain3D creates terrain mesh
-- [ ] Verify terrain matches Azgaar map visually
+func _setup_ui():
+    var main_vbox = $MainVBox
+    var main_hsplit = $MainVBox/MainHSplit
+    
+    # Instance modules
+    top_bar = TOP_BAR_SCENE.instantiate()
+    main_vbox.add_child(top_bar)
+    main_vbox.move_child(top_bar, 0)
+    
+    left_nav = LEFT_NAV_SCENE.instantiate()
+    main_hsplit.add_child(left_nav)
+    main_hsplit.move_child(left_nav, 0)
+    
+    center_webview = CENTER_WEBVIEW_SCENE.instantiate()
+    main_hsplit.add_child(center_webview)
+    
+    right_controls = RIGHT_CONTROLS_SCENE.instantiate()
+    main_hsplit.add_child(right_controls)
+    
+    bottom_bar = BOTTOM_BAR_SCENE.instantiate()
+    main_vbox.add_child(bottom_bar)
 
-#### Phase 6 Testing
-- [ ] Project loads without errors (no broken references)
-- [ ] No deprecated code remains in active use
-- [ ] Documentation updated
+func _connect_signals():
+    # Left nav → Root → Right controls
+    if left_nav.has_signal("step_changed"):
+        left_nav.step_changed.connect(_on_step_changed)
+    
+    # Right controls → Root → Center webview
+    if right_controls.has_signal("parameter_changed"):
+        right_controls.parameter_changed.connect(_on_parameter_changed)
+    
+    # Bottom bar → Root → Center webview
+    if bottom_bar.has_signal("generate_pressed"):
+        bottom_bar.generate_pressed.connect(_on_generate_pressed)
+    if bottom_bar.has_signal("back_pressed"):
+        bottom_bar.back_pressed.connect(_on_back_pressed)
+    if bottom_bar.has_signal("next_pressed"):
+        bottom_bar.next_pressed.connect(_on_next_pressed)
+    
+    # Center webview → Root → Bottom bar
+    if center_webview.has_signal("generation_complete"):
+        center_webview.generation_complete.connect(_on_generation_complete)
+    if center_webview.has_signal("generation_failed"):
+        center_webview.generation_failed.connect(_on_generation_failed)
 
----
+func _on_step_changed(step_index: int):
+    current_step = step_index
+    right_controls.update_step(step_index)
+    bottom_bar.update_navigation(step_index, 8)
 
-## 4. Potential Risks and Mitigations
+func _on_parameter_changed(azgaar_key: String, value: Variant):
+    current_params[azgaar_key] = value
 
-### 4.1 Performance Risks
+func _on_generate_pressed():
+    if center_webview.has_method("trigger_generation_with_options"):
+        center_webview.trigger_generation_with_options(current_params, true)
+        bottom_bar.update_status("Generating map...", 40)
 
-**Risk:** Embedded browser (GDCef) causes low FPS (< 30 FPS)
-- **Impact:** Poor user experience, UI feels sluggish
-- **Mitigation:**
-  - Lazy load: Only initialize GDCef when World Builder UI is opened
-  - Viewport culling: Hide WebView when not visible (e.g., when another menu is open)
-  - Optimize Azgaar: Reduce cell density for preview, increase only for final export
-  - Profile with PerformanceMonitor: Identify bottlenecks, optimize hot paths
+func _on_generation_complete():
+    bottom_bar.update_status("Generation complete!", 100)
+    current_step = 7
+    _on_step_changed(7)
 
-**Risk:** Memory leaks in WebView
-- **Impact:** Memory usage grows over time, potential crashes
-- **Mitigation:**
-  - Properly cleanup: Call `web_view.queue_free()` when World Builder UI is closed
-  - Monitor memory: Use `PerformanceMonitor` to track memory usage
-  - Test extended sessions: Run World Builder for 30+ minutes, check for leaks
+func _on_generation_failed(reason: String):
+    bottom_bar.update_status("Generation failed: %s" % reason, 0)
 
-### 4.2 Compatibility Risks
+func _on_back_pressed():
+    if current_step > 0:
+        _on_step_changed(current_step - 1)
 
-**Risk:** GDCef not compatible with Godot 4.5.1
-- **Impact:** WebView doesn't initialize, Azgaar cannot be embedded
-- **Mitigation:**
-  - Test early: Verify GDCef works in Phase 1
-  - Fallback plan: If GDCef fails, consider alternative (Godot WebView addon, or external browser with communication bridge)
-  - Check GDCef repository: Look for 4.5.1 compatibility updates
+func _on_next_pressed():
+    if current_step < 7:
+        _on_step_changed(current_step + 1)
 
-**Risk:** Azgaar JavaScript API differs from assumptions
-- **Impact:** Parameter syncing fails, generation doesn't trigger
-- **Mitigation:**
-  - Research first: Inspect `tools/azgaar/main.js` for actual API functions
-  - Document findings: Update `AZGAAR_PARAMETERS.md` with verified API
-  - Fallback: Use file-based approach (write `options.json`, reload) if JS injection fails
+func _initialize_defaults():
+    _on_step_changed(0)
 
-### 4.3 Data Export/Import Risks
+func set_terrain_manager(manager: Node):
+    terrain_manager = manager
+    if center_webview.has_method("set_terrain_manager"):
+        center_webview.set_terrain_manager(manager)
+```
 
-**Risk:** Azgaar export format incompatible with Terrain3D
-- **Impact:** Heightmap cannot be imported, 3D bake fails
-- **Mitigation:**
-  - Research Terrain3D API: Check documentation for supported formats (PNG, EXR, raw)
-  - Test early: Export sample heightmap, attempt import in Phase 5
-  - Conversion: If format mismatch, convert using Godot's Image API (e.g., PNG → EXR, normalize values)
+3. Update `world_root.gd` to use `WorldBuilderRoot.tscn` instead of `WorldBuilderUI.tscn`
 
-**Risk:** Heightmap resolution too high/low for Terrain3D
-- **Impact:** Terrain quality poor or performance issues
-- **Mitigation:**
-  - Clamp resolution: Limit Azgaar export to reasonable size (e.g., 2048x2048 max)
-  - Downscale if needed: Use `Image.resize()` if Terrain3D has max resolution limits
-  - Document limits: Add UI hints about recommended resolutions
+#### Step 6: Testing and Validation (3-4 hours)
+1. **Functional Testing:**
+   - Test all 8 steps navigation
+   - Test parameter editing
+   - Test generation flow
+   - Test bake to 3D
+   - Test archetype presets
+   - Test seed randomization
 
-### 4.4 Fallback Strategies
+2. **Performance Testing:**
+   - Measure FPS before/after
+   - Profile with Godot Profiler
+   - Check draw calls
+   - Verify no memory leaks
 
-**If Azgaar Integration Fails:**
-- **Option A:** Retain local procedural generation as toggle (keep `MapMakerModule.gd` as backup)
-- **Option B:** Use Azgaar in external browser, communicate via file system (write `options.json`, read exports)
-- **Option C:** Implement minimal procedural fallback (basic noise generation) for quick world creation
+3. **Edge Cases:**
+   - Test with WebView disabled
+   - Test with invalid parameters
+   - Test rapid step switching
+   - Test window resize
 
-**If GDCef Fails:**
-- **Option A:** Use Godot WebView addon (if available for 4.5.1)
-- **Option B:** Launch external browser, use file-based communication
-- **Option C:** Implement native Godot UI for Azgaar parameters (recreate Azgaar's UI in Godot) - **NOT RECOMMENDED** (too much work)
+#### Step 7: Optimization (2-3 hours)
+1. **Visibility Culling:**
+   - Hide inactive modules when possible
+   - Use `visible = false` and `process_mode = DISABLED`
 
----
+2. **Signal Optimization:**
+   - Remove redundant signal connections
+   - Use one-shot signals where appropriate
 
-## 5. Resource Requirements
-
-### 5.1 New Files/Scenes/Scripts Needed
-
-1. **`res://data/config/azgaar_step_parameters.json`** (new)
-   - Estimated size: ~5-10 KB
-   - Contains step-to-parameter mappings
-
-2. **`res://tests/gdcef_verification_test.gd`** (optional, new)
-   - Estimated size: ~2-3 KB
-   - EditorScript for testing GDCef API
-
-3. **No new scenes required** (modify existing `WorldBuilderUI.tscn`)
-
-### 5.2 Updates to Existing Files
-
-1. **`res://project.godot`** - 1 line change (version update)
-2. **`res://ui/world_builder/WorldBuilderUI.tscn`** - Major restructuring (~100+ line changes)
-3. **`res://ui/world_builder/WorldBuilderUI.gd`** - Major refactoring (~200+ line changes)
-4. **`res://scripts/ui/WorldBuilderAzgaar.gd`** - Add JS execution, export methods (~100+ line changes)
-5. **`res://scripts/ui/UIConstants.gd`** - Possibly add percentage constants (minor, ~10 lines)
-
-### 5.3 Estimated Effort
-
-**Phase 1: Setup and Foundation** - 4-6 hours
-**Phase 2: Restructure Left Panel** - 3-4 hours
-**Phase 3: Azgaar JS Communication** - 6-8 hours (most complex, depends on GDCef API research)
-**Phase 4: Dynamic Step Controls** - 4-5 hours
-**Phase 5: Export and 3D Bake** - 5-6 hours
-**Phase 6: Cleanup** - 2-3 hours
-
-**Total Estimated Effort:** 24-32 hours (3-4 full working days)
-
-**Dependencies:**
-- GDCef API documentation/research: +2-4 hours (if not readily available)
-- Terrain3D API research: +1-2 hours
-- Testing and bug fixes: +4-6 hours (20% buffer)
-
-**Grand Total:** 31-44 hours (~1-1.5 weeks for a single developer)
-
----
-
-## 6. Compliance Checklist
-
-### 6.1 Responsive UI per Section 11.2
-
-- [ ] **Built-in containers with size flags/anchors:** ✅ Current (HSplitContainer, VBoxContainer, HBoxContainer used)
-- [ ] **No magic numbers:** ❌ **18 magic numbers found** - Must replace with UIConstants
-- [ ] **Theme applied:** ✅ Current (`bg3_theme.tres` applied)
-- [ ] **Tested on multiple resolutions:** ❌ **Not tested** - Must test 1080p, 4K, ultrawide, window resize
-- [ ] **Size flags explicitly set:** ⚠️ **Partial** - Center panel correct, left/right need fixes
-- [ ] **Resize handling:** ❌ **Missing** - Must add `_notification(NOTIFICATION_RESIZED)`
-
-### 6.2 Theme Consistency
-
-- [x] **Theme resource exists:** ✅ `res://themes/bg3_theme.tres`
-- [x] **Theme applied to root:** ✅ `WorldBuilderUI` has `theme = ExtResource("2_theme")`
-- [ ] **Overrides documented:** ⚠️ **Some overrides** (font sizes, colors) - Should document with comments
-- [ ] **Fantasy aesthetics:** ✅ Current (parchment colors, gold accents)
-
-### 6.3 Code Quality
-
-- [x] **Typed GDScript:** ✅ Current (most variables typed)
-- [x] **Script headers:** ✅ Current (exact header format used)
-- [x] **Docstrings:** ✅ Current (public functions documented)
-- [ ] **One class per file:** ✅ Current
-- [ ] **No hard-coded values in scripts:** ⚠️ **Some hard-coded** (e.g., timeout 60.0, polling 0.5s) - Consider constants
-
-### 6.4 Performance Target
-
-- [ ] **60 FPS target maintained:** ❌ **Current: 3-7 FPS** - Must investigate and optimize
-  - Likely causes: GDCef overhead, no viewport culling, unoptimized rendering
-  - Target: 30+ FPS with WebView active (60 FPS may be unrealistic with embedded browser)
-
-### 6.5 Migration-Specific Compliance
-
-- [ ] **UIConstants usage:** ❌ **Not used in .tscn file** - Must replace all magic numbers
-- [ ] **Percentage-based layouts:** ❌ **Fixed pixels** - Must convert to percentages or calculated values
-- [ ] **Dynamic parameter loading:** ⚠️ **Partially** - Uses hard-coded `STEP_DEFINITIONS`, should use JSON config
-- [ ] **Azgaar integration complete:** ❌ **Partial** - JS communication missing, export missing
+3. **Performance Profiling:**
+   - Use Godot Profiler to identify remaining bottlenecks
+   - Optimize hot paths
 
 ---
 
-## 7. Recommendations and Next Steps
+## Potential Challenges and Mitigations
 
-### 7.1 Immediate Actions (Before Migration)
+### Challenge 1: WebView Initialization Timing
+**Issue:** WebView may not be ready when module is instantiated  
+**Mitigation:**
+- Use `call_deferred()` for WebView initialization
+- Check `web_view != null` before JS execution
+- Add retry logic with timeout
 
-1. **Verify GDCef Compatibility:**
-   - Test GDCef with Godot 4.5.1 in a minimal test project
-   - Verify `execute_javascript()` method exists and works
-   - Document actual GDCef API (methods, signals, properties)
+### Challenge 2: Parameter Tree Complexity
+**Issue:** ParamTree is complex and tightly coupled to step definitions  
+**Mitigation:**
+- Keep Tree in RightControls module (isolated)
+- Consider future replacement with VBoxContainer of ParamRow scenes
+- Maintain caching system for performance
 
-2. **Research Azgaar API:**
-   - Inspect `tools/azgaar/main.js` for global functions
-   - Document available functions (e.g., `azgaar.setOption()`, `azgaar.generate()`, `azgaar.exportMap()`)
-   - Test in browser DevTools: Can we call these functions from console?
+### Challenge 3: Signal Spaghetti
+**Issue:** Too many signals between modules can become hard to manage  
+**Mitigation:**
+- Use EventBus for cross-module communication (centralized)
+- Document signal flow in comments
+- Use signal namespacing (e.g., `world_builder_*`)
 
-3. **Research Terrain3D Heightmap Import:**
-   - Check Terrain3D documentation for heightmap import methods
-   - Look for examples in `addons/terrain_3d/` or tests
-   - Verify supported formats (PNG, EXR, raw)
+### Challenge 4: Node Path Breaking
+**Issue:** Deep `@onready var` paths break when nodes move  
+**Mitigation:**
+- Use `%` unique node names for critical nodes
+- Use `get_node_or_null()` with fallbacks
+- Prefer signal communication over direct node access
 
-### 7.2 Migration Priority Order
+### Challenge 5: Performance Regression
+**Issue:** Modularization might not improve performance if not done carefully  
+**Mitigation:**
+- Profile before/after each phase
+- Use `visible = false` and `process_mode = DISABLED` for inactive modules
+- Limit module count (target: 5-7 modules, not 20+)
 
-1. **Phase 1 (Setup)** - **CRITICAL** - Must do first (verify GDCef, update version, fix magic numbers)
-2. **Phase 3 (JS Communication)** - **CRITICAL** - Core functionality (Azgaar integration won't work without this)
-3. **Phase 2 (Sidebar)** - **HIGH** - UI restructuring (improves UX, aligns with desired design)
-4. **Phase 5 (Export/Bake)** - **HIGH** - Core feature (3D bake is essential for workflow)
-5. **Phase 4 (Dynamic Controls)** - **MEDIUM** - Nice to have (improves maintainability)
-6. **Phase 6 (Cleanup)** - **LOW** - Can be done last (doesn't affect functionality)
-
-### 7.3 Risk Mitigation Strategy
-
-1. **Start with Minimal Viable Product:**
-   - Phase 1 + Phase 3 (basic JS communication)
-   - Test with simple parameter (e.g., seed) before full parameter mapping
-   - Verify completion detection works before moving to next phases
-
-2. **Incremental Testing:**
-   - Test after each phase (don't wait until end)
-   - Use `run_project` MCP action to verify UI scales, FPS acceptable
-   - Fix issues immediately (don't accumulate technical debt)
-
-3. **Fallback Planning:**
-   - Keep old procedural code as backup until Azgaar integration is proven stable
-   - Archive, don't delete, deprecated files until migration is complete
-
----
-
-## Appendix A: Current vs Desired Step Mapping
-
-| Current Step | Desired Step | Key Differences |
-|--------------|--------------|-----------------|
-| 0: Terrain & Heightmap | 1: Map Generation & Editing | Broader scope (includes global params like seed, template, map size) |
-| 1: Climate & Environment | 2: Terrain | Focused on heightmap/elevation (moved from step 0) |
-| 2: Biomes & Ecosystems | 3: Climate | Separated from environment (more focused) |
-| 3: Structures & Civilizations | 4: Biomes | No change (same scope) |
-| 4: Environment & Atmosphere | 5: Structures & Civilizations | No change (same scope) |
-| 5: Resources & Magic | 6: Environment | Renamed from "Environment & Atmosphere" (more focused on 3D atmosphere) |
-| 6: Export & Preview | 7: Resources & Magic | No change (same scope) |
-| 7: Bake to 3D | 8: Export | Export includes bake option (merged) |
-
-**Note:** Step numbering changes from 0-indexed to 1-indexed for user-facing labels (internal code remains 0-indexed).
+### Challenge 6: godot_wry Compatibility
+**Issue:** WebView node must exist in scene tree at initialization  
+**Mitigation:**
+- Keep WebView node in `WorldBuilderCenterWebView.tscn` scene
+- Don't try to create WebView dynamically
+- Test on all target platforms
 
 ---
 
-## Appendix B: GDCef API Assumptions (To Be Verified)
+## Recommendations and Next Steps
 
-Based on code analysis, the following GDCef API is assumed (must be verified):
+### Immediate Actions (Week 1)
+1. **Create EventBus autoload** - Foundation for module communication
+2. **Extract BottomBar module** - Lowest risk, validates approach
+3. **Profile baseline performance** - Document current FPS/metrics
 
-- `GDCef.initialize(settings: Dictionary) -> void` - Initialize CEF
-- `GDCef.is_alive() -> bool` - Check if CEF is initialized
-- `GDCef.create_browser(url: String, texture_rect: TextureRect, options: Dictionary) -> Browser` - Create browser instance
-- `Browser.load_url(url: String) -> void` - Load URL
-- `Browser.execute_javascript(code: String) -> Variant` - Execute JS, return result (ASSUMED - **NEEDS VERIFICATION**)
-- `Browser.reload() -> void` - Reload page
-- Signals: `page_loaded`, `url_changed`, `title_changed` (ASSUMED - **NEEDS VERIFICATION**)
+### Short-Term (Weeks 2-3)
+1. **Extract remaining modules** - TopBar, LeftNav, RightControls, CenterWebView
+2. **Create Root container** - Orchestrate modules
+3. **Functional testing** - Ensure all workflows work
 
-**Action Required:** Verify these methods exist and document actual API.
+### Medium-Term (Week 4)
+1. **Performance optimization** - Visibility culling, signal optimization
+2. **Edge case testing** - Handle error scenarios
+3. **Documentation** - Update API docs, migration notes
+
+### Long-Term (Future)
+1. **Replace ParamTree with ParamRow scenes** - Further modularization
+2. **Add 3D preview toggle** - SubViewport for Terrain3D
+3. **Add tooltips** - Parameter descriptions
+4. **Performance monitoring** - Built-in FPS overlay for World Builder
+
+### Tools and Best Practices
+
+#### Scene Inheritance
+Use Godot's scene inheritance for reusable components:
+- `StepButton.tscn` (base) → `StepButton1.tscn`, `StepButton2.tscn`, etc.
+- Reduces duplication
+
+#### Data-Driven Parameters
+Keep parameter definitions in JSON:
+- Easy to modify without code changes
+- Supports modding
+- Enables dynamic UI generation
+
+#### Profiling Strategy
+1. **Before migration:** Profile monolithic UI
+2. **After each phase:** Profile and compare
+3. **Final:** Profile complete modular UI
+4. **Use Godot Profiler:** Focus on `_process()`, `_draw()`, draw calls
+
+#### Testing Strategy
+1. **Unit tests:** Test each module in isolation
+2. **Integration tests:** Test module interactions
+3. **Performance tests:** Measure FPS, draw calls, memory
+4. **User acceptance:** Test full workflow end-to-end
 
 ---
 
-## Appendix C: Azgaar Parameter Mapping Reference
+## Appendices
 
-Key Azgaar parameters (from `azgaar_parameter_mapping.json`):
+### Appendix A: Current Node Tree Dump
+```
+WorldBuilderUI (Control)
+├── Background (ColorRect)
+└── MainVBox (VBoxContainer)
+    ├── TopBar (PanelContainer)
+    │   └── TopBarContent (CenterContainer)
+    │       └── TitleLabel (Label)
+    ├── MainHSplit (HSplitContainer)
+    │   ├── LeftPanel (PanelContainer)
+    │   │   └── LeftContent (VBoxContainer)
+    │   │       └── StepSidebar (VBoxContainer)
+    │   │           ├── Step1Btn (Button)
+    │   │           ├── Step2Btn (Button)
+    │   │           ├── Step3Btn (Button)
+    │   │           ├── Step4Btn (Button)
+    │   │           ├── Step5Btn (Button)
+    │   │           ├── Step6Btn (Button)
+    │   │           ├── Step7Btn (Button)
+    │   │           └── Step8Btn (Button)
+    │   ├── CenterPanel (PanelContainer)
+    │   │   └── CenterContent (Control) [WorldBuilderAzgaar script]
+    │   │       └── OverlayPlaceholder (TextureRect)
+    │   └── RightPanel (PanelContainer)
+    │       └── RightScroll (ScrollContainer)
+    │           └── RightVBox (VBoxContainer)
+    │               ├── ArchetypeLabel (Label)
+    │               ├── ArchetypeOption (OptionButton)
+    │               ├── SeedLabel (Label)
+    │               ├── SeedHBox (HBoxContainer)
+    │               │   ├── SeedSpin (SpinBox)
+    │               │   └── RandomizeBtn (Button)
+    │               ├── SectionSep (HSeparator)
+    │               ├── StepTitle (Label)
+    │               └── ParamTree (Tree)
+    └── BottomBar (PanelContainer)
+        └── BottomContent (HBoxContainer)
+            ├── SpacerLeft (Control)
+            ├── BackBtn (Button)
+            ├── GenBtn (Button)
+            ├── BakeTo3DBtn (Button)
+            ├── NextBtn (Button)
+            ├── ProgressBar (ProgressBar)
+            ├── StatusLabel (Label)
+            └── SpacerRight (Control)
 
-- `templateInput` - Heightmap template (OptionButton)
-- `pointsInput` - Cell density (HSlider, 1-13, maps to 1K-100K cells)
-- `statesNumber` - Number of states (SpinBox, 0-100)
-- `culturesInput` - Number of cultures (SpinBox, 1-32)
-- `culturesSet` - Culture set (OptionButton: world, european, oriental, highFantasy, darkFantasy)
-- `religionsNumber` - Number of religions (SpinBox, 0-50)
+Total: 43 nodes
+```
 
-**Full mapping:** See `res://data/config/azgaar_parameter_mapping.json`
+### Appendix B: Proposed Modular Tree Structure
+```
+WorldBuilderRoot (Control)
+├── Background (ColorRect)
+└── MainVBox (VBoxContainer)
+    ├── TopBarInstance (WorldBuilderTopBar) [3-4 nodes]
+    ├── MainHSplit (HSplitContainer)
+    │   ├── LeftNavInstance (WorldBuilderLeftNav) [10-12 nodes]
+    │   ├── CenterWebViewInstance (WorldBuilderCenterWebView) [3-5 nodes]
+    │   └── RightControlsInstance (WorldBuilderRightControls) [12-15 nodes]
+    └── BottomBarInstance (WorldBuilderBottomBar) [8-10 nodes]
+
+Total: 5-8 nodes in root + 36-46 nodes in modules = 41-54 nodes total
+(Similar count, but better organized and cullable)
+```
+
+### Appendix C: Signal Flow Diagram
+```
+┌─────────────────┐
+│  LeftNav        │
+│  (Step Buttons) │
+└────────┬────────┘
+         │ step_changed(step_index)
+         ▼
+┌─────────────────┐
+│  WorldBuilder   │
+│  Root           │
+└────────┬────────┘
+         │ update_step(step_index)
+         ▼
+┌─────────────────┐      ┌─────────────────┐
+│  RightControls  │      │  BottomBar      │
+│  (Parameters)   │      │  (Navigation)   │
+└────────┬────────┘      └────────┬────────┘
+         │                         │
+         │ parameter_changed()     │ generate_pressed()
+         │                         │
+         ▼                         ▼
+┌─────────────────┐      ┌─────────────────┐
+│  CenterWebView  │      │  CenterWebView   │
+│  (Azgaar)       │      │  (Azgaar)       │
+└────────┬────────┘      └────────┬────────┘
+         │                         │
+         │ generation_complete()   │ generation_failed()
+         │                         │
+         ▼                         ▼
+┌─────────────────┐      ┌─────────────────┐
+│  BottomBar      │      │  BottomBar       │
+│  (Status)       │      │  (Status)        │
+└─────────────────┘      └─────────────────┘
+```
+
+### Appendix D: Performance Baseline (from audit)
+**Current Performance (Monolithic):**
+- **Idle FPS:** ~5 FPS (with performance monitors)
+- **Idle FPS (monitors off):** ~30-40 FPS
+- **During generation:** ~2-3 FPS
+- **Draw calls:** ~20-30 per frame
+- **Node count:** 43 nodes in single scene
+
+**Target Performance (Modular):**
+- **Idle FPS:** 60+ FPS (with visibility culling)
+- **During generation:** 30+ FPS
+- **Draw calls:** 15-25 per frame (fewer with culling)
+- **Node count:** Similar, but organized in modules
+
+**Expected Improvements:**
+- ✅ Faster initial load (smaller scenes load faster)
+- ✅ Better visibility culling (hide inactive modules)
+- ✅ Reduced tree traversal (shallow hierarchies)
+- ✅ Easier debugging (isolated modules)
 
 ---
 
-**End of Audit Report**
+## Conclusion
 
+The migration from monolithic `WorldBuilderUI.tscn` to a modular architecture is **highly feasible** with **~70% code reusability**. The main effort lies in breaking the 43-node scene into 5-7 modular scenes and establishing communication patterns via signals or EventBus.
+
+**Key Success Factors:**
+1. ✅ **WebView integration is solid** - godot_wry provides full JS execution and IPC
+2. ✅ **Data-driven parameters** - JSON configs make refactoring easier
+3. ✅ **Existing optimizations** - Caching, throttling already in place
+4. ✅ **Clear module boundaries** - Natural separation (Left, Center, Right, Bottom)
+
+**Risks to Mitigate:**
+1. ⚠️ **Signal complexity** - Use EventBus to centralize communication
+2. ⚠️ **WebView timing** - Ensure proper initialization order
+3. ⚠️ **Performance regression** - Profile at each phase
+
+**Recommended Approach:**
+- **Phase 1:** Extract BottomBar (validate approach)
+- **Phase 2:** Extract remaining modules incrementally
+- **Phase 3:** Create Root container and integrate
+- **Phase 4:** Optimize and polish
+
+**Estimated Timeline:** 15-25 hours over 3-4 weeks
+
+**Next Step:** Create EventBus autoload and extract BottomBar module as proof of concept.
+
+---
+
+**Report Generated:** 2025-12-27  
+**Author:** Cursor AI (Auto)  
+**Status:** Ready for Implementation

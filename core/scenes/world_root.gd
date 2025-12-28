@@ -112,10 +112,10 @@ func _setup_world_builder_ui_async() -> void:
 	LoadingOverlay.update_progress("Loading UI scene...", 45.0)
 	await get_tree().process_frame
 	
-	# Load WorldBuilderUI scene
-	var ui_scene: PackedScene = load("res://ui/world_builder/WorldBuilderUI.tscn")
+	# Load WorldBuilderRoot scene (modular UI)
+	var ui_scene: PackedScene = load("res://ui/world_builder/modules/WorldBuilderRoot.tscn")
 	if ui_scene == null:
-		MythosLogger.error("World", "Failed to load WorldBuilderUI scene")
+		MythosLogger.error("World", "Failed to load WorldBuilderRoot scene")
 		LoadingOverlay.hide_loading()
 		return
 	

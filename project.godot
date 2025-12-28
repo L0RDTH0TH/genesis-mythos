@@ -36,6 +36,7 @@ AzgaarIntegrator="*res://scripts/managers/AzgaarIntegrator.gd"
 AzgaarServer="*res://scripts/managers/AzgaarServer.gd"
 LoadingOverlay="*res://core/singletons/LoadingOverlay.gd"
 DataCache="*res://core/singletons/DataCache.gd"
+EventBus="*res://core/singletons/EventBus.gd"
 
 [debug]
 

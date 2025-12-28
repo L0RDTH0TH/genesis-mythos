@@ -1,4 +1,4 @@
-[gd_resource type="Theme" load_steps=43 format=3 uid="uid://dpiqolc47bhf4"]
+[gd_resource type="Theme" format=3 uid="uid://dpiqolc47bhf4"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_24"]
 bg_color = Color(0.164706, 0.196078, 0.239216, 1)
@@ -343,6 +343,18 @@ bg_color = Color(0.0392157, 0.0392157, 0.0392157, 1)
 border_width_left = 2
 border_color = Color(1, 0.843137, 0, 1)
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_44"]
+bg_color = Color(0.05, 0.05, 0.1, 0.85)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.843137, 0, 0.6)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_35"]
 bg_color = Color(0.2, 0.12, 0.07, 1)
 border_width_left = 3
@@ -397,18 +409,6 @@ corner_radius_bottom_left = 8
 shadow_color = Color(1, 0.843137, 0, 0.6)
 shadow_size = 8
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_44"]
-bg_color = Color(0.05, 0.05, 0.1, 0.85)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(1, 0.843137, 0, 0.6)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
-
 [resource]
 default_font_size = 18
 Button/colors/font_color = Color(1, 0.843137, 0, 1)
@@ -449,8 +449,6 @@ Label/colors/negative = Color(0.9, 0.3, 0.3, 1)
 Label/colors/negative_modifier = Color(0.9, 0.4, 0.4, 1)
 Label/colors/positive = Color(0.85, 0.7, 0.4, 1)
 Label/colors/positive_modifier = Color(1, 0.843137, 0, 1)
-# Emergency Performance Fix: Disable expensive label shadows (per-character draw calls in Godot 4.x)
-Label/constants/shadow_offset_x = 0
 Label/constants/shadow_offset_y = 0
 Label/font_sizes/font_size = 18
 Label/font_sizes/title_label = 64
