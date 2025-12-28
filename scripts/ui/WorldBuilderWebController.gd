@@ -50,8 +50,8 @@ func _ready() -> void:
 	# Load step definitions from JSON
 	_load_step_definitions()
 	
-	# Load the World Builder HTML file
-	var html_url: String = "res://web_ui/world_builder/index.html"
+	# Load the World Builder HTML file (custom template with 8-step sidebar)
+	var html_url: String = "res://assets/ui_web/templates/world_builder.html"
 	web_view.load_url(html_url)
 	MythosLogger.info("WorldBuilderWebController", "Loaded World Builder HTML", {"url": html_url})
 	
