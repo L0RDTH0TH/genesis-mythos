@@ -12,7 +12,7 @@ const AZGAAR_DIR: String = "user://azgaar"
 const HOST: String = "127.0.0.1"
 
 # Check if Azgaar is enabled (matches WorldBuilderAzgaar.gd flag)
-const DEBUG_DISABLE_AZGAAR: bool = true  # TEMPORARY DIAGNOSTIC: Disable Azgaar server when Azgaar is disabled
+const DEBUG_DISABLE_AZGAAR: bool = false  # Azgaar server enabled for HTTP serving
 
 const MIME_TYPES: Dictionary = {
 	"html": "text/html",

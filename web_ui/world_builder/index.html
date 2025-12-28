@@ -70,7 +70,13 @@
 
                     <!-- Parameters Tree (Step-specific curated parameters) -->
                     <div class="param-scroll">
-                        <div class="param-list">
+                        <!-- Empty Step Info Text -->
+                        <div x-show="currentStepParams.length === 0 && currentStepInfoText" class="empty-step-info">
+                            <p class="info-text" x-text="currentStepInfoText"></p>
+                        </div>
+                        
+                        <!-- Parameters List -->
+                        <div class="param-list" x-show="currentStepParams.length > 0">
                             <template x-for="param in currentStepParams" :key="param.azgaar_key">
                                 <div class="param-row">
                                     <label class="param-label" :title="param.description || ''" x-text="(param.name || param.azgaar_key).replace(/([A-Z])/g, ' $1').trim() + ':'"></label>

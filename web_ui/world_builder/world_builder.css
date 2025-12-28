@@ -78,7 +78,9 @@ body {
 
 /* Left Tabs Panel (BG3-style numbered tabs) */
 .left-tabs-panel {
-    width: var(--left-tabs-width);
+    width: var(--left-tabs-width, 280px);
+    min-width: var(--left-tabs-width-min, 180px);
+    max-width: var(--left-tabs-width-max, 300px);
     background-color: var(--bg-panel);
     border-right: 2px solid var(--border-gold);
     display: flex;
@@ -196,8 +198,9 @@ body {
 
 /* Right Panel (Floating Panel Style) */
 .right-panel {
-    width: var(--right-panel-width);
-    min-width: var(--right-panel-width);
+    width: var(--right-panel-width, 280px);
+    min-width: var(--right-panel-width-min, 200px);
+    max-width: var(--right-panel-width-max, 350px);
     background-color: rgba(26, 31, 38, 0.95); /* Semi-transparent dark bg */
     border-left: 2px solid var(--border-gold);
     display: flex;
@@ -407,5 +410,24 @@ body {
     color: var(--font-color-gold);
     font-size: 14px;
     min-width: 150px;
+}
+
+/* Empty Step Info Text */
+.empty-step-info {
+    padding: var(--spacing-large);
+    text-align: center;
+    color: var(--font-color-gold);
+    opacity: 0.8;
+    border: 1px solid rgba(255, 215, 0, 0.3);
+    border-radius: 4px;
+    background-color: rgba(26, 31, 38, 0.5);
+    margin: var(--spacing-medium);
+}
+
+.empty-step-info .info-text {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.6;
+    font-style: italic;
 }
 

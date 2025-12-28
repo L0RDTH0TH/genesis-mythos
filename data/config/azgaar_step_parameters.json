@@ -155,6 +155,72 @@
           "default": 20,
           "description": "Depression depth threshold for lakes",
           "curated": true
+        },
+        {
+          "name": "windDirection90N",
+          "azgaar_key": "options.winds[0]",
+          "ui_type": "HSlider",
+          "min": 0,
+          "max": 360,
+          "step": 15,
+          "default": 225,
+          "description": "Wind direction 90°N-60°N (degrees)",
+          "curated": true
+        },
+        {
+          "name": "windDirection60N",
+          "azgaar_key": "options.winds[1]",
+          "ui_type": "HSlider",
+          "min": 0,
+          "max": 360,
+          "step": 15,
+          "default": 45,
+          "description": "Wind direction 60°N-30°N (degrees)",
+          "curated": true
+        },
+        {
+          "name": "windDirection30N",
+          "azgaar_key": "options.winds[2]",
+          "ui_type": "HSlider",
+          "min": 0,
+          "max": 360,
+          "step": 15,
+          "default": 225,
+          "description": "Wind direction 30°N-0° Equator (degrees)",
+          "curated": true
+        },
+        {
+          "name": "windDirection30S",
+          "azgaar_key": "options.winds[3]",
+          "ui_type": "HSlider",
+          "min": 0,
+          "max": 360,
+          "step": 15,
+          "default": 315,
+          "description": "Wind direction 0°-30°S (degrees)",
+          "curated": true
+        },
+        {
+          "name": "windDirection60S",
+          "azgaar_key": "options.winds[4]",
+          "ui_type": "HSlider",
+          "min": 0,
+          "max": 360,
+          "step": 15,
+          "default": 135,
+          "description": "Wind direction 30°S-60°S (degrees)",
+          "curated": true
+        },
+        {
+          "name": "windDirection90S",
+          "azgaar_key": "options.winds[5]",
+          "ui_type": "HSlider",
+          "min": 0,
+          "max": 360,
+          "step": 15,
+          "default": 315,
+          "description": "Wind direction 60°S-90°S (degrees)",
+          "curated": true
         }
       ]
     },
@@ -213,7 +279,8 @@
       "index": 3,
       "title": "4. Biomes",
       "description": "Biome distribution (automatically generated from climate and terrain)",
-      "parameters": []
+      "parameters": [],
+      "info_text": "Biomes are automatically generated based on temperature, precipitation, elevation, and wind patterns. No manual configuration is needed. Adjust climate and terrain settings in previous steps to influence biome distribution."
     },
     {
       "index": 4,
@@ -292,6 +359,28 @@
           "default": 20,
           "description": "Burgs percentage to form province",
           "curated": true
+        },
+        {
+          "name": "sizeVariety",
+          "azgaar_key": "sizeVariety",
+          "ui_type": "SpinBox",
+          "min": 0,
+          "max": 10,
+          "step": 1,
+          "default": 4,
+          "description": "State/culture size variety (expansionism)",
+          "curated": true
+        },
+        {
+          "name": "growthRate",
+          "azgaar_key": "growthRate",
+          "ui_type": "HSlider",
+          "min": 0.1,
+          "max": 2.0,
+          "step": 0.1,
+          "default": 1.5,
+          "description": "State/culture growth rate (affects neutral lands)",
+          "curated": true
         }
       ]
     },
@@ -332,6 +421,48 @@
           "default": 10,
           "description": "Urban density (average population per building)",
           "curated": true
+        },
+        {
+          "name": "distanceUnitInput",
+          "azgaar_key": "distanceUnitInput",
+          "ui_type": "OptionButton",
+          "options": ["mi", "km", "lg", "vr", "nmi", "nlg"],
+          "default": "mi",
+          "description": "Distance unit for map scale",
+          "curated": true
+        },
+        {
+          "name": "distanceScaleInput",
+          "azgaar_key": "distanceScaleInput",
+          "ui_type": "HSlider",
+          "min": 0.1,
+          "max": 20.0,
+          "step": 0.1,
+          "default": 3.0,
+          "description": "Distance units per pixel",
+          "curated": true
+        },
+        {
+          "name": "latitudeInput",
+          "azgaar_key": "latitudeInput",
+          "ui_type": "HSlider",
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "default": 50,
+          "description": "North-South map shift (50 = Equator)",
+          "curated": true
+        },
+        {
+          "name": "longitudeInput",
+          "azgaar_key": "longitudeInput",
+          "ui_type": "HSlider",
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "default": 50,
+          "description": "West-East map shift (50 = Prime Meridian)",
+          "curated": true
         }
       ]
     },
@@ -339,13 +470,34 @@
       "index": 6,
       "title": "7. Resources & Magic",
       "description": "Resource distribution and magical elements (future expansion)",
-      "parameters": []
+      "parameters": [],
+      "info_text": "Resource distribution and magical elements are not yet configurable in this version. Future updates will add options for mineral deposits, magical ley lines, and fantastical resource placement."
     },
     {
       "index": 7,
       "title": "8. Export",
       "description": "Export and bake settings",
-      "parameters": []
+      "parameters": [
+        {
+          "name": "heightmapResolution",
+          "azgaar_key": "heightmapResolution",
+          "ui_type": "OptionButton",
+          "options": ["Low (512x512)", "Medium (1024x1024)", "High (2048x2048)", "Ultra (4096x4096)"],
+          "default": "Medium (1024x1024)",
+          "description": "Heightmap resolution for 3D terrain export",
+          "curated": true
+        },
+        {
+          "name": "exportFormat",
+          "azgaar_key": "exportFormat",
+          "ui_type": "OptionButton",
+          "options": ["PNG", "EXR", "RAW"],
+          "default": "PNG",
+          "description": "Heightmap export format",
+          "curated": true
+        }
+      ],
+      "info_text": "Configure export settings for baking the 2D map to 3D terrain. Higher resolutions provide more detail but require more memory and processing time."
     }
   ]
 }

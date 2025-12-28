@@ -67,6 +67,7 @@ func _ready() -> void:
 	
 	# Wait for page to load, then send initial data
 	await get_tree().create_timer(1.5).timeout
+	_inject_theme_and_constants()
 	_send_step_definitions()
 	_send_archetypes()
 	
@@ -175,6 +176,73 @@ func _send_archetypes() -> void:
 		web_view.eval(script)
 
 
+func _inject_theme_and_constants() -> void:
+	"""Inject theme colors and UIConstants values into CSS for responsive layout."""
+	if not web_view:
+		return
+	
+	# Get theme colors from bg3_theme.tres (extract common colors)
+	# Note: Theme resource parsing is limited, so we'll use known values
+	var theme_colors: Dictionary = {
+		"bg_dark": "#101010",  # Color(0.0588235, 0.0588235, 0.0588235, 1)
+		"font_gold": "#FFD700",  # Color(1, 0.843137, 0, 1)
+		"font_hover_gold": "#FFF5BF",  # Color(1, 0.95, 0.75, 1)
+		"font_pressed_gold": "#D9B366",  # Color(0.85, 0.7, 0.4, 1)
+		"bg_panel": "#1A1F26",  # Panel background
+		"bg_panel_light": "#2A323D",  # Hover state
+		"font_default": "#E0E0E0",  # Default text
+		"border_gold": "#FFD700"
+	}
+	
+	# Get UIConstants values for responsive panel widths
+	var panel_constants: Dictionary = {
+		"left_panel_width": UIConstants.LEFT_PANEL_WIDTH,
+		"left_panel_width_min": UIConstants.LEFT_PANEL_WIDTH_MIN,
+		"left_panel_width_max": UIConstants.LEFT_PANEL_WIDTH_MAX,
+		"right_panel_width": UIConstants.RIGHT_PANEL_WIDTH,
+		"right_panel_width_min": UIConstants.RIGHT_PANEL_WIDTH_MIN,
+		"right_panel_width_max": UIConstants.RIGHT_PANEL_WIDTH_MAX,
+		"spacing_small": UIConstants.SPACING_SMALL,
+		"spacing_medium": UIConstants.SPACING_MEDIUM,
+		"spacing_large": UIConstants.SPACING_LARGE,
+		"button_height_small": UIConstants.BUTTON_HEIGHT_SMALL,
+		"button_height_medium": UIConstants.BUTTON_HEIGHT_MEDIUM,
+		"button_height_large": UIConstants.BUTTON_HEIGHT_LARGE
+	}
+	
+	# Inject CSS variables via JavaScript
+	var script: String = """
+		(function() {
+			var root = document.documentElement;
+			
+			// Inject theme colors
+			var themeColors = %s;
+			for (var key in themeColors) {
+				var cssKey = '--' + key.replace(/_/g, '-');
+				root.style.setProperty(cssKey, themeColors[key]);
+			}
+			
+			// Inject UIConstants for responsive sizing
+			var constants = %s;
+			root.style.setProperty('--left-tabs-width', constants.left_panel_width + 'px');
+			root.style.setProperty('--left-tabs-width-min', constants.left_panel_width_min + 'px');
+			root.style.setProperty('--left-tabs-width-max', constants.left_panel_width_max + 'px');
+			root.style.setProperty('--right-panel-width', constants.right_panel_width + 'px');
+			root.style.setProperty('--right-panel-width-min', constants.right_panel_width_min + 'px');
+			root.style.setProperty('--right-panel-width-max', constants.right_panel_width_max + 'px');
+			
+			console.log('Theme colors and UIConstants injected');
+		})();
+	""" % [JSON.stringify(theme_colors), JSON.stringify(panel_constants)]
+	
+	if web_view.has_method("execute_js"):
+		web_view.execute_js(script)
+		MythosLogger.info("WorldBuilderWebController", "Injected theme colors and UIConstants")
+	elif web_view.has_method("eval"):
+		web_view.eval(script)
+		MythosLogger.info("WorldBuilderWebController", "Injected theme colors and UIConstants via eval")
+
+
 func _on_ipc_message(message: String) -> void:
 	"""Handle IPC messages from WebView."""
 	MythosLogger.debug("WorldBuilderWebController", "Received IPC message from WebView", {"message": message})
@@ -274,6 +342,16 @@ func _handle_set_seed(data: Dictionary) -> void:
 
 func _clamp_parameter_value(azgaar_key: String, value: Variant) -> Variant:
 	"""Clamp parameter value based on step definitions (curated/clamped_min/clamped_max)."""
+	# Special handling for pointsInput: use hardware-aware clamping
+	if azgaar_key == "pointsInput" and value is int:
+		# Convert slider value (1-13) to approximate cell count, then clamp by hardware
+		# Approximate: pointsInput maps to ~1K-100K cells (log scale)
+		var approximate_cells: int = int(pow(10.0, float(value)) * 1000.0)
+		var clamped_cells: int = UIConstants.get_clamped_points(approximate_cells)
+		# Convert back to slider value (inverse log)
+		var clamped_slider: int = int(log(clamped_cells / 1000.0) / log(10.0))
+		return clamp(clamped_slider, 1, 10)  # Ensure within slider range
+	
 	# Find parameter definition in step definitions
 	for step_dict in step_definitions.get("steps", []):
 		var parameters: Array = step_dict.get("parameters", [])

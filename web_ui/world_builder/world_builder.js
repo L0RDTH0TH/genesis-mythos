@@ -53,6 +53,7 @@ Alpine.data('worldBuilder', () => ({
     isGenerating: false,
     progressValue: 0,
     statusText: '',
+    updateDebounceTimer: null,
     
     init() {
         // Store instance for global access
@@ -124,6 +125,13 @@ Alpine.data('worldBuilder', () => ({
             return curatedParams;
         }
         return [];
+    },
+    
+    get currentStepInfoText() {
+        if (this.steps && this.steps[this.currentStep]) {
+            return this.steps[this.currentStep].info_text || null;
+        }
+        return null;
     },
     
     setStep(index) {
@@ -206,14 +214,21 @@ Alpine.data('worldBuilder', () => ({
             }
         }
         
-        // Update local params
+        // Update local params immediately (for UI responsiveness)
         this.params[key] = value;
         
-        // Send to Godot (server-side will also clamp)
-        GodotBridge.postMessage('update_param', { 
-            azgaar_key: key, 
-            value: value 
-        });
+        // Debounce sending to Godot (100ms delay)
+        if (this.updateDebounceTimer) {
+            clearTimeout(this.updateDebounceTimer);
+        }
+        this.updateDebounceTimer = setTimeout(() => {
+            // Send to Godot (server-side will also clamp)
+            GodotBridge.postMessage('update_param', { 
+                azgaar_key: key, 
+                value: this.params[key]
+            });
+            this.updateDebounceTimer = null;
+        }, 100);
     },
     
     generate() {

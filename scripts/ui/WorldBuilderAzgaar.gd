@@ -6,8 +6,8 @@
 
 extends Control
 
-# TEMPORARY DIAGNOSTIC: Azgaar WebView disabled to test custom GUI layout visibility
-const DEBUG_DISABLE_AZGAAR := true
+# Azgaar WebView enabled - integrated for live map preview and generation
+const DEBUG_DISABLE_AZGAAR := false
 
 var web_view: Node = null  # godot_wry WebView node
 @onready var azgaar_integrator: Node = get_node("/root/AzgaarIntegrator")
