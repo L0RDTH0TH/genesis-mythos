@@ -448,7 +448,7 @@ func _handle_generate(data: Dictionary) -> void:
 	
 	current_params = clamped_params
 	
-	MythosLogger.info("WorldBuilderWebController", "Generation requested", {"params": current_params})
+	MythosLogger.info("WorldBuilderWebController", "Generation requested", {"params_count": current_params.size(), "seed": current_seed})
 	
 	# Generation is handled via iframe postMessage in JavaScript
 	# The JS generate() function sends postMessage to the Azgaar iframe

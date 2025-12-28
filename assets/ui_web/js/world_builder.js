@@ -55,6 +55,7 @@ document.addEventListener('alpine:init', () => {
         progressValue: 0,
         statusText: '',
         updateDebounceTimer: null,
+        azgaarListenerInjected: false,
         
         init() {
             // Store instance for global access
@@ -120,7 +121,152 @@ document.addEventListener('alpine:init', () => {
             // Send initial step
             this.setStep(0);
             console.log('[WorldBuilder] Initialized, current step:', this.currentStep, 'total steps:', this.steps.length);
+            
+            // Setup Azgaar iframe message listener injection
+            this._setupAzgaarListener();
         },
+    
+    _setupAzgaarListener() {
+        // Inject message listener into Azgaar iframe when it loads
+        const iframe = document.getElementById('azgaar-iframe');
+        if (!iframe) {
+            console.warn('[WorldBuilder] Azgaar iframe not found, cannot setup listener');
+            return;
+        }
+        
+        const injectListener = () => {
+            if (this.azgaarListenerInjected) {
+                return; // Already injected
+            }
+            
+            try {
+                if (iframe.contentWindow) {
+                    // Inject message listener script into Azgaar iframe
+                    const listenerScript = `
+                        (function() {
+                            // Check if listener already exists
+                            if (window._azgaarMessageListenerInjected) {
+                                return;
+                            }
+                            window._azgaarMessageListenerInjected = true;
+                            
+                            window.addEventListener('message', function(event) {
+                                // Accept messages from parent window (World Builder)
+                                // Origin check: allow file://, res://, and http://127.0.0.1 origins
+                                const allowedOrigins = ['file://', 'res://', 'http://127.0.0.1:8080', window.location.origin];
+                                const isAllowedOrigin = allowedOrigins.some(origin => 
+                                    event.origin === origin || event.origin.startsWith(origin)
+                                );
+                                
+                                if (!isAllowedOrigin) {
+                                    console.warn('[Azgaar] Rejected message from origin:', event.origin);
+                                    return;
+                                }
+                                
+                                // Handle azgaar_params message
+                                if (event.data && event.data.type === 'azgaar_params') {
+                                    if (typeof azgaar !== 'undefined' && azgaar.options) {
+                                        try {
+                                            // Apply parameters to azgaar.options
+                                            if (event.data.params) {
+                                                Object.assign(azgaar.options, event.data.params);
+                                            }
+                                            // Set seed if provided
+                                            if (event.data.seed !== undefined) {
+                                                azgaar.options.seed = event.data.seed;
+                                            }
+                                            console.log('[Azgaar] Parameters applied from parent window');
+                                        } catch (e) {
+                                            console.error('[Azgaar] Error applying parameters:', e);
+                                        }
+                                    } else {
+                                        console.warn('[Azgaar] azgaar.options not available yet');
+                                    }
+                                }
+                                
+                                // Handle azgaar_generate message
+                                if (event.data && event.data.type === 'azgaar_generate') {
+                                    if (typeof azgaar !== 'undefined' && typeof azgaar.generate === 'function') {
+                                        try {
+                                            console.log('[Azgaar] Generation triggered from parent window');
+                                            azgaar.generate();
+                                        } catch (e) {
+                                            console.error('[Azgaar] Error triggering generation:', e);
+                                        }
+                                    } else {
+                                        console.warn('[Azgaar] azgaar.generate not available yet');
+                                    }
+                                }
+                            });
+                            
+                            console.log('[Azgaar] Message listener injected successfully');
+                        })();
+                    `;
+                    
+                    // Try to inject via script tag (more reliable than eval)
+                    try {
+                        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                        if (iframeDoc) {
+                            const script = iframeDoc.createElement('script');
+                            script.textContent = listenerScript;
+                            iframeDoc.head.appendChild(script);
+                            this.azgaarListenerInjected = true;
+                            console.log('[WorldBuilder] Azgaar message listener injected via script tag');
+                        } else {
+                            // Fallback to eval if script tag injection fails
+                            iframe.contentWindow.eval(listenerScript);
+                            this.azgaarListenerInjected = true;
+                            console.log('[WorldBuilder] Azgaar message listener injected via eval');
+                        }
+                    } catch (evalError) {
+                        // If both methods fail, try eval as last resort
+                        try {
+                            iframe.contentWindow.eval(listenerScript);
+                            this.azgaarListenerInjected = true;
+                            console.log('[WorldBuilder] Azgaar message listener injected via eval (fallback)');
+                        } catch (e) {
+                            console.error('[WorldBuilder] Failed to inject listener via both methods:', e);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('[WorldBuilder] Failed to inject Azgaar message listener:', e);
+            }
+        };
+        
+        // Try to inject immediately if iframe is already loaded
+        if (iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
+            // Wait for Azgaar to fully initialize (it loads many scripts)
+            setTimeout(injectListener, 3000);
+        } else {
+            // Wait for iframe to load
+            iframe.addEventListener('load', () => {
+                // Wait for Azgaar to initialize (it loads many scripts)
+                // Use multiple retries with increasing delays
+                let retryCount = 0;
+                const maxRetries = 5;
+                const retryInterval = 2000;
+                
+                const tryInject = () => {
+                    if (this.azgaarListenerInjected) {
+                        return; // Success
+                    }
+                    
+                    if (retryCount < maxRetries) {
+                        injectListener();
+                        retryCount++;
+                        if (!this.azgaarListenerInjected) {
+                            setTimeout(tryInject, retryInterval);
+                        }
+                    } else {
+                        console.warn('[WorldBuilder] Failed to inject listener after', maxRetries, 'retries');
+                    }
+                };
+                
+                setTimeout(tryInject, 2000);
+            }, { once: true });
+        }
+    },
     
     _initializeParams() {
         // Initialize params with default values from step definitions (only curated parameters)
@@ -289,36 +435,107 @@ document.addEventListener('alpine:init', () => {
         // Send to Godot for progress tracking
         GodotBridge.postMessage('generate', { params: this.params });
         
+        // Ensure message listener is injected before sending messages
+        if (!this.azgaarListenerInjected) {
+            this._setupAzgaarListener();
+        }
+        
         // Send parameters to Azgaar iframe via postMessage
         const iframe = document.getElementById('azgaar-iframe');
-        if (iframe && iframe.contentWindow) {
-            try {
-                // Wait for iframe to be ready, then send parameters
-                const sendToIframe = () => {
-                    if (iframe.contentWindow) {
-                        // Send parameters to Azgaar iframe
-                        iframe.contentWindow.postMessage({
-                            type: 'azgaar_params',
-                            params: this.params,
-                            seed: this.seed
-                        }, 'http://127.0.0.1:8080');
-                        
-                        // Trigger generation in Azgaar
-                        iframe.contentWindow.postMessage({
-                            type: 'azgaar_generate'
-                        }, 'http://127.0.0.1:8080');
+        if (!iframe || !iframe.contentWindow) {
+            console.error('[WorldBuilder] Iframe not found or has no contentWindow');
+            this.isGenerating = false;
+            this.statusText = 'Error: Azgaar iframe not available';
+            return;
+        }
+        
+        try {
+            // Wait for iframe to be ready, then send parameters
+            const sendToIframe = () => {
+                if (!iframe.contentWindow) {
+                    console.warn('[WorldBuilder] iframe.contentWindow is null');
+                    this.isGenerating = false;
+                    this.statusText = 'Error: Cannot access Azgaar iframe';
+                    return;
+                }
+                
+                // Ensure listener is injected (retry if needed)
+                if (!this.azgaarListenerInjected) {
+                    try {
+                        const listenerScript = `
+                            (function() {
+                                if (window._azgaarMessageListenerInjected) return;
+                                window._azgaarMessageListenerInjected = true;
+                                window.addEventListener('message', function(event) {
+                                    const allowedOrigins = ['file://', 'res://', 'http://127.0.0.1:8080', window.location.origin];
+                                    const isAllowedOrigin = allowedOrigins.some(origin => 
+                                        event.origin === origin || event.origin.startsWith(origin)
+                                    );
+                                    if (!isAllowedOrigin) return;
+                                    
+                                    if (event.data && event.data.type === 'azgaar_params') {
+                                        if (typeof azgaar !== 'undefined' && azgaar.options) {
+                                            if (event.data.params) Object.assign(azgaar.options, event.data.params);
+                                            if (event.data.seed !== undefined) azgaar.options.seed = event.data.seed;
+                                        }
+                                    }
+                                    if (event.data && event.data.type === 'azgaar_generate') {
+                                        if (typeof azgaar !== 'undefined' && typeof azgaar.generate === 'function') {
+                                            azgaar.generate();
+                                        }
+                                    }
+                                });
+                            })();
+                        `;
+                        // Try script tag first, then eval
+                        try {
+                            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                            if (iframeDoc) {
+                                const script = iframeDoc.createElement('script');
+                                script.textContent = listenerScript;
+                                iframeDoc.head.appendChild(script);
+                                this.azgaarListenerInjected = true;
+                            } else {
+                                iframe.contentWindow.eval(listenerScript);
+                                this.azgaarListenerInjected = true;
+                            }
+                        } catch (e) {
+                            iframe.contentWindow.eval(listenerScript);
+                            this.azgaarListenerInjected = true;
+                        }
+                    } catch (e) {
+                        console.warn('[WorldBuilder] Failed to inject listener on send:', e);
                     }
+                }
+                
+                // Send parameters to Azgaar iframe
+                const paramsMessage = {
+                    type: 'azgaar_params',
+                    params: this.params,
+                    seed: this.seed
                 };
                 
-                // Try immediately, or wait for iframe load
-                if (iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
-                    sendToIframe();
-                } else {
-                    iframe.addEventListener('load', sendToIframe, { once: true });
-                }
-            } catch (e) {
-                console.warn('[WorldBuilder] Failed to send to iframe:', e);
+                // Trigger generation in Azgaar
+                const generateMessage = {
+                    type: 'azgaar_generate'
+                };
+                
+                // Use '*' as targetOrigin since we're in a WebView context (res:// origin)
+                // The listener will validate the origin
+                iframe.contentWindow.postMessage(paramsMessage, '*');
+                iframe.contentWindow.postMessage(generateMessage, '*');
+            };
+            
+            // Try immediately, or wait for iframe load
+            if (iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
+                sendToIframe();
+            } else {
+                iframe.addEventListener('load', sendToIframe, { once: true });
             }
+        } catch (e) {
+            console.error('[WorldBuilder] Failed to send to iframe:', e);
+            this.isGenerating = false;
+            this.statusText = 'Error: Failed to communicate with Azgaar';
         }
     }
     }));
