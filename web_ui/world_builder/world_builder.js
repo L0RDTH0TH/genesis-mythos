@@ -107,7 +107,21 @@ Alpine.data('worldBuilder', () => ({
         if (this.steps && this.steps[this.currentStep]) {
             // Filter to only show curated parameters
             const allParams = this.steps[this.currentStep].parameters || [];
-            return allParams.filter(param => param.curated !== false);
+            const curatedParams = allParams.filter(param => param.curated !== false);
+            // Ensure params are initialized for displayed parameters
+            for (let param of curatedParams) {
+                if (!(param.azgaar_key in this.params)) {
+                    // Initialize with default value
+                    if (param.default !== undefined) {
+                        this.params[param.azgaar_key] = param.default;
+                    } else if (param.ui_type === 'CheckBox') {
+                        this.params[param.azgaar_key] = false;
+                    } else if (param.ui_type === 'HSlider' || param.ui_type === 'SpinBox') {
+                        this.params[param.azgaar_key] = param.min || 0;
+                    }
+                }
+            }
+            return curatedParams;
         }
         return [];
     },
@@ -115,7 +129,29 @@ Alpine.data('worldBuilder', () => ({
     setStep(index) {
         if (index >= 0 && index < this.totalSteps) {
             this.currentStep = index;
+            // Send step change to Godot
             GodotBridge.postMessage('set_step', { step: index });
+            // Ensure params are initialized for this step
+            this._ensureStepParamsInitialized(index);
+        }
+    },
+    
+    _ensureStepParamsInitialized(stepIndex) {
+        // Initialize any missing params for the current step with defaults
+        if (this.steps && this.steps[stepIndex] && this.steps[stepIndex].parameters) {
+            for (let param of this.steps[stepIndex].parameters) {
+                // Only initialize curated parameters
+                if (param.curated !== false && !(param.azgaar_key in this.params)) {
+                    // Use default if available, otherwise use type-appropriate default
+                    if (param.default !== undefined) {
+                        this.params[param.azgaar_key] = param.default;
+                    } else if (param.ui_type === 'CheckBox') {
+                        this.params[param.azgaar_key] = false;
+                    } else if (param.ui_type === 'HSlider' || param.ui_type === 'SpinBox') {
+                        this.params[param.azgaar_key] = param.min || 0;
+                    }
+                }
+            }
         }
     },
     
@@ -163,9 +199,17 @@ Alpine.data('worldBuilder', () => ({
             if (min !== undefined && max !== undefined) {
                 value = Math.max(min, Math.min(max, value));
             }
+            // Also handle step for sliders
+            if (paramDef.step !== undefined) {
+                // Round to nearest step
+                value = Math.round(value / paramDef.step) * paramDef.step;
+            }
         }
         
+        // Update local params
         this.params[key] = value;
+        
+        // Send to Godot (server-side will also clamp)
         GodotBridge.postMessage('update_param', { 
             azgaar_key: key, 
             value: value 

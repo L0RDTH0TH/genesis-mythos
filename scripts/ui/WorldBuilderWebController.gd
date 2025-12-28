@@ -140,7 +140,8 @@ func _send_step_definitions() -> void:
 	var json_string: String = JSON.stringify(step_definitions)
 	var script: String = """
 		if (window.worldBuilderInstance) {
-			window.worldBuilderInstance.steps = %s.steps || [];
+			var stepData = %s;
+			window.worldBuilderInstance.steps = stepData.steps || [];
 			window.worldBuilderInstance._initializeParams();
 		}
 	""" % json_string
@@ -222,6 +223,8 @@ func _handle_set_step(data: Dictionary) -> void:
 	if step >= 0 and step < 8:
 		current_step = step
 		MythosLogger.info("WorldBuilderWebController", "Step changed", {"step": step})
+		# Send updated step parameters to WebView
+		_send_step_params_for_current_step()
 
 
 func _handle_load_archetype(data: Dictionary) -> void:
@@ -438,6 +441,35 @@ func _send_params_update() -> void:
 		web_view.execute_js(update_script)
 	elif web_view.has_method("eval"):
 		web_view.eval(update_script)
+
+
+func _send_step_params_for_current_step() -> void:
+	"""Send parameters for the current step to WebView."""
+	if not web_view or step_definitions.is_empty():
+		return
+	
+	# Get current step definition
+	var steps: Array = step_definitions.get("steps", [])
+	if current_step >= 0 and current_step < steps.size():
+		var step_dict: Dictionary = steps[current_step]
+		var step_params: Array = step_dict.get("parameters", [])
+		
+		# Filter to only curated parameters and build param update dict
+		var curated_params: Dictionary = {}
+		for param_dict in step_params:
+			if param_dict.get("curated", true) == true:
+				var azgaar_key: String = param_dict.get("azgaar_key", "")
+				if not azgaar_key.is_empty():
+					# Use current value if exists, otherwise use default
+					if current_params.has(azgaar_key):
+						curated_params[azgaar_key] = current_params[azgaar_key]
+					elif param_dict.has("default"):
+						curated_params[azgaar_key] = param_dict["default"]
+		
+		# Send update to WebView
+		if not curated_params.is_empty():
+			_send_params_update()
+			MythosLogger.debug("WorldBuilderWebController", "Sent step params for step", {"step": current_step, "params": curated_params})
 
 
 func send_progress_update(progress: float, status: String, is_generating: bool) -> void:

@@ -15,15 +15,16 @@
 
         <!-- Main Content Area -->
         <div class="main-hsplit">
-            <!-- Left Panel: Step Sidebar -->
-            <div class="left-panel">
-                <div class="step-sidebar">
+            <!-- Left Panel: Numbered Tab Bar (BG3-style) -->
+            <div class="left-tabs-panel">
+                <div class="left-tabs-container">
                     <template x-for="(step, index) in steps" :key="index">
                         <button 
-                            class="step-button" 
+                            class="left-tab-button" 
                             :class="{ 'active': currentStep === index }"
-                            @click="setStep(index)"
-                            x-text="step.title || `Step ${index + 1}`">
+                            @click="setStep(index)">
+                            <span class="tab-number" x-text="index + 1"></span>
+                            <span class="tab-label" x-text="step.title || `Step ${index + 1}`"></span>
                         </button>
                     </template>
                 </div>
@@ -37,10 +38,10 @@
                 </div>
             </div>
 
-            <!-- Right Panel: Parameters -->
+            <!-- Right Panel: Parameters (Floating Panel Style) -->
             <div class="right-panel">
                 <div class="right-outer-vbox">
-                    <!-- Archetype Selector -->
+                    <!-- Archetype Selector (Top) -->
                     <div class="archetype-selector">
                         <label>Archetype:</label>
                         <select x-model="archetype" @change="loadArchetype($event.target.value)">
@@ -67,12 +68,12 @@
                         <h2 class="step-title" x-text="currentStepTitle"></h2>
                     </div>
 
-                    <!-- Parameters Tree -->
+                    <!-- Parameters Tree (Step-specific curated parameters) -->
                     <div class="param-scroll">
                         <div class="param-list">
                             <template x-for="param in currentStepParams" :key="param.azgaar_key">
                                 <div class="param-row">
-                                    <label class="param-label" x-text="(param.name || param.azgaar_key).replace(/([A-Z])/g, ' $1').trim() + ':'"></label>
+                                    <label class="param-label" :title="param.description || ''" x-text="(param.name || param.azgaar_key).replace(/([A-Z])/g, ' $1').trim() + ':'"></label>
                                     <div class="param-control">
                                         <!-- OptionButton -->
                                         <template x-if="param.ui_type === 'OptionButton'">

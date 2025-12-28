@@ -17,8 +17,8 @@
     --spacing-small: 10px;
     --spacing-medium: 20px;
     --spacing-large: 40px;
-    --left-panel-width: 220px;
-    --right-panel-width: 240px;
+    --left-tabs-width: 280px;
+    --right-panel-width: 280px;
     --bottom-bar-height: 50px;
     --step-button-height: 40px;
     --button-width-small: 120px;
@@ -76,9 +76,9 @@ body {
     overflow: hidden;
 }
 
-/* Left Panel */
-.left-panel {
-    width: var(--left-panel-width);
+/* Left Tabs Panel (BG3-style numbered tabs) */
+.left-tabs-panel {
+    width: var(--left-tabs-width);
     background-color: var(--bg-panel);
     border-right: 2px solid var(--border-gold);
     display: flex;
@@ -86,42 +86,91 @@ body {
     overflow: hidden;
 }
 
-.step-sidebar {
+.left-tabs-container {
     display: flex;
     flex-direction: column;
-    padding: var(--spacing-small);
+    padding: var(--spacing-medium);
     gap: var(--spacing-small);
     overflow-y: auto;
 }
 
-.step-button {
-    height: var(--step-button-height);
+.left-tab-button {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-small);
+    height: 50px;
+    min-height: 50px;
     background-color: var(--bg-panel);
-    border: 1px solid var(--border-gold);
+    border: 2px solid var(--border-gold);
+    border-radius: 4px;
     color: var(--font-default);
-    font-size: 14px;
+    font-size: 16px;
+    font-family: 'Times New Roman', serif;
     cursor: pointer;
     transition: all 0.2s;
     text-align: left;
-    padding: 0 var(--spacing-small);
+    padding: 0 var(--spacing-medium);
+    position: relative;
 }
 
-.step-button:hover {
+.left-tab-button:hover {
     background-color: var(--bg-panel-light);
     border-color: var(--border-gold-hover);
     color: var(--font-hover-gold);
 }
 
-.step-button.active {
+.left-tab-button.active {
     background-color: var(--font-color-gold);
     color: var(--bg-dark);
     border-color: var(--font-color-gold);
     font-weight: bold;
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
 }
 
-/* Center Panel */
+.left-tab-button.active .tab-number {
+    color: var(--bg-dark);
+    font-weight: bold;
+}
+
+.left-tab-button.active .tab-label {
+    color: var(--bg-dark);
+    font-weight: bold;
+}
+
+.tab-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    width: 28px;
+    height: 28px;
+    background-color: rgba(255, 215, 0, 0.2);
+    border: 1px solid var(--border-gold);
+    border-radius: 50%;
+    color: var(--font-color-gold);
+    font-size: 14px;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.left-tab-button.active .tab-number {
+    background-color: var(--bg-dark);
+    border-color: var(--bg-dark);
+    color: var(--font-color-gold);
+}
+
+.tab-label {
+    flex: 1;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Center Panel (Map Preview - Dominant) */
 .center-panel {
     flex: 1;
+    min-width: 0; /* Allow flex shrinking */
     background-color: var(--bg-dark);
     display: flex;
     align-items: center;
@@ -145,14 +194,16 @@ body {
     font-style: italic;
 }
 
-/* Right Panel */
+/* Right Panel (Floating Panel Style) */
 .right-panel {
     width: var(--right-panel-width);
-    background-color: var(--bg-panel);
+    min-width: var(--right-panel-width);
+    background-color: rgba(26, 31, 38, 0.95); /* Semi-transparent dark bg */
     border-left: 2px solid var(--border-gold);
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    box-shadow: -4px 0 12px rgba(0, 0, 0, 0.5);
 }
 
 .right-outer-vbox {
