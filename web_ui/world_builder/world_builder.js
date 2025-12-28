@@ -60,6 +60,14 @@ Alpine.data('worldBuilder', () => ({
         window.worldBuilderInstance = this;
         console.log('[WorldBuilder] Alpine.js init() called, steps:', this.steps.length);
         
+        // Notify Godot that Alpine.js is ready via IPC
+        if (window.GodotBridge && window.GodotBridge.postMessage) {
+            window.GodotBridge.postMessage('alpine_ready', {});
+            console.log('[WorldBuilder] Sent alpine_ready IPC message to Godot');
+        } else {
+            console.warn('[WorldBuilder] GodotBridge.postMessage not available - cannot notify Godot');
+        }
+        
         // Check if steps data was stored before Alpine initialized
         if (window._pendingStepsData && window._pendingStepsData.steps) {
             console.log('[WorldBuilder] Loading pending steps data:', window._pendingStepsData.steps.length);

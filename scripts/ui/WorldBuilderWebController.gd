@@ -65,12 +65,10 @@ func _ready() -> void:
 	# Try to find WorldBuilderAzgaar in scene tree (for generation)
 	_find_azgaar_controller()
 	
-	# Wait for page to load, then inject data with polling to ensure Alpine.js is ready
-	await get_tree().create_timer(1.5).timeout
+	# Wait for page to load, then inject theme/constants
+	# Alpine.js readiness will be signaled via IPC message 'alpine_ready'
+	await get_tree().create_timer(0.5).timeout
 	_inject_theme_and_constants()
-	await _wait_for_alpine_ready()
-	_send_step_definitions()
-	_send_archetypes()
 	
 	# WebView automatically sizes via anchors/size flags - no manual resize needed
 
@@ -137,38 +135,6 @@ func _load_step_definitions() -> void:
 	})
 
 
-func _wait_for_alpine_ready() -> void:
-	"""Poll until Alpine.js worldBuilder instance is ready."""
-	if not web_view:
-		return
-	
-	var max_attempts: int = 20  # 2 seconds total (20 * 0.1s)
-	var attempt: int = 0
-	
-	while attempt < max_attempts:
-		var check_script: String = """
-			(function() {
-				if (window.worldBuilderInstance && window.worldBuilderInstance.steps !== undefined) {
-					return true;
-				}
-				return false;
-			})();
-		"""
-		
-		var result = null
-		if web_view.has_method("execute_js"):
-			result = web_view.execute_js(check_script)
-		elif web_view.has_method("eval"):
-			web_view.eval(check_script)
-		
-		if result == true:
-			MythosLogger.info("WorldBuilderWebController", "Alpine.js ready", {"attempts": attempt + 1})
-			return
-		
-		attempt += 1
-		await get_tree().create_timer(0.1).timeout
-	
-	MythosLogger.warn("WorldBuilderWebController", "Alpine.js not ready after %d attempts, proceeding anyway" % max_attempts)
 
 
 func _send_step_definitions() -> void:
@@ -185,15 +151,19 @@ func _send_step_definitions() -> void:
 	})
 	
 	# Use reactive assignment and force Alpine.js to detect changes
+	# Fallback: store in _pendingStepsData if worldBuilderInstance not found
 	var script: String = """
 		(function() {
 			try {
+				var stepData = %s;
+				
 				if (!window.worldBuilderInstance) {
-					console.error('[WorldBuilder] worldBuilderInstance not found!');
-					return false;
+					// Store in pending data for later initialization
+					console.log('[WorldBuilder] worldBuilderInstance not found, storing in _pendingStepsData');
+					window._pendingStepsData = stepData;
+					return 'pending';
 				}
 				
-				var stepData = %s;
 				console.log('[WorldBuilder] Received step definitions:', stepData.steps.length, 'steps');
 				
 				// Reactive assignment - use Object.assign or direct assignment with nextTick
@@ -228,7 +198,10 @@ func _send_step_definitions() -> void:
 	
 	if web_view.has_method("execute_js"):
 		var result = web_view.execute_js(script)
-		MythosLogger.info("WorldBuilderWebController", "Sent step definitions to WebView", {"result": result})
+		if result == "pending":
+			MythosLogger.info("WorldBuilderWebController", "Step definitions stored in _pendingStepsData (Alpine.js not ready yet)")
+		else:
+			MythosLogger.info("WorldBuilderWebController", "Sent step definitions to WebView", {"result": result})
 	elif web_view.has_method("eval"):
 		web_view.eval(script)
 		MythosLogger.info("WorldBuilderWebController", "Sent step definitions to WebView via eval")
@@ -348,6 +321,8 @@ func _on_ipc_message(message: String) -> void:
 		message_data = data
 	
 	match message_type:
+		"alpine_ready":
+			_handle_alpine_ready(message_data)
 		"set_step":
 			_handle_set_step(message_data)
 		"load_archetype":
@@ -362,6 +337,14 @@ func _on_ipc_message(message: String) -> void:
 			_handle_request_data(message_data)
 		_:
 			MythosLogger.warn("WorldBuilderWebController", "Unknown IPC message type", {"type": message_type, "data": data})
+
+
+func _handle_alpine_ready(data: Dictionary) -> void:
+	"""Handle alpine_ready IPC message from WebView."""
+	MythosLogger.info("WorldBuilderWebController", "Alpine.js ready signal received from WebView")
+	# Now that Alpine.js is ready, send step definitions and archetypes
+	_send_step_definitions()
+	_send_archetypes()
 
 
 func _handle_set_step(data: Dictionary) -> void:
