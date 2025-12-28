@@ -58,21 +58,28 @@ Alpine.data('worldBuilder', () => ({
     init() {
         // Store instance for global access
         window.worldBuilderInstance = this;
+        console.log('[WorldBuilder] Alpine.js init() called, steps:', this.steps.length);
         
         // Check if steps data was stored before Alpine initialized
         if (window._pendingStepsData && window._pendingStepsData.steps) {
+            console.log('[WorldBuilder] Loading pending steps data:', window._pendingStepsData.steps.length);
             this.steps = window._pendingStepsData.steps;
             this._initializeParams();
             delete window._pendingStepsData;
         } else {
-            // Request step definitions from Godot
-            GodotBridge.requestData('step_definitions', (data) => {
-                if (data && data.steps) {
-                    this.steps = data.steps;
-                    // Initialize params with defaults from first step
-                    this._initializeParams();
-                }
-            });
+            // Request step definitions from Godot (fallback if direct injection fails)
+            console.log('[WorldBuilder] Requesting step definitions from Godot');
+            if (window.GodotBridge && window.GodotBridge.requestData) {
+                GodotBridge.requestData('step_definitions', (data) => {
+                    if (data && data.steps) {
+                        console.log('[WorldBuilder] Received steps via requestData:', data.steps.length);
+                        this.steps = data.steps;
+                        this._initializeParams();
+                    }
+                });
+            } else {
+                console.warn('[WorldBuilder] GodotBridge.requestData not available');
+            }
         }
         
         // Request archetypes (already have names, but can request full data if needed)
@@ -80,6 +87,7 @@ Alpine.data('worldBuilder', () => ({
         
         // Send initial step
         this.setStep(0);
+        console.log('[WorldBuilder] Initialized, current step:', this.currentStep, 'total steps:', this.steps.length);
     },
     
     _initializeParams() {
@@ -105,10 +113,15 @@ Alpine.data('worldBuilder', () => ({
     },
     
     get currentStepParams() {
-        if (this.steps && this.steps[this.currentStep]) {
+        if (this.steps && this.steps.length > 0 && this.steps[this.currentStep]) {
             // Filter to only show curated parameters
             const allParams = this.steps[this.currentStep].parameters || [];
             const curatedParams = allParams.filter(param => param.curated !== false);
+            console.log('[WorldBuilder] currentStepParams:', {
+                step: this.currentStep,
+                allParams: allParams.length,
+                curatedParams: curatedParams.length
+            });
             // Ensure params are initialized for displayed parameters
             for (let param of curatedParams) {
                 if (!(param.azgaar_key in this.params)) {
@@ -124,6 +137,11 @@ Alpine.data('worldBuilder', () => ({
             }
             return curatedParams;
         }
+        console.warn('[WorldBuilder] currentStepParams: no steps available', {
+            hasSteps: !!this.steps,
+            stepsLength: this.steps ? this.steps.length : 0,
+            currentStep: this.currentStep
+        });
         return [];
     },
     

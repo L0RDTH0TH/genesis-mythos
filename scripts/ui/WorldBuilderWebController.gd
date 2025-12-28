@@ -65,9 +65,10 @@ func _ready() -> void:
 	# Try to find WorldBuilderAzgaar in scene tree (for generation)
 	_find_azgaar_controller()
 	
-	# Wait for page to load, then send initial data
+	# Wait for page to load, then inject data with polling to ensure Alpine.js is ready
 	await get_tree().create_timer(1.5).timeout
 	_inject_theme_and_constants()
+	await _wait_for_alpine_ready()
 	_send_step_definitions()
 	_send_archetypes()
 	
@@ -129,27 +130,105 @@ func _load_step_definitions() -> void:
 	
 	# Store step definitions
 	step_definitions = data
-	MythosLogger.info("WorldBuilderWebController", "Loaded step definitions", {"count": data.steps.size()})
+	MythosLogger.info("WorldBuilderWebController", "Loaded step definitions", {
+		"count": data.steps.size(),
+		"step_0_params": data.steps[0].get("parameters", []).size() if data.steps.size() > 0 else 0,
+		"step_1_params": data.steps[1].get("parameters", []).size() if data.steps.size() > 1 else 0
+	})
+
+
+func _wait_for_alpine_ready() -> void:
+	"""Poll until Alpine.js worldBuilder instance is ready."""
+	if not web_view:
+		return
+	
+	var max_attempts: int = 20  # 2 seconds total (20 * 0.1s)
+	var attempt: int = 0
+	
+	while attempt < max_attempts:
+		var check_script: String = """
+			(function() {
+				if (window.worldBuilderInstance && window.worldBuilderInstance.steps !== undefined) {
+					return true;
+				}
+				return false;
+			})();
+		"""
+		
+		var result = null
+		if web_view.has_method("execute_js"):
+			result = web_view.execute_js(check_script)
+		elif web_view.has_method("eval"):
+			web_view.eval(check_script)
+		
+		if result == true:
+			MythosLogger.info("WorldBuilderWebController", "Alpine.js ready", {"attempts": attempt + 1})
+			return
+		
+		attempt += 1
+		await get_tree().create_timer(0.1).timeout
+	
+	MythosLogger.warn("WorldBuilderWebController", "Alpine.js not ready after %d attempts, proceeding anyway" % max_attempts)
 
 
 func _send_step_definitions() -> void:
-	"""Send step definitions to WebView via IPC."""
+	"""Send step definitions to WebView via IPC with reactive assignment."""
 	if not web_view or step_definitions.is_empty():
+		MythosLogger.warn("WorldBuilderWebController", "Cannot send step definitions - web_view or data missing")
 		return
 	
-	# Send step definitions as JSON string
+	# Send step definitions as JSON string with reactive assignment
 	var json_string: String = JSON.stringify(step_definitions)
+	MythosLogger.debug("WorldBuilderWebController", "Sending step definitions JSON", {
+		"json_length": json_string.length(),
+		"steps_count": step_definitions.get("steps", []).size()
+	})
+	
+	# Use reactive assignment and force Alpine.js to detect changes
 	var script: String = """
-		if (window.worldBuilderInstance) {
-			var stepData = %s;
-			window.worldBuilderInstance.steps = stepData.steps || [];
-			window.worldBuilderInstance._initializeParams();
-		}
+		(function() {
+			try {
+				if (!window.worldBuilderInstance) {
+					console.error('[WorldBuilder] worldBuilderInstance not found!');
+					return false;
+				}
+				
+				var stepData = %s;
+				console.log('[WorldBuilder] Received step definitions:', stepData.steps.length, 'steps');
+				
+				// Reactive assignment - use Object.assign or direct assignment with nextTick
+				if (stepData && stepData.steps && Array.isArray(stepData.steps)) {
+					// Clear existing steps and assign new ones (triggers reactivity)
+					window.worldBuilderInstance.steps = [];
+					window.worldBuilderInstance.steps = stepData.steps;
+					
+					// Force Alpine to update by triggering a reactive change
+					if (window.worldBuilderInstance.$nextTick) {
+						window.worldBuilderInstance.$nextTick(() => {
+							console.log('[WorldBuilder] Steps updated via $nextTick:', window.worldBuilderInstance.steps.length);
+							window.worldBuilderInstance._initializeParams();
+						});
+					} else {
+						// Fallback: direct call
+						window.worldBuilderInstance._initializeParams();
+						console.log('[WorldBuilder] Steps updated (no $nextTick):', window.worldBuilderInstance.steps.length);
+					}
+					
+					return true;
+				} else {
+					console.error('[WorldBuilder] Invalid step data structure');
+					return false;
+				}
+			} catch (e) {
+				console.error('[WorldBuilder] Error setting steps:', e);
+				return false;
+			}
+		})();
 	""" % json_string
 	
 	if web_view.has_method("execute_js"):
-		web_view.execute_js(script)
-		MythosLogger.info("WorldBuilderWebController", "Sent step definitions to WebView")
+		var result = web_view.execute_js(script)
+		MythosLogger.info("WorldBuilderWebController", "Sent step definitions to WebView", {"result": result})
 	elif web_view.has_method("eval"):
 		web_view.eval(script)
 		MythosLogger.info("WorldBuilderWebController", "Sent step definitions to WebView via eval")

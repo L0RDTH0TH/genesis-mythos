@@ -209,8 +209,35 @@ func _sync_parameters_to_azgaar(params: Dictionary) -> void:
 	# Direct mapping: param keys are Azgaar option keys
 	# NOTE: Validation/clamping is handled in WorldBuilderWebController before params reach here
 	
-	# Inject each parameter
+	# Special handling: Collect wind array parameters (options.winds[0..5])
+	var winds_array: Array[int] = []
+	var wind_keys_processed: Array[String] = []
+	
+	for azgaar_key in params.keys():
+		# Check if this is a wind array parameter (e.g., "options.winds[0]")
+		if azgaar_key.begins_with("options.winds[") and azgaar_key.ends_with("]"):
+			var index_str: String = azgaar_key.substr(azgaar_key.find("[") + 1, azgaar_key.find("]") - azgaar_key.find("[") - 1)
+			var wind_index: int = int(index_str)
+			var wind_value: int = int(params[azgaar_key])
+			
+			# Ensure array is large enough
+			while winds_array.size() <= wind_index:
+				winds_array.append(0)
+			winds_array[wind_index] = wind_value
+			wind_keys_processed.append(azgaar_key)
+	
+	# If we collected wind values, set the winds array in Azgaar
+	if winds_array.size() > 0:
+		var winds_js: String = "[%s]" % ",".join(winds_array.map(func(v): return str(v)))
+		var js_code: String = "if (typeof azgaar !== 'undefined' && azgaar.options) { azgaar.options.winds = %s; }" % winds_js
+		_execute_azgaar_js(js_code)
+		MythosLogger.debug("WorldBuilderAzgaar", "Synced winds array to Azgaar", {"winds": winds_array})
+	
+	# Inject each parameter (skip wind array indices as they're handled above)
 	for azgaar_key in params:
+		if azgaar_key in wind_keys_processed:
+			continue  # Skip, already handled
+		
 		var value = params[azgaar_key]
 		
 		# Format value based on type
@@ -236,7 +263,7 @@ func _sync_parameters_to_azgaar(params: Dictionary) -> void:
 		
 		_execute_azgaar_js(js_code)
 	
-	MythosLogger.debug("WorldBuilderAzgaar", "Synced parameters to Azgaar", {"param_count": params.size()})
+	MythosLogger.debug("WorldBuilderAzgaar", "Synced parameters to Azgaar", {"param_count": params.size(), "winds_processed": winds_array.size()})
 
 func _on_generation_timeout() -> void:
 	"""Handle generation timeout."""
