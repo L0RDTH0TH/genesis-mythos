@@ -4,385 +4,145 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>World Builder - Genesis Mythos</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: #e0e0e0;
-            height: 100vh;
-            overflow: hidden;
-        }
-        
-        .world-builder-container {
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            width: 100vw;
-        }
-        
-        /* Top Bar */
-        .top-bar {
-            background: rgba(0, 0, 0, 0.5);
-            border-bottom: 2px solid #d4af37;
-            padding: 1rem 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .title {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: #d4af37;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-        }
-        
-        .step-indicator {
-            display: flex;
-            gap: 0.5rem;
-        }
-        
-        .step-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.3);
-            border: 2px solid rgba(255, 255, 255, 0.5);
-            transition: all 0.3s;
-        }
-        
-        .step-dot.active {
-            background: #d4af37;
-            border-color: #d4af37;
-            box-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
-        }
-        
-        .step-dot.completed {
-            background: #4caf50;
-            border-color: #4caf50;
-        }
-        
-        /* Main Content */
-        .main-content {
-            flex: 1;
-            display: flex;
-            overflow: hidden;
-        }
-        
-        /* Left Sidebar - Step Navigation */
-        .left-sidebar {
-            width: 200px;
-            background: rgba(0, 0, 0, 0.3);
-            border-right: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 1rem;
-            overflow-y: auto;
-        }
-        
-        .step-button {
-            width: 100%;
-            padding: 0.75rem 1rem;
-            margin-bottom: 0.5rem;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 4px;
-            color: #e0e0e0;
-            cursor: pointer;
-            transition: all 0.3s;
-            text-align: left;
-        }
-        
-        .step-button:hover {
-            background: rgba(255, 255, 255, 0.1);
-            border-color: rgba(212, 175, 55, 0.5);
-        }
-        
-        .step-button.active {
-            background: rgba(212, 175, 55, 0.2);
-            border-color: #d4af37;
-            color: #d4af37;
-        }
-        
-        /* Center - Parameter Controls */
-        .center-panel {
-            flex: 1;
-            padding: 2rem;
-            overflow-y: auto;
-        }
-        
-        .step-title {
-            font-size: 1.8rem;
-            color: #d4af37;
-            margin-bottom: 1.5rem;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-        }
-        
-        .parameter-group {
-            margin-bottom: 2rem;
-        }
-        
-        .parameter-label {
-            display: block;
-            margin-bottom: 0.5rem;
-            color: #e0e0e0;
-            font-weight: 500;
-        }
-        
-        .parameter-control {
-            width: 100%;
-            padding: 0.5rem;
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 4px;
-            color: #e0e0e0;
-        }
-        
-        .parameter-control:focus {
-            outline: none;
-            border-color: #d4af37;
-            box-shadow: 0 0 5px rgba(212, 175, 55, 0.3);
-        }
-        
-        .slider-container {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-        
-        .slider {
-            flex: 1;
-        }
-        
-        .slider-value {
-            min-width: 60px;
-            text-align: right;
-            color: #d4af37;
-            font-weight: bold;
-        }
-        
-        /* Bottom Bar */
-        .bottom-bar {
-            background: rgba(0, 0, 0, 0.5);
-            border-top: 2px solid #d4af37;
-            padding: 1rem 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .nav-buttons {
-            display: flex;
-            gap: 1rem;
-        }
-        
-        .btn {
-            padding: 0.75rem 1.5rem;
-            border: 2px solid #d4af37;
-            border-radius: 4px;
-            background: rgba(212, 175, 55, 0.1);
-            color: #d4af37;
-            cursor: pointer;
-            font-weight: bold;
-            transition: all 0.3s;
-        }
-        
-        .btn:hover:not(:disabled) {
-            background: rgba(212, 175, 55, 0.3);
-            box-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
-        }
-        
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        
-        .btn-primary {
-            background: rgba(212, 175, 55, 0.3);
-        }
-        
-        .status-area {
-            flex: 1;
-            text-align: center;
-        }
-        
-        .status-text {
-            color: #e0e0e0;
-            margin-bottom: 0.5rem;
-        }
-        
-        .progress-bar {
-            width: 100%;
-            height: 8px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 4px;
-            overflow: hidden;
-        }
-        
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #d4af37, #ffd700);
-            transition: width 0.3s;
-        }
-        
-        /* Scrollbar styling */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        
-        ::-webkit-scrollbar-track {
-            background: rgba(0, 0, 0, 0.2);
-        }
-        
-        ::-webkit-scrollbar-thumb {
-            background: rgba(212, 175, 55, 0.5);
-            border-radius: 4px;
-        }
-        
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(212, 175, 55, 0.7);
-        }
-    </style>
+    <link rel="stylesheet" href="world_builder.css">
 </head>
 <body>
-    <div class="world-builder-container" x-data="worldBuilder" x-init="init()">
+    <div class="world-builder-container" x-data="worldBuilder">
         <!-- Top Bar -->
         <div class="top-bar">
-            <div class="title">World Builder – Forging the World</div>
-            <div class="step-indicator">
-                <template x-for="(step, index) in totalSteps" :key="index">
-                    <div 
-                        class="step-dot"
-                        :class="{ 
-                            'active': index === currentStep,
-                            'completed': index < currentStep
-                        }"
-                    ></div>
-                </template>
-            </div>
+            <h1 class="title-label">World Builder – Forging the World</h1>
         </div>
-        
-        <!-- Main Content -->
-        <div class="main-content">
-            <!-- Left Sidebar -->
-            <div class="left-sidebar">
-                <template x-for="(title, index) in stepTitles" :key="index">
-                    <button 
-                        class="step-button"
-                        :class="{ 'active': index === currentStep }"
-                        @click="goToStep(index)"
-                        x-text="title"
-                    ></button>
-                </template>
-            </div>
-            
-            <!-- Center Panel -->
-            <div class="center-panel">
-                <h2 class="step-title" x-text="getCurrentStepTitle()"></h2>
-                
-                <div class="parameter-group">
-                    <template x-for="param in getCurrentStepParameters()" :key="param.azgaar_key">
-                        <div class="parameter-group">
-                            <label class="parameter-label" x-text="param.name + ':'"></label>
-                            
-                            <!-- Slider -->
-                            <template x-if="param.ui_type === 'HSlider'">
-                                <div class="slider-container">
-                                    <input 
-                                        type="range" 
-                                        class="slider parameter-control"
-                                        :min="param.min || 0"
-                                        :max="param.max || 100"
-                                        :step="param.step || 1"
-                                        :value="parameters[param.azgaar_key] || param.default || 0"
-                                        @input="updateParameter(param.azgaar_key, parseFloat($event.target.value))"
-                                    >
-                                    <span class="slider-value" x-text="parameters[param.azgaar_key] || param.default || 0"></span>
-                                </div>
-                            </template>
-                            
-                            <!-- Option Button -->
-                            <template x-if="param.ui_type === 'OptionButton'">
-                                <select 
-                                    class="parameter-control"
-                                    :value="parameters[param.azgaar_key] || param.default"
-                                    @change="updateParameter(param.azgaar_key, $event.target.value)"
-                                >
-                                    <template x-for="option in param.options" :key="option">
-                                        <option :value="option" x-text="option"></option>
-                                    </template>
-                                </select>
-                            </template>
-                            
-                            <!-- Checkbox -->
-                            <template x-if="param.ui_type === 'CheckBox'">
-                                <input 
-                                    type="checkbox"
-                                    class="parameter-control"
-                                    :checked="parameters[param.azgaar_key] || param.default || false"
-                                    @change="updateParameter(param.azgaar_key, $event.target.checked)"
-                                >
-                            </template>
-                            
-                            <!-- SpinBox -->
-                            <template x-if="param.ui_type === 'SpinBox'">
-                                <input 
-                                    type="number"
-                                    class="parameter-control"
-                                    :min="param.min || 0"
-                                    :max="param.max || 100"
-                                    :step="param.step || 1"
-                                    :value="parameters[param.azgaar_key] || param.default || 0"
-                                    @input="updateParameter(param.azgaar_key, parseFloat($event.target.value))"
-                                >
-                            </template>
-                        </div>
+
+        <!-- Main Content Area -->
+        <div class="main-hsplit">
+            <!-- Left Panel: Step Sidebar -->
+            <div class="left-panel">
+                <div class="step-sidebar">
+                    <template x-for="(step, index) in steps" :key="index">
+                        <button 
+                            class="step-button" 
+                            :class="{ 'active': currentStep === index }"
+                            @click="setStep(index)"
+                            x-text="step.title || `Step ${index + 1}`">
+                        </button>
                     </template>
                 </div>
             </div>
-        </div>
-        
-        <!-- Bottom Bar -->
-        <div class="bottom-bar">
-            <div class="nav-buttons">
-                <button 
-                    class="btn"
-                    @click="previousStep()"
-                    :disabled="!canGoBack()"
-                >← Back</button>
-                
-                <button 
-                    class="btn btn-primary"
-                    @click="generate()"
-                    x-show="isExportStep()"
-                    :disabled="isLoading"
-                >✨ Generate / Apply Changes</button>
-                
-                <button 
-                    class="btn"
-                    @click="nextStep()"
-                    :disabled="!canGoNext() || isLoading"
-                    x-show="!isExportStep()"
-                >Next →</button>
+
+            <!-- Center Panel: Azgaar Preview (placeholder - handled by separate WebView in Godot) -->
+            <div class="center-panel">
+                <div class="azgaar-placeholder">
+                    <p>Map Preview</p>
+                    <p class="placeholder-note">(Azgaar WebView handled separately)</p>
+                </div>
             </div>
-            
-            <div class="status-area">
-                <div class="status-text" x-text="status"></div>
-                <div class="progress-bar" x-show="isLoading">
-                    <div class="progress-fill" :style="'width: ' + progress + '%'"></div>
+
+            <!-- Right Panel: Parameters -->
+            <div class="right-panel">
+                <div class="right-outer-vbox">
+                    <!-- Archetype Selector -->
+                    <div class="archetype-selector">
+                        <label>Archetype:</label>
+                        <select x-model="archetype" @change="loadArchetype($event.target.value)">
+                            <template x-for="arch in archetypeNames" :key="arch">
+                                <option :value="arch" x-text="arch"></option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <!-- Seed Controls -->
+                    <div class="seed-controls">
+                        <label>Seed:</label>
+                        <input 
+                            type="number" 
+                            x-model.number="seed" 
+                            @change="setSeed(seed)"
+                            :min="1" 
+                            :max="999999999">
+                        <button @click="randomizeSeed()" class="randomize-btn">🎲</button>
+                    </div>
+
+                    <!-- Step Title -->
+                    <div class="step-title-section">
+                        <h2 class="step-title" x-text="currentStepTitle"></h2>
+                    </div>
+
+                    <!-- Parameters Tree -->
+                    <div class="param-scroll">
+                        <div class="param-list">
+                            <template x-for="param in currentStepParams" :key="param.azgaar_key">
+                                <div class="param-row">
+                                    <label class="param-label" x-text="(param.name || param.azgaar_key).replace(/([A-Z])/g, ' $1').trim() + ':'"></label>
+                                    <div class="param-control">
+                                        <!-- OptionButton -->
+                                        <template x-if="param.ui_type === 'OptionButton'">
+                                            <select 
+                                                x-model="params[param.azgaar_key]"
+                                                @change="updateParam(param.azgaar_key, $event.target.value)">
+                                                <template x-for="opt in param.options" :key="opt">
+                                                    <option :value="opt" x-text="opt"></option>
+                                                </template>
+                                            </select>
+                                        </template>
+
+                                        <!-- HSlider -->
+                                        <template x-if="param.ui_type === 'HSlider'">
+                                            <div class="slider-container">
+                                                <input 
+                                                    type="range" 
+                                                    x-model.number="params[param.azgaar_key]"
+                                                    @input="updateParam(param.azgaar_key, $event.target.value)"
+                                                    :min="param.min || 0"
+                                                    :max="param.max || 100"
+                                                    :step="param.step || 1">
+                                                <span class="slider-value" x-text="params[param.azgaar_key] || param.default || 0"></span>
+                                            </div>
+                                        </template>
+
+                                        <!-- SpinBox -->
+                                        <template x-if="param.ui_type === 'SpinBox'">
+                                            <input 
+                                                type="number" 
+                                                x-model.number="params[param.azgaar_key]"
+                                                @change="updateParam(param.azgaar_key, $event.target.value)"
+                                                :min="param.min || 0"
+                                                :max="param.max || 999999"
+                                                :step="param.step || 1">
+                                        </template>
+
+                                        <!-- CheckBox -->
+                                        <template x-if="param.ui_type === 'CheckBox'">
+                                            <input 
+                                                type="checkbox" 
+                                                x-model="params[param.azgaar_key]"
+                                                @change="updateParam(param.azgaar_key, $event.target.checked)">
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Bar: Navigation -->
+        <div class="bottom-bar">
+            <div class="bottom-content">
+                <div class="spacer-left"></div>
+                <button @click="previousStep()" :disabled="currentStep === 0" class="nav-button">← Back</button>
+                <button @click="generate()" class="nav-button generate-btn">✨ Generate / Apply Changes</button>
+                <button @click="nextStep()" :disabled="currentStep >= totalSteps - 1" class="nav-button">Next →</button>
+                <div class="progress-section" x-show="isGenerating">
+                    <progress :value="progressValue" max="100" class="progress-bar"></progress>
+                    <span class="status-label" x-text="statusText"></span>
                 </div>
             </div>
         </div>
     </div>
-    
-    <!-- Scripts -->
+
     <script src="../shared/bridge.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js" defer></script>
+    <script src="../shared/alpine.min.js" defer></script>
     <script src="world_builder.js"></script>
 </body>
 </html>

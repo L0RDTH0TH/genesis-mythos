@@ -1,64 +1,83 @@
-// ╔═══════════════════════════════════════════════════════════
-// ║ bridge.js
-// ║ Desc: Godot-WebView IPC bridge for bidirectional communication
-// ║ Author: Lordthoth
-// ╚═══════════════════════════════════════════════════════════
+// Godot Bridge API - Shared communication library for WebView UIs
+// Provides bidirectional communication between JavaScript and Godot via godot_wry IPC
 
-// GodotBridge - Communication bridge between Godot and WebView
-// Works with godot_wry's IPC system via postMessage and ipc_message signal
-(function() {
-    'use strict';
+// Initialize GodotBridge namespace
+window.GodotBridge = {
+    // Send message to Godot
+    postMessage: function(type, data) {
+        // Support both object format {type, data} and separate parameters
+        if (typeof type === 'object' && type !== null) {
+            // Single object parameter format
+            data = type;
+            type = data.type || 'message';
+        }
+        
+        // Build message object
+        var message = {
+            type: type,
+            data: data || {},
+            timestamp: Date.now()
+        };
+        
+        // godot_wry provides window.ipc.postMessage directly (see character_creator example)
+        if (window.ipc && typeof window.ipc.postMessage === 'function') {
+            window.ipc.postMessage(JSON.stringify(message));
+        } else {
+            console.warn('Godot IPC not available - message not sent:', message);
+        }
+    },
     
-    // Initialize Godot bridge object
-    if (typeof window.GodotBridge === 'undefined') {
-        window.GodotBridge = {
-            // Send message to Godot via godot_wry IPC
-            postMessage: function(type, data) {
-                var message = {
-                    type: type,
-                    data: data || {},
-                    timestamp: Date.now()
-                };
-                
-                try {
-                    // godot_wry exposes postMessage via window.godot.postMessage or direct IPC
-                    if (typeof window.godot !== 'undefined' && window.godot.postMessage) {
-                        window.godot.postMessage(JSON.stringify(message));
-                        console.log('[GodotBridge] Message sent via window.godot.postMessage:', type, data);
-                    } else if (typeof window.ipc !== 'undefined' && window.ipc.postMessage) {
-                        window.ipc.postMessage(JSON.stringify(message));
-                        console.log('[GodotBridge] Message sent via window.ipc.postMessage:', type, data);
-                    } else {
-                        console.warn('[GodotBridge] IPC not available, message not sent:', type, data);
+    // Request data from Godot (async)
+    requestData: function(endpoint, callback) {
+        var requestId = Math.random().toString(36).substring(2, 15);
+        window.GodotBridge._pendingRequests[requestId] = callback;
+        window.GodotBridge.postMessage('request_data', {
+            request_id: requestId,
+            endpoint: endpoint
+        });
+    },
+    
+    // Call Godot function (async)
+    callFunction: function(functionName, args, callback) {
+        var requestId = Math.random().toString(36).substring(2, 15);
+        window.GodotBridge._pendingRequests[requestId] = callback;
+        window.GodotBridge.postMessage('call_function', {
+            request_id: requestId,
+            function_name: functionName,
+            arguments: args || []
+        });
+    },
+    
+    // Handle update messages from Godot
+    _handleUpdate: function(data) {
+        // Override this in specific UI scripts to handle updates
+        console.log('Godot update received:', data);
+    },
+    
+    // Pending request callbacks
+    _pendingRequests: {}
+};
+
+// Handle messages from Godot (responses to requests)
+if (typeof window.addEventListener !== 'undefined') {
+    window.addEventListener('message', function(event) {
+        if (event.data && typeof event.data === 'string') {
+            try {
+                var message = JSON.parse(event.data);
+                if (message.type === 'response' && message.request_id) {
+                    var callback = window.GodotBridge._pendingRequests[message.request_id];
+                    if (callback) {
+                        callback(message.data);
+                        delete window.GodotBridge._pendingRequests[message.request_id];
                     }
-                } catch (error) {
-                    console.error('[GodotBridge] Error sending message:', error);
+                } else if (message.type === 'update') {
+                    // Handle push updates from Godot
+                    window.GodotBridge._handleUpdate(message.data);
                 }
-            },
-            
-            // Receive message from Godot (called by godot_wry via injected script)
-            onMessage: function(message) {
-                try {
-                    var data = typeof message === 'string' ? JSON.parse(message) : message;
-                    console.log('[GodotBridge] Message received:', data);
-                    
-                    // Dispatch custom event
-                    var event = new CustomEvent('godot-message', {
-                        detail: data
-                    });
-                    window.dispatchEvent(event);
-                } catch (error) {
-                    console.error('[GodotBridge] Error parsing message:', error);
-                }
+            } catch (e) {
+                console.error('Failed to parse message from Godot:', e);
             }
-        };
-        
-        // Expose onMessage globally for godot_wry to call
-        window.godotBridgeOnMessage = function(message) {
-            window.GodotBridge.onMessage(message);
-        };
-        
-        console.log('[GodotBridge] Bridge loaded');
-    }
-})();
+        }
+    });
+}
 

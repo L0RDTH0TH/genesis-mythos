@@ -1,0 +1,17 @@
+[gd_scene load_steps=2 format=3 uid="uid://progress_dialog_web"]
+
+[ext_resource type="Script" path="res://scripts/ui/ProgressDialogWebController.gd" id="1_controller"]
+
+[node name="ProgressDialogWeb" type="CanvasLayer"]
+layer = 100
+visible = false
+script = ExtResource("1_controller")
+
+[node name="WebView" type="WebView" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+

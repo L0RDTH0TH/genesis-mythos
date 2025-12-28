@@ -1,178 +1,161 @@
-// ╔═══════════════════════════════════════════════════════════
-// ║ world_builder.js
-// ║ Desc: Alpine.js data and logic for World Builder UI
-// ║ Author: Lordthoth
-// ╚═══════════════════════════════════════════════════════════
+// World Builder Alpine.js Data and IPC Handlers
 
-// Alpine.js data component for World Builder
-document.addEventListener('alpine:init', () => {
-    Alpine.data('worldBuilder', () => ({
-        // Current step (0-7)
-        currentStep: 0,
-        totalSteps: 8,
-        
-        // Step definitions (loaded from Godot)
-        stepDefinitions: [],
-        
-        // Current parameters (synced with Godot)
-        parameters: {},
-        
-        // Step titles
-        stepTitles: [
-            '1. Map Generation & Editing',
-            '2. Terrain',
-            '3. Climate',
-            '4. Biomes',
-            '5. Structures & Civilizations',
-            '6. Environment',
-            '7. Resources & Magic',
-            '8. Export'
-        ],
-        
-        // Loading state
-        isLoading: false,
-        progress: 0,
-        status: 'Ready',
-        
-        // Initialize
-        init() {
-            console.log('[WorldBuilder] Initialized');
-            
-            // Listen for messages from Godot
-            window.addEventListener('godot-message', (event) => {
-                this.handleGodotMessage(event.detail);
-            });
-            
-            // Request step definitions from Godot
-            this.requestStepDefinitions();
-        },
-        
-        // Handle messages from Godot
-        handleGodotMessage(message) {
-            if (!message || !message.type) return;
-            
-            switch (message.type) {
-                case 'step_definitions':
-                    this.stepDefinitions = message.data.steps || [];
-                    console.log('[WorldBuilder] Step definitions loaded:', this.stepDefinitions.length);
-                    break;
-                    
-                case 'parameters':
-                    this.parameters = message.data.parameters || {};
-                    console.log('[WorldBuilder] Parameters synced:', Object.keys(this.parameters).length);
-                    break;
-                    
-                case 'step_changed':
-                    this.currentStep = message.data.step || 0;
-                    console.log('[WorldBuilder] Step changed to:', this.currentStep);
-                    break;
-                    
-                case 'generation_progress':
-                    this.progress = message.data.progress || 0;
-                    this.status = message.data.status || 'Generating...';
-                    this.isLoading = this.progress < 100;
-                    break;
-                    
-                case 'generation_complete':
-                    this.isLoading = false;
-                    this.progress = 100;
-                    this.status = 'Generation complete!';
-                    break;
-                    
-                case 'generation_failed':
-                    this.isLoading = false;
-                    this.status = 'Generation failed: ' + (message.data.reason || 'Unknown error');
-                    break;
+// Override GodotBridge._handleUpdate for World Builder specific updates
+// Note: This will be set after Alpine.js initializes
+document.addEventListener('DOMContentLoaded', function() {
+    var originalHandleUpdate = window.GodotBridge._handleUpdate;
+    window.GodotBridge._handleUpdate = function(data) {
+        if (data.update_type === 'params_update') {
+            // Update parameters from Godot
+            if (window.worldBuilderInstance) {
+                Object.assign(window.worldBuilderInstance.params, data.params || {});
             }
-        },
-        
-        // Request step definitions from Godot
-        requestStepDefinitions() {
-            if (window.GodotBridge) {
-                window.GodotBridge.postMessage('request_step_definitions', {});
+        } else if (data.update_type === 'progress_update') {
+            // Update progress bar
+            if (window.worldBuilderInstance) {
+                window.worldBuilderInstance.progressValue = data.progress || 0;
+                window.worldBuilderInstance.statusText = data.status || '';
+                window.worldBuilderInstance.isGenerating = data.is_generating || false;
             }
-        },
-        
-        // Navigate to step
-        goToStep(step) {
-            if (step < 0 || step >= this.totalSteps) return;
-            
-            this.currentStep = step;
-            
-            if (window.GodotBridge) {
-                window.GodotBridge.postMessage('step_changed', { step: step });
+        } else if (data.update_type === 'step_definitions') {
+            // Step definitions loaded
+            if (window.worldBuilderInstance) {
+                window.worldBuilderInstance.steps = data.steps || [];
             }
-        },
-        
-        // Navigate to previous step
-        previousStep() {
-            if (this.currentStep > 0) {
-                this.goToStep(this.currentStep - 1);
+        } else if (data.update_type === 'archetypes') {
+            // Archetypes loaded
+            if (window.worldBuilderInstance) {
+                window.worldBuilderInstance.archetypeNames = data.archetype_names || [];
             }
-        },
-        
-        // Navigate to next step
-        nextStep() {
-            if (this.currentStep < this.totalSteps - 1) {
-                this.goToStep(this.currentStep + 1);
+        } else if (data.update_type === 'archetype_params') {
+            // Archetype preset parameters loaded
+            if (window.worldBuilderInstance) {
+                Object.assign(window.worldBuilderInstance.params, data.params || {});
             }
-        },
-        
-        // Update parameter value
-        updateParameter(key, value) {
-            this.parameters[key] = value;
-            
-            if (window.GodotBridge) {
-                window.GodotBridge.postMessage('parameter_changed', {
-                    key: key,
-                    value: value
-                });
-            }
-        },
-        
-        // Trigger generation
-        generate() {
-            this.isLoading = true;
-            this.progress = 0;
-            this.status = 'Generating map...';
-            
-            if (window.GodotBridge) {
-                window.GodotBridge.postMessage('generate', {
-                    parameters: this.parameters
-                });
-            }
-        },
-        
-        // Get current step title
-        getCurrentStepTitle() {
-            if (this.stepDefinitions.length > 0 && this.stepDefinitions[this.currentStep]) {
-                return this.stepDefinitions[this.currentStep].title || this.stepTitles[this.currentStep];
-            }
-            return this.stepTitles[this.currentStep] || 'Unknown Step';
-        },
-        
-        // Get parameters for current step
-        getCurrentStepParameters() {
-            if (this.stepDefinitions.length > 0 && this.stepDefinitions[this.currentStep]) {
-                return this.stepDefinitions[this.currentStep].parameters || [];
-            }
-            return [];
-        },
-        
-        // Check if can go back
-        canGoBack() {
-            return this.currentStep > 0;
-        },
-        
-        // Check if can go next
-        canGoNext() {
-            return this.currentStep < this.totalSteps - 1;
-        },
-        
-        // Check if is export step
-        isExportStep() {
-            return this.currentStep === 7;
         }
-    }));
+        
+        // Call original handler if needed
+        if (originalHandleUpdate && typeof originalHandleUpdate === 'function') {
+            originalHandleUpdate.call(this, data);
+        }
+    };
 });
+
+// Alpine.js data component
+Alpine.data('worldBuilder', () => ({
+    currentStep: 0,
+    totalSteps: 8,
+    steps: [],
+    params: {},
+    archetype: 'High Fantasy',
+    archetypeNames: ['High Fantasy', 'Low Fantasy', 'Dark Fantasy', 'Realistic', 'Custom'],
+    seed: Math.floor(Math.random() * 1e9),
+    isGenerating: false,
+    progressValue: 0,
+    statusText: '',
+    
+    init() {
+        // Store instance for global access
+        window.worldBuilderInstance = this;
+        
+        // Check if steps data was stored before Alpine initialized
+        if (window._pendingStepsData && window._pendingStepsData.steps) {
+            this.steps = window._pendingStepsData.steps;
+            this._initializeParams();
+            delete window._pendingStepsData;
+        } else {
+            // Request step definitions from Godot
+            GodotBridge.requestData('step_definitions', (data) => {
+                if (data && data.steps) {
+                    this.steps = data.steps;
+                    // Initialize params with defaults from first step
+                    this._initializeParams();
+                }
+            });
+        }
+        
+        // Request archetypes (already have names, but can request full data if needed)
+        // Archetype names are already set in archetypeNames array
+        
+        // Send initial step
+        this.setStep(0);
+    },
+    
+    _initializeParams() {
+        // Initialize params with default values from step definitions
+        for (let step of this.steps) {
+            if (step.parameters) {
+                for (let param of step.parameters) {
+                    if (!(param.azgaar_key in this.params)) {
+                        this.params[param.azgaar_key] = param.default !== undefined ? param.default : 
+                            (param.ui_type === 'CheckBox' ? false : 0);
+                    }
+                }
+            }
+        }
+    },
+    
+    get currentStepTitle() {
+        if (this.steps && this.steps[this.currentStep]) {
+            return this.steps[this.currentStep].title || `Step ${this.currentStep + 1}`;
+        }
+        return `Step ${this.currentStep + 1}`;
+    },
+    
+    get currentStepParams() {
+        if (this.steps && this.steps[this.currentStep]) {
+            return this.steps[this.currentStep].parameters || [];
+        }
+        return [];
+    },
+    
+    setStep(index) {
+        if (index >= 0 && index < this.totalSteps) {
+            this.currentStep = index;
+            GodotBridge.postMessage('set_step', { step: index });
+        }
+    },
+    
+    previousStep() {
+        if (this.currentStep > 0) {
+            this.setStep(this.currentStep - 1);
+        }
+    },
+    
+    nextStep() {
+        if (this.currentStep < this.totalSteps - 1) {
+            this.setStep(this.currentStep + 1);
+        }
+    },
+    
+    loadArchetype(archetypeName) {
+        this.archetype = archetypeName;
+        GodotBridge.postMessage('load_archetype', { archetype: archetypeName });
+    },
+    
+    setSeed(newSeed) {
+        this.seed = newSeed;
+        GodotBridge.postMessage('set_seed', { seed: this.seed });
+    },
+    
+    randomizeSeed() {
+        this.seed = Math.floor(Math.random() * 1e9);
+        this.setSeed(this.seed);
+    },
+    
+    updateParam(key, value) {
+        this.params[key] = value;
+        GodotBridge.postMessage('update_param', { 
+            azgaar_key: key, 
+            value: value 
+        });
+    },
+    
+    generate() {
+        this.isGenerating = true;
+        this.progressValue = 0;
+        this.statusText = 'Generating...';
+        GodotBridge.postMessage('generate', { params: this.params });
+    }
+}));
 

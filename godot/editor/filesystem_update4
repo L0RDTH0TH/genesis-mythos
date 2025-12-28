@@ -1,2 +1,3 @@
 res://ui/world_builder/modules/WorldBuilderRightControls.gd
 res://ui/world_builder/submodules/ParameterSubcategory.gd
+res://scripts/ui/WorldBuilderAzgaar.gd
