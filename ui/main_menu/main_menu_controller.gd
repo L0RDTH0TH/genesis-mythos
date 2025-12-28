@@ -8,7 +8,7 @@ class_name MainMenuController
 extends Control
 
 const CHARACTER_CREATION_SCENE: String = "res://scenes/character_creation/CharacterCreationRoot.tscn"
-const WORLD_CREATION_SCENE: String = "res://scenes/ui/WorldBuilderUI.tscn"
+const WORLD_CREATION_SCENE: String = "res://core/scenes/world_root.tscn"
 
 @onready var character_button: Button = %CharacterCreationButton
 @onready var world_button: Button = %WorldCreationButton

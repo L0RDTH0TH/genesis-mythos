@@ -43,6 +43,10 @@ func queue_diagnostic(callable: Callable) -> void:
 	"""Queue a diagnostic callable for execution on main thread (DiagnosticDispatcher API)."""
 	if monitor_instance:
 		monitor_instance.queue_diagnostic(callable)
+	else:
+		# Fallback: If monitor not instantiated, execute directly on main thread
+		# This ensures logging still works when PerformanceMonitor is disabled for testing
+		callable.call()
 
 
 func push_metric_from_thread(metric: Dictionary) -> void:
