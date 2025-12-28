@@ -10,9 +10,6 @@ extends Control
 ## Reference to the WebView node
 @onready var web_view: WebView = $WebView
 
-## Reference to WorldBuilderUI for accessing generation logic (optional, can be set by parent)
-var world_builder_ui: WorldBuilderUI = null
-
 ## Reference to WorldBuilderAzgaar for generation (can be found in scene tree)
 var world_builder_azgaar: Node = null
 
@@ -73,8 +70,7 @@ func _ready() -> void:
 	_send_step_definitions()
 	_send_archetypes()
 	
-	# Ensure WebView matches initial viewport size
-	_update_webview_size()
+	# WebView automatically sizes via anchors/size flags - no manual resize needed
 
 
 func _find_azgaar_controller() -> void:
@@ -105,15 +101,8 @@ func _find_nodes_with_script(node: Node, results: Array) -> void:
 func _notification(what: int) -> void:
 	"""Handle window resize events for responsive UI."""
 	if what == NOTIFICATION_WM_SIZE_CHANGED:
-		_update_webview_size()
-
-
-func _update_webview_size() -> void:
-	"""Force WebView to match viewport size."""
-	if web_view:
-		var viewport_size: Vector2 = get_viewport().get_visible_rect().size
-		web_view.size = viewport_size
-		MythosLogger.debug("WorldBuilderWebController", "WebView resized to viewport", {"size": viewport_size})
+		# WebView automatically resizes via anchors/size flags - no manual resize needed
+		MythosLogger.debug("WorldBuilderWebController", "Window resized - WebView handles via anchors")
 
 
 func _load_step_definitions() -> void:
@@ -281,12 +270,10 @@ func _handle_generate(data: Dictionary) -> void:
 	
 	MythosLogger.info("WorldBuilderWebController", "Generation requested", {"params": current_params})
 	
-	# Trigger generation via WorldBuilderAzgaar (prefer direct reference, fallback to WorldBuilderUI)
+	# Trigger generation via WorldBuilderAzgaar
 	var azgaar_controller: Node = null
 	if world_builder_azgaar:
 		azgaar_controller = world_builder_azgaar
-	elif world_builder_ui and world_builder_ui.world_builder_azgaar:
-		azgaar_controller = world_builder_ui.world_builder_azgaar
 	
 	if azgaar_controller and azgaar_controller.has_method("trigger_generation_with_options"):
 		# Connect signals for progress updates

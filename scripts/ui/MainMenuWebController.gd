@@ -83,9 +83,8 @@ func _handle_viewport_resize(data: Dictionary) -> void:
 	
 	MythosLogger.debug("MainMenuWebController", "Viewport resize", {"width": width, "height": height})
 	
-	# Ensure WebView matches viewport size
-	if web_view and web_view.has_method("set_size"):
-		web_view.set_size(Vector2i(width, height))
+	# WebView automatically resizes via anchors/size flags - no manual resize needed
+	# The viewport_resize message is informational only
 
 func _inject_ipc_bridge() -> void:
 	"""Verify IPC bridge is available (godot_wry provides window.ipc automatically)."""
@@ -111,8 +110,6 @@ func _inject_ipc_bridge() -> void:
 func _notification(what: int) -> void:
 	"""Handle window resize events."""
 	if what == NOTIFICATION_WM_SIZE_CHANGED:
-		# Ensure WebView fills viewport
-		var viewport_size: Vector2 = get_viewport().get_visible_rect().size
-		if web_view and web_view.has_method("set_size"):
-			web_view.set_size(Vector2i(int(viewport_size.x), int(viewport_size.y)))
+		# WebView automatically resizes via anchors/size flags - no manual resize needed
+		MythosLogger.debug("MainMenuWebController", "Window resized - WebView handles via anchors")
 
