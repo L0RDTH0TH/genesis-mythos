@@ -1,8 +1,7 @@
 [gd_scene load_steps=4 format=3 uid="uid://world_builder_web_phase2"]
 
 [ext_resource type="Script" path="res://scripts/ui/WorldBuilderWebController.gd" id="1_worldbuilderweb"]
-[ext_resource type="Script" path="res://scripts/ui/WorldBuilderAzgaar.gd" id="2_worldbuilderazgaar"]
-[ext_resource type="Theme" uid="uid://dpiqolc47bhf4" path="res://themes/bg3_theme.tres" id="3_theme"]
+[ext_resource type="Theme" uid="uid://dpiqolc47bhf4" path="res://themes/bg3_theme.tres" id="2_theme"]
 
 [node name="WorldBuilderWebRoot" type="Control"]
 layout_mode = 3
@@ -11,37 +10,8 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme = ExtResource("3_theme")
+theme = ExtResource("2_theme")
 script = ExtResource("1_worldbuilderweb")
-
-[node name="AzgaarController" type="Control" parent="."]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-script = ExtResource("2_worldbuilderazgaar")
-
-[node name="WebViewMargin" type="MarginContainer" parent="AzgaarController"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_constants/margin_left = 0
-theme_override_constants/margin_top = 0
-theme_override_constants/margin_right = 0
-theme_override_constants/margin_bottom = 0
-
-[node name="AzgaarWebView" type="WebView" parent="AzgaarController/WebViewMargin"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
 
 [node name="WebView" type="WebView" parent="."]
 layout_mode = 1
@@ -50,4 +20,3 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-transparent = true

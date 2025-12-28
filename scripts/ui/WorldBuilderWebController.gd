@@ -10,8 +10,7 @@ extends Control
 ## Reference to the WebView node
 @onready var web_view: WebView = $WebView
 
-## Reference to WorldBuilderAzgaar for generation (can be found in scene tree)
-var world_builder_azgaar: Node = null
+## Azgaar is now embedded via iframe - no separate controller needed
 
 ## Current step index (synced with WebView)
 var current_step: int = 0
@@ -62,8 +61,7 @@ func _ready() -> void:
 	else:
 		MythosLogger.warn("WorldBuilderWebController", "WebView does not have ipc_message signal")
 	
-	# Try to find WorldBuilderAzgaar in scene tree (for generation)
-	_find_azgaar_controller()
+	# Azgaar is now embedded via iframe - no separate controller needed
 	
 	# Wait for page to load, then inject theme/constants
 	# Alpine.js readiness will be signaled via IPC message 'alpine_ready'
@@ -73,29 +71,7 @@ func _ready() -> void:
 	# WebView automatically sizes via anchors/size flags - no manual resize needed
 
 
-func _find_azgaar_controller() -> void:
-	"""Try to find WorldBuilderAzgaar controller in scene tree."""
-	# Look for nodes with WorldBuilderAzgaar script
-	var root: Node = get_tree().root
-	var azgaar_nodes: Array[Node] = []
-	_find_nodes_with_script(root, azgaar_nodes)
-	
-	if azgaar_nodes.size() > 0:
-		world_builder_azgaar = azgaar_nodes[0]
-		MythosLogger.info("WorldBuilderWebController", "Found WorldBuilderAzgaar controller", {"path": world_builder_azgaar.get_path()})
-	else:
-		MythosLogger.warn("WorldBuilderWebController", "WorldBuilderAzgaar controller not found in scene tree")
-
-
-func _find_nodes_with_script(node: Node, results: Array) -> void:
-	"""Recursively find nodes with WorldBuilderAzgaar script."""
-	if node.get_script():
-		var script_path: String = node.get_script().resource_path
-		if "WorldBuilderAzgaar" in script_path:
-			results.append(node)
-	
-	for child in node.get_children():
-		_find_nodes_with_script(child, results)
+# Azgaar controller finding removed - using iframe embedding instead
 
 
 func _notification(what: int) -> void:
@@ -474,34 +450,24 @@ func _handle_generate(data: Dictionary) -> void:
 	
 	MythosLogger.info("WorldBuilderWebController", "Generation requested", {"params": current_params})
 	
-	# Trigger generation via WorldBuilderAzgaar
-	var azgaar_controller: Node = null
-	if world_builder_azgaar:
-		azgaar_controller = world_builder_azgaar
+	# Generation is handled via iframe postMessage in JavaScript
+	# The JS generate() function sends postMessage to the Azgaar iframe
+	# We just track progress here
+	send_progress_update(10.0, "Syncing parameters...", true)
+	send_progress_update(40.0, "Generating map...", true)
 	
-	if azgaar_controller and azgaar_controller.has_method("trigger_generation_with_options"):
-		# Connect signals for progress updates
-		if not azgaar_controller.generation_complete.is_connected(_on_generation_complete):
-			azgaar_controller.generation_complete.connect(_on_generation_complete)
-		if not azgaar_controller.generation_failed.is_connected(_on_generation_failed):
-			azgaar_controller.generation_failed.connect(_on_generation_failed)
-		
-		send_progress_update(10.0, "Syncing parameters...", true)
-		azgaar_controller.trigger_generation_with_options(current_params, true)
-		send_progress_update(40.0, "Generating map...", true)
-	else:
-		MythosLogger.error("WorldBuilderWebController", "Azgaar controller not available for generation")
-		send_progress_update(0.0, "Error: Azgaar controller not found", false)
+	# Note: Actual generation happens in iframe via postMessage from JS
+	# We'll update progress when iframe sends completion message (if needed)
 
 
 func _on_generation_complete() -> void:
-	"""Handle generation complete signal."""
+	"""Handle generation complete signal (legacy - iframe handles generation now)."""
 	send_progress_update(100.0, "Generation complete!", false)
 	MythosLogger.info("WorldBuilderWebController", "Generation complete")
 
 
 func _on_generation_failed(reason: String) -> void:
-	"""Handle generation failed signal."""
+	"""Handle generation failed signal (legacy - iframe handles generation now)."""
 	send_progress_update(0.0, "Generation failed: %s" % reason, false)
 	MythosLogger.error("WorldBuilderWebController", "Generation failed", {"reason": reason})
 

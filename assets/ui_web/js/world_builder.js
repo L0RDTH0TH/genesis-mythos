@@ -285,7 +285,41 @@ document.addEventListener('alpine:init', () => {
         this.isGenerating = true;
         this.progressValue = 0;
         this.statusText = 'Generating...';
+        
+        // Send to Godot for progress tracking
         GodotBridge.postMessage('generate', { params: this.params });
+        
+        // Send parameters to Azgaar iframe via postMessage
+        const iframe = document.getElementById('azgaar-iframe');
+        if (iframe && iframe.contentWindow) {
+            try {
+                // Wait for iframe to be ready, then send parameters
+                const sendToIframe = () => {
+                    if (iframe.contentWindow) {
+                        // Send parameters to Azgaar iframe
+                        iframe.contentWindow.postMessage({
+                            type: 'azgaar_params',
+                            params: this.params,
+                            seed: this.seed
+                        }, 'http://127.0.0.1:8080');
+                        
+                        // Trigger generation in Azgaar
+                        iframe.contentWindow.postMessage({
+                            type: 'azgaar_generate'
+                        }, 'http://127.0.0.1:8080');
+                    }
+                };
+                
+                // Try immediately, or wait for iframe load
+                if (iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
+                    sendToIframe();
+                } else {
+                    iframe.addEventListener('load', sendToIframe, { once: true });
+                }
+            } catch (e) {
+                console.warn('[WorldBuilder] Failed to send to iframe:', e);
+            }
+        }
     }
     }));
 });
