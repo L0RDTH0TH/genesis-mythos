@@ -241,7 +241,8 @@ func _handle_load_archetype(data: Dictionary) -> void:
 			var points_count: int = preset["points"]
 			var clamped_points: int = UIConstants.get_clamped_points(points_count)
 			# Convert to slider value (1-13 scale, approximate)
-			preset_mapped["pointsInput"] = int(logf(clamped_points / 1000.0) / logf(10.0))
+			# Use natural log divided by log(10) to get log base 10
+			preset_mapped["pointsInput"] = int(log(clamped_points / 1000.0) / log(10.0))
 			preset_mapped["pointsInput"] = clamp(preset_mapped["pointsInput"], 1, 10)  # Use clamped max
 		if preset.has("heightExponent"):
 			preset_mapped["heightExponentInput"] = preset["heightExponent"]
