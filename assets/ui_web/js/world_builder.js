@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 });
 
-// Register the worldBuilder component only after Alpine is fully initialized
+// Register the worldBuilder component before Alpine initializes (script loads synchronously)
 document.addEventListener('alpine:init', () => {
     Alpine.data('worldBuilder', () => ({
         currentStep: 0,
@@ -89,6 +89,29 @@ document.addEventListener('alpine:init', () => {
                 } else {
                     console.warn('[WorldBuilder] GodotBridge.requestData not available');
                 }
+            }
+            
+            // Fallback: Periodic check for late-arriving pending data (handles timing edge cases)
+            if (this.steps.length === 0) {
+                const checkInterval = setInterval(() => {
+                    if (window._pendingStepsData && window._pendingStepsData.steps) {
+                        console.log('[WorldBuilder] Late-loaded pending steps data:', window._pendingStepsData.steps.length);
+                        this.steps = window._pendingStepsData.steps;
+                        this._initializeParams();
+                        delete window._pendingStepsData;
+                        clearInterval(checkInterval);
+                    } else if (this.steps.length > 0) {
+                        // Steps were populated via another method (e.g., requestData callback)
+                        clearInterval(checkInterval);
+                    }
+                }, 100);
+                // Safety timeout: stop checking after 2 seconds
+                setTimeout(() => {
+                    clearInterval(checkInterval);
+                    if (this.steps.length === 0) {
+                        console.warn('[WorldBuilder] Steps still empty after 2 seconds - may need manual intervention');
+                    }
+                }, 2000);
             }
             
             // Request archetypes (already have names, but can request full data if needed)

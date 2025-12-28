@@ -166,22 +166,24 @@ func _send_step_definitions() -> void:
 				
 				console.log('[WorldBuilder] Received step definitions:', stepData.steps.length, 'steps');
 				
-				// Reactive assignment - use Object.assign or direct assignment with nextTick
+				// Reactive assignment - ensure Alpine.js detects the change
 				if (stepData && stepData.steps && Array.isArray(stepData.steps)) {
-					// Clear existing steps and assign new ones (triggers reactivity)
+					// Use Alpine's reactivity system - assign via component instance
+					// Clear existing steps first to trigger reactivity
 					window.worldBuilderInstance.steps = [];
-					window.worldBuilderInstance.steps = stepData.steps;
 					
-					// Force Alpine to update by triggering a reactive change
+					// Use $nextTick to ensure Alpine processes the change
 					if (window.worldBuilderInstance.$nextTick) {
 						window.worldBuilderInstance.$nextTick(() => {
+							window.worldBuilderInstance.steps = stepData.steps;
 							console.log('[WorldBuilder] Steps updated via $nextTick:', window.worldBuilderInstance.steps.length);
 							window.worldBuilderInstance._initializeParams();
 						});
 					} else {
-						// Fallback: direct call
+						// Fallback: direct assignment (Alpine should detect array replacement)
+						window.worldBuilderInstance.steps = stepData.steps;
 						window.worldBuilderInstance._initializeParams();
-						console.log('[WorldBuilder] Steps updated (no $nextTick):', window.worldBuilderInstance.steps.length);
+						console.log('[WorldBuilder] Steps updated (direct assignment):', window.worldBuilderInstance.steps.length);
 					}
 					
 					return true;
@@ -342,6 +344,8 @@ func _on_ipc_message(message: String) -> void:
 func _handle_alpine_ready(data: Dictionary) -> void:
 	"""Handle alpine_ready IPC message from WebView."""
 	MythosLogger.info("WorldBuilderWebController", "Alpine.js ready signal received from WebView")
+	# Small delay to ensure Alpine.js component is fully initialized before sending data
+	await get_tree().create_timer(0.1).timeout
 	# Now that Alpine.js is ready, send step definitions and archetypes
 	_send_step_definitions()
 	_send_archetypes()
