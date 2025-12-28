@@ -37,7 +37,8 @@ body {
     padding: 0;
     width: 100vw;
     height: 100vh;
-    background-color: var(--bg-dark);
+    /* Made transparent to allow Azgaar WebView behind to show through */
+    background-color: transparent;
     font-family: 'Times New Roman', serif;
     color: var(--font-default);
     overflow: hidden;
