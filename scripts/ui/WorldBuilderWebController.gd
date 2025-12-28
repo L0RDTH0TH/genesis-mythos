@@ -231,17 +231,35 @@ func _handle_load_archetype(data: Dictionary) -> void:
 	
 	var preset: Dictionary = ARCHETYPES.get(archetype_name, {}).duplicate()
 	if not preset.is_empty():
-		# Apply hardware clamping for points parameter
+		# Map preset keys to azgaar_keys (handle different naming conventions)
+		# Note: ARCHETYPES uses different keys than azgaar - this mapping is approximate
+		var preset_mapped: Dictionary = {}
+		# Convert points (actual count) to pointsInput slider value (1-13) - approximate conversion
 		if preset.has("points"):
-			preset["points"] = UIConstants.get_clamped_points(preset["points"])
+			# Approximate: pointsInput 1-13 maps to ~1K-100K cells
+			# We'll use a simple mapping - this may need adjustment
+			var points_count: int = preset["points"]
+			var clamped_points: int = UIConstants.get_clamped_points(points_count)
+			# Convert to slider value (1-13 scale, approximate)
+			preset_mapped["pointsInput"] = int(logf(clamped_points / 1000.0) / logf(10.0))
+			preset_mapped["pointsInput"] = clamp(preset_mapped["pointsInput"], 1, 10)  # Use clamped max
+		if preset.has("heightExponent"):
+			preset_mapped["heightExponentInput"] = preset["heightExponent"]
+		if preset.has("allowErosion"):
+			preset_mapped["allowErosion"] = preset["allowErosion"]
+		if preset.has("burgs"):
+			preset_mapped["manorsInput"] = preset["burgs"]
+		if preset.has("precip"):
+			preset_mapped["precInput"] = int(preset["precip"] * 100)  # Convert to percentage
 		
-		# Merge preset params into current_params
-		for key in preset.keys():
-			current_params[key] = preset[key]
+		# Clamp and apply preset params
+		for key in preset_mapped.keys():
+			var clamped_value = _clamp_parameter_value(key, preset_mapped[key])
+			current_params[key] = clamped_value
 		
 		# Send params update to WebView
 		_send_params_update()
-		MythosLogger.info("WorldBuilderWebController", "Loaded archetype preset", {"archetype": archetype_name, "params": preset})
+		MythosLogger.info("WorldBuilderWebController", "Loaded archetype preset", {"archetype": archetype_name, "params": preset_mapped})
 
 
 func _handle_set_seed(data: Dictionary) -> void:
@@ -250,14 +268,44 @@ func _handle_set_seed(data: Dictionary) -> void:
 	MythosLogger.debug("WorldBuilderWebController", "Seed changed", {"seed": current_seed})
 
 
+func _clamp_parameter_value(azgaar_key: String, value: Variant) -> Variant:
+	"""Clamp parameter value based on step definitions (curated/clamped_min/clamped_max)."""
+	# Find parameter definition in step definitions
+	for step_dict in step_definitions.get("steps", []):
+		var parameters: Array = step_dict.get("parameters", [])
+		for param_dict in parameters:
+			if param_dict.get("azgaar_key") == azgaar_key:
+				# Only clamp curated parameters
+				if param_dict.get("curated", true) != true:
+					return value
+				
+				# Clamp numeric values
+				if value is int or value is float:
+					var min_val = param_dict.get("clamped_min")
+					if min_val == null:
+						min_val = param_dict.get("min")
+					var max_val = param_dict.get("clamped_max")
+					if max_val == null:
+						max_val = param_dict.get("max")
+					
+					if min_val != null and max_val != null:
+						# Clamp numeric value to defined range
+						return clamp(value, min_val, max_val)
+				return value
+	
+	return value
+
+
 func _handle_update_param(data: Dictionary) -> void:
 	"""Handle update_param message from WebView."""
 	var azgaar_key: String = data.get("azgaar_key", "")
 	var value = data.get("value")
 	
 	if not azgaar_key.is_empty():
-		current_params[azgaar_key] = value
-		MythosLogger.debug("WorldBuilderWebController", "Parameter updated", {"key": azgaar_key, "value": value})
+		# Clamp value based on parameter definition
+		var clamped_value = _clamp_parameter_value(azgaar_key, value)
+		current_params[azgaar_key] = clamped_value
+		MythosLogger.debug("WorldBuilderWebController", "Parameter updated", {"key": azgaar_key, "value": clamped_value, "original": value})
 
 
 func _handle_generate(data: Dictionary) -> void:
@@ -267,6 +315,14 @@ func _handle_generate(data: Dictionary) -> void:
 	
 	# Ensure seed is set
 	current_params["optionsSeed"] = current_seed
+	
+	# Clamp all parameters before generation (only curated parameters)
+	var clamped_params: Dictionary = {}
+	for key in current_params.keys():
+		var value = current_params[key]
+		clamped_params[key] = _clamp_parameter_value(key, value)
+	
+	current_params = clamped_params
 	
 	MythosLogger.info("WorldBuilderWebController", "Generation requested", {"params": current_params})
 	
@@ -405,4 +461,3 @@ func send_progress_update(progress: float, status: String, is_generating: bool) 
 		web_view.execute_js(update_script)
 	elif web_view.has_method("eval"):
 		web_view.eval(update_script)
-

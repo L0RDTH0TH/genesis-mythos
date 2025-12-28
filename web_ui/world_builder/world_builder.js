@@ -82,11 +82,12 @@ Alpine.data('worldBuilder', () => ({
     },
     
     _initializeParams() {
-        // Initialize params with default values from step definitions
+        // Initialize params with default values from step definitions (only curated parameters)
         for (let step of this.steps) {
             if (step.parameters) {
                 for (let param of step.parameters) {
-                    if (!(param.azgaar_key in this.params)) {
+                    // Only include curated parameters
+                    if (param.curated !== false && !(param.azgaar_key in this.params)) {
                         this.params[param.azgaar_key] = param.default !== undefined ? param.default : 
                             (param.ui_type === 'CheckBox' ? false : 0);
                     }
@@ -104,7 +105,9 @@ Alpine.data('worldBuilder', () => ({
     
     get currentStepParams() {
         if (this.steps && this.steps[this.currentStep]) {
-            return this.steps[this.currentStep].parameters || [];
+            // Filter to only show curated parameters
+            const allParams = this.steps[this.currentStep].parameters || [];
+            return allParams.filter(param => param.curated !== false);
         }
         return [];
     },
@@ -144,6 +147,24 @@ Alpine.data('worldBuilder', () => ({
     },
     
     updateParam(key, value) {
+        // Find the parameter definition to get clamping info
+        let paramDef = null;
+        for (let step of this.steps) {
+            if (step.parameters) {
+                paramDef = step.parameters.find(p => p.azgaar_key === key);
+                if (paramDef) break;
+            }
+        }
+        
+        // Clamp value if param definition exists and has min/max
+        if (paramDef && typeof value === 'number') {
+            const min = paramDef.clamped_min !== undefined ? paramDef.clamped_min : paramDef.min;
+            const max = paramDef.clamped_max !== undefined ? paramDef.clamped_max : paramDef.max;
+            if (min !== undefined && max !== undefined) {
+                value = Math.max(min, Math.min(max, value));
+            }
+        }
+        
         this.params[key] = value;
         GodotBridge.postMessage('update_param', { 
             azgaar_key: key, 

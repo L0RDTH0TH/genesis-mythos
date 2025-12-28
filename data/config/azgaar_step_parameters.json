@@ -45,7 +45,8 @@
             "us-mainland",
             "world-from-pacific"
           ],
-          "default": "continents"
+          "default": "continents",
+          "curated": true
         },
         {
           "name": "pointsInput",
@@ -55,7 +56,10 @@
           "max": 13,
           "step": 1,
           "default": 5,
-          "description": "Cell density (1=1K cells, 13=100K cells)"
+          "description": "Cell density (1=1K cells, 13=100K cells)",
+          "curated": true,
+          "clamped_min": 1,
+          "clamped_max": 10
         },
         {
           "name": "optionsSeed",
@@ -64,7 +68,8 @@
           "min": 1,
           "max": 999999999,
           "default": 12345,
-          "description": "Map seed number"
+          "description": "Map seed number",
+          "curated": true
         },
         {
           "name": "mapWidthInput",
@@ -74,7 +79,10 @@
           "max": 3840,
           "step": 10,
           "default": 960,
-          "description": "Canvas width in pixels"
+          "description": "Canvas width in pixels",
+          "curated": true,
+          "clamped_min": 800,
+          "clamped_max": 2000
         },
         {
           "name": "mapHeightInput",
@@ -84,7 +92,10 @@
           "max": 2160,
           "step": 10,
           "default": 540,
-          "description": "Canvas height in pixels"
+          "description": "Canvas height in pixels",
+          "curated": true,
+          "clamped_min": 450,
+          "clamped_max": 1500
         },
         {
           "name": "mapSizeInput",
@@ -94,7 +105,8 @@
           "max": 100,
           "step": 1,
           "default": 50,
-          "description": "Map size relative to world (1-100%)"
+          "description": "Map size relative to world (1-100%)",
+          "curated": true
         }
       ]
     },
@@ -111,14 +123,16 @@
           "max": 2.2,
           "step": 0.1,
           "default": 1.8,
-          "description": "Height exponent for altitude sharpness"
+          "description": "Height exponent for altitude sharpness",
+          "curated": true
         },
         {
           "name": "allowErosion",
           "azgaar_key": "allowErosion",
           "ui_type": "CheckBox",
           "default": true,
-          "description": "Allow water erosion"
+          "description": "Allow water erosion",
+          "curated": true
         },
         {
           "name": "resolveDepressionsStepsInput",
@@ -128,7 +142,8 @@
           "max": 500,
           "step": 10,
           "default": 250,
-          "description": "Max iterations for depression filling"
+          "description": "Max iterations for depression filling",
+          "curated": true
         },
         {
           "name": "lakeElevationLimitInput",
@@ -138,7 +153,8 @@
           "max": 80,
           "step": 1,
           "default": 20,
-          "description": "Depression depth threshold for lakes"
+          "description": "Depression depth threshold for lakes",
+          "curated": true
         }
       ]
     },
@@ -155,7 +171,8 @@
           "max": 500,
           "step": 10,
           "default": 100,
-          "description": "Precipitation percentage (0-500%)"
+          "description": "Precipitation percentage (0-500%)",
+          "curated": true
         },
         {
           "name": "temperatureEquator",
@@ -165,7 +182,8 @@
           "max": 50,
           "step": 1,
           "default": 28,
-          "description": "Temperature at equator (\u00b0C)"
+          "description": "Temperature at equator (\u00b0C)",
+          "curated": true
         },
         {
           "name": "temperatureNorthPole",
@@ -175,7 +193,8 @@
           "max": 50,
           "step": 1,
           "default": -25,
-          "description": "Temperature at North Pole (\u00b0C)"
+          "description": "Temperature at North Pole (\u00b0C)",
+          "curated": true
         },
         {
           "name": "temperatureSouthPole",
@@ -185,7 +204,8 @@
           "max": 50,
           "step": 1,
           "default": -20,
-          "description": "Temperature at South Pole (\u00b0C)"
+          "description": "Temperature at South Pole (\u00b0C)",
+          "curated": true
         }
       ]
     },
@@ -208,7 +228,8 @@
           "max": 100,
           "step": 1,
           "default": 18,
-          "description": "Number of states/countries"
+          "description": "Number of states/countries",
+          "curated": true
         },
         {
           "name": "culturesInput",
@@ -218,7 +239,8 @@
           "max": 32,
           "step": 1,
           "default": 12,
-          "description": "Number of cultures"
+          "description": "Number of cultures",
+          "curated": true
         },
         {
           "name": "culturesSet",
@@ -235,7 +257,8 @@
             "random"
           ],
           "default": "world",
-          "description": "Culture set for names"
+          "description": "Culture set for names",
+          "curated": true
         },
         {
           "name": "religionsNumber",
@@ -245,7 +268,8 @@
           "max": 50,
           "step": 1,
           "default": 6,
-          "description": "Number of organized religions"
+          "description": "Number of organized religions",
+          "curated": true
         },
         {
           "name": "manorsInput",
@@ -255,7 +279,8 @@
           "max": 1000,
           "step": 10,
           "default": 1000,
-          "description": "Number of towns to place (0-1000, 1000=auto)"
+          "description": "Number of towns to place (0-1000, 1000=auto)",
+          "curated": true
         },
         {
           "name": "provincesRatio",
@@ -265,7 +290,8 @@
           "max": 100,
           "step": 1,
           "default": 20,
-          "description": "Burgs percentage to form province"
+          "description": "Burgs percentage to form province",
+          "curated": true
         }
       ]
     },
@@ -282,7 +308,8 @@
           "max": 10000,
           "step": 10,
           "default": 1000,
-          "description": "People per population point"
+          "description": "People per population point",
+          "curated": true
         },
         {
           "name": "urbanizationInput",
@@ -292,7 +319,8 @@
           "max": 5.0,
           "step": 0.01,
           "default": 1.0,
-          "description": "Urbanization rate"
+          "description": "Urbanization rate",
+          "curated": true
         },
         {
           "name": "urbanDensityInput",
@@ -302,7 +330,8 @@
           "max": 200,
           "step": 1,
           "default": 10,
-          "description": "Urban density (average population per building)"
+          "description": "Urban density (average population per building)",
+          "curated": true
         }
       ]
     },

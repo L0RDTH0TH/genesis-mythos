@@ -91,9 +91,9 @@
                                                 <input 
                                                     type="range" 
                                                     x-model.number="params[param.azgaar_key]"
-                                                    @input="updateParam(param.azgaar_key, $event.target.value)"
-                                                    :min="param.min || 0"
-                                                    :max="param.max || 100"
+                                                    @input="updateParam(param.azgaar_key, parseFloat($event.target.value))"
+                                                    :min="param.clamped_min !== undefined ? param.clamped_min : (param.min || 0)"
+                                                    :max="param.clamped_max !== undefined ? param.clamped_max : (param.max || 100)"
                                                     :step="param.step || 1">
                                                 <span class="slider-value" x-text="params[param.azgaar_key] || param.default || 0"></span>
                                             </div>
@@ -104,9 +104,9 @@
                                             <input 
                                                 type="number" 
                                                 x-model.number="params[param.azgaar_key]"
-                                                @change="updateParam(param.azgaar_key, $event.target.value)"
-                                                :min="param.min || 0"
-                                                :max="param.max || 999999"
+                                                @change="updateParam(param.azgaar_key, parseFloat($event.target.value))"
+                                                :min="param.clamped_min !== undefined ? param.clamped_min : (param.min || 0)"
+                                                :max="param.clamped_max !== undefined ? param.clamped_max : (param.max || 999999)"
                                                 :step="param.step || 1">
                                         </template>
 

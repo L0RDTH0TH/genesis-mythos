@@ -203,9 +203,11 @@ func trigger_generation_with_options(options: Dictionary, auto_generate: bool = 
 	MythosLogger.info("WorldBuilderAzgaar", "Generation triggered with options", {"auto_generate": auto_generate})
 
 func _sync_parameters_to_azgaar(params: Dictionary) -> void:
-	"""Sync parameters to Azgaar via JavaScript injection."""
+	"""Sync parameters to Azgaar via JavaScript injection.
+	Parameters should already be validated/clamped by WorldBuilderWebController."""
 	# Parameters are already in Azgaar key format from JSON config
 	# Direct mapping: param keys are Azgaar option keys
+	# NOTE: Validation/clamping is handled in WorldBuilderWebController before params reach here
 	
 	# Inject each parameter
 	for azgaar_key in params:
@@ -398,3 +400,38 @@ func post_message_to_azgaar(message: Dictionary) -> void:
 		MythosLogger.debug("WorldBuilderAzgaar", "Posted message to Azgaar", {"message": message})
 	else:
 		MythosLogger.warn("WorldBuilderAzgaar", "Cannot post message - WebView or method not available")
+
+func get_azgaar_options_state() -> Dictionary:
+	"""Fetch current Azgaar options state via JavaScript eval for debugging/feedback.
+	Returns empty Dictionary if WebView is not available or Azgaar is not loaded."""
+	# TEMPORARY DIAGNOSTIC: Skip if Azgaar is disabled
+	if DEBUG_DISABLE_AZGAAR:
+		MythosLogger.info("WorldBuilderAzgaar", "DIAGNOSTIC: get_azgaar_options_state skipped (Azgaar disabled)")
+		return {}
+	
+	if not web_view:
+		MythosLogger.warn("WorldBuilderAzgaar", "WebView is null, cannot fetch Azgaar state")
+		return {}
+	
+	# Execute JS to get azgaar.options as JSON
+	var js_code: String = """
+		(function() {
+			if (typeof azgaar !== 'undefined' && azgaar.options) {
+				return JSON.stringify(azgaar.options);
+			}
+			return null;
+		})();
+	"""
+	
+	var result = _execute_azgaar_js(js_code)
+	if result != null and result is String:
+		var json: JSON = JSON.new()
+		var parse_result = json.parse(result)
+		if parse_result == OK:
+			var data = json.data
+			if data is Dictionary:
+				MythosLogger.debug("WorldBuilderAzgaar", "Fetched Azgaar options state", {"keys": data.keys()})
+				return data
+	
+	MythosLogger.warn("WorldBuilderAzgaar", "Failed to fetch Azgaar options state")
+	return {}
