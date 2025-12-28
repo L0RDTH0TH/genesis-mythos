@@ -228,7 +228,11 @@ func _sync_parameters_to_azgaar(params: Dictionary) -> void:
 	
 	# If we collected wind values, set the winds array in Azgaar
 	if winds_array.size() > 0:
-		var winds_js: String = "[%s]" % ",".join(winds_array.map(func(v): return str(v)))
+		# Convert array to JS array string
+		var winds_strs: Array[String] = []
+		for wind_val in winds_array:
+			winds_strs.append(str(wind_val))
+		var winds_js: String = "[%s]" % ",".join(winds_strs)
 		var js_code: String = "if (typeof azgaar !== 'undefined' && azgaar.options) { azgaar.options.winds = %s; }" % winds_js
 		_execute_azgaar_js(js_code)
 		MythosLogger.debug("WorldBuilderAzgaar", "Synced winds array to Azgaar", {"winds": winds_array})
