@@ -582,6 +582,13 @@ func _send_step_params_for_current_step() -> void:
 			MythosLogger.debug("WorldBuilderWebController", "Sent step params for step", {"step": current_step, "params": curated_params})
 
 
+func set_terrain_manager(manager: Node) -> void:
+	"""Set terrain manager reference (stub for interface compatibility)."""
+	# Store reference if needed for future terrain operations
+	# Currently, WorldBuilderWebController doesn't directly interact with terrain
+	MythosLogger.debug("WorldBuilderWebController", "Terrain manager set", {"manager": manager})
+
+
 func send_progress_update(progress: float, status: String, is_generating: bool) -> void:
 	"""Send progress update to WebView."""
 	if not web_view:

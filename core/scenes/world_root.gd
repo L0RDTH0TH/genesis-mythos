@@ -112,12 +112,21 @@ func _setup_world_builder_ui_async() -> void:
 	LoadingOverlay.update_progress("Loading UI scene...", 45.0)
 	await get_tree().process_frame
 	
-	# Load WorldBuilderRoot scene (modular UI)
-	var ui_scene: PackedScene = load("res://ui/world_builder/modules/WorldBuilderRoot.tscn")
+	# Load WorldBuilderWeb scene (WebView-based UI)
+	var ui_scene: PackedScene = load("res://ui/world_builder/WorldBuilderWeb.tscn")
 	if ui_scene == null:
-		MythosLogger.error("World", "Failed to load WorldBuilderRoot scene")
-		LoadingOverlay.hide_loading()
-		return
+		MythosLogger.error("World", "Failed to load WorldBuilderWeb scene", {
+			"path": "res://ui/world_builder/WorldBuilderWeb.tscn",
+			"alternative": "res://scenes/ui/WorldBuilderUI.tscn"
+		})
+		# Try alternative path
+		ui_scene = load("res://scenes/ui/WorldBuilderUI.tscn")
+		if ui_scene == null:
+			MythosLogger.error("World", "Failed to load alternative WorldBuilderUI scene")
+			LoadingOverlay.hide_loading()
+			return
+		else:
+			MythosLogger.info("World", "Loaded alternative WorldBuilderUI scene")
 	
 	# Update progress: Instantiating UI
 	LoadingOverlay.update_progress("Instantiating UI...", 55.0)
@@ -132,11 +141,7 @@ func _setup_world_builder_ui_async() -> void:
 	
 	MythosLogger.info("World", "WorldBuilderUI instantiated successfully")
 	
-	# Verify it's the correct type
-	if not world_builder_ui.has_method("set_terrain_manager"):
-		MythosLogger.error("World", "Instantiated node is not WorldBuilderUI")
-		LoadingOverlay.hide_loading()
-		return
+	# Note: set_terrain_manager() method is optional - some UI implementations may not support it
 	
 	# Update progress: Applying theme
 	LoadingOverlay.update_progress("Applying theme...", 60.0)
@@ -167,10 +172,12 @@ func _setup_world_builder_ui_async() -> void:
 	LoadingOverlay.update_progress("Finalizing...", 70.0)
 	await get_tree().process_frame
 	
-	# Connect UI to terrain manager
-	if terrain_manager:
+	# Connect UI to terrain manager (optional - only if method exists)
+	if terrain_manager and world_builder_ui.has_method("set_terrain_manager"):
 		world_builder_ui.set_terrain_manager(terrain_manager)
 		MythosLogger.debug("World", "Terrain manager connected to WorldBuilderUI")
+	elif terrain_manager:
+		MythosLogger.debug("World", "WorldBuilderUI does not support terrain manager connection")
 	else:
 		MythosLogger.warn("World", "Terrain manager not available for WorldBuilderUI connection")
 	
