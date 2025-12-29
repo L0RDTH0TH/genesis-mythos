@@ -19,6 +19,7 @@ var is_generation_complete: bool = false
 signal generation_started
 signal generation_complete
 signal generation_failed(reason: String)
+signal azgaar_ready  # Emitted when Azgaar WebView is loaded and ready
 
 func _ready() -> void:
 	"""Initialize Azgaar WebView on ready."""
@@ -101,9 +102,16 @@ func _initialize_webview() -> void:
 						MythosLogger.debug("WorldBuilderAzgaar", "Azgaar loading... (75%)")
 				
 				_inject_azgaar_bridge()
+				# Wait a bit more for Azgaar to fully initialize, then emit ready signal
+				await tree.process_frame
+				await tree.process_frame
+				emit_signal("azgaar_ready")
+				MythosLogger.info("WorldBuilderAzgaar", "Azgaar is ready for generation")
 			else:
 				MythosLogger.warn("WorldBuilderAzgaar", "Node not in tree, injecting bridge immediately")
 				_inject_azgaar_bridge()
+				emit_signal("azgaar_ready")
+				MythosLogger.info("WorldBuilderAzgaar", "Azgaar is ready for generation (no tree)")
 		else:
 			MythosLogger.error("WorldBuilderAzgaar", "WebView does not have load_url method")
 	else:

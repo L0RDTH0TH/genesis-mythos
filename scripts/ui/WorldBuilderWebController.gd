@@ -76,6 +76,12 @@ func _ready() -> void:
 	# Find WorldBuilderAzgaar controller for direct JS injection
 	_find_azgaar_controller()
 	
+	# Connect to Azgaar ready signal if available
+	if azgaar_controller and azgaar_controller.has_signal("azgaar_ready"):
+		if not azgaar_controller.azgaar_ready.is_connected(_on_azgaar_ready):
+			azgaar_controller.azgaar_ready.connect(_on_azgaar_ready)
+		MythosLogger.info("WorldBuilderWebController", "Connected to Azgaar ready signal")
+	
 	# Wait for page to load, then inject theme/constants
 	# Alpine.js readiness will be signaled via IPC message 'alpine_ready'
 	await get_tree().create_timer(0.5).timeout
@@ -542,6 +548,72 @@ func _handle_generate(data: Dictionary) -> void:
 	else:
 		MythosLogger.error("WorldBuilderWebController", "Cannot generate - Azgaar controller not available")
 		send_progress_update(0.0, "Error: Azgaar controller not found", false)
+
+
+func _on_azgaar_ready() -> void:
+	"""Handle Azgaar ready signal - trigger initial default map generation."""
+	MythosLogger.info("WorldBuilderWebController", "Azgaar ready signal received, triggering initial generation")
+	
+	# Wait a moment for Azgaar to be fully ready
+	await get_tree().create_timer(0.5).timeout
+	
+	# Generate default map with default parameters
+	_generate_initial_default_map()
+
+
+func _generate_initial_default_map() -> void:
+	"""Generate initial default map when World Builder loads."""
+	if not azgaar_controller or not azgaar_controller.has_method("trigger_generation_with_options"):
+		MythosLogger.warn("WorldBuilderWebController", "Cannot generate initial map - Azgaar controller not available")
+		return
+	
+	# Build default parameters from step definitions
+	var default_params: Dictionary = {}
+	
+	# Load defaults from step definitions
+	if not step_definitions.is_empty():
+		var steps: Array = step_definitions.get("steps", [])
+		for step_dict in steps:
+			var parameters: Array = step_dict.get("parameters", [])
+			for param_dict in parameters:
+				# Only include curated parameters with defaults
+				if param_dict.get("curated", true) == true and param_dict.has("default"):
+					var azgaar_key: String = param_dict.get("azgaar_key", "")
+					if not azgaar_key.is_empty():
+						default_params[azgaar_key] = param_dict["default"]
+	
+	# Ensure we have at least basic defaults if JSON didn't provide them
+	if default_params.is_empty():
+		MythosLogger.warn("WorldBuilderWebController", "No defaults from JSON, using hardcoded defaults")
+		default_params = {
+			"templateInput": "continents",
+			"pointsInput": 5,
+			"mapWidthInput": 960,
+			"mapHeightInput": 540
+		}
+	
+	# Use random seed for initial generation
+	var initial_seed: int = randi() % 999999999 + 1
+	default_params["optionsSeed"] = initial_seed
+	current_seed = initial_seed
+	
+	# Clamp parameters
+	var clamped_params: Dictionary = {}
+	for key in default_params.keys():
+		var value = default_params[key]
+		clamped_params[key] = _clamp_parameter_value(key, value)
+	
+	MythosLogger.info("WorldBuilderWebController", "Triggering initial default map generation", {
+		"params_count": clamped_params.size(),
+		"seed": initial_seed,
+		"sample_params": _get_sample_params(clamped_params, 5)
+	})
+	
+	# Trigger generation
+	azgaar_controller.trigger_generation_with_options(clamped_params, true)
+	
+	# Also update current_params so UI reflects the defaults
+	current_params = clamped_params.duplicate()
 
 
 func _on_azgaar_generation_complete() -> void:
