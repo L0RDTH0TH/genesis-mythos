@@ -106,13 +106,14 @@ func regenerate_world() -> void:
 func _setup_world_builder_ui_async() -> void:
 	"""Setup and display the world builder UI overlay asynchronously with progress updates."""
 	MythosLogger.verbose("World", "_setup_world_builder_ui_async() called")
-	MythosLogger.debug("World", "Setting up WorldBuilderUI...")
+	MythosLogger.info("World", "Setting up WorldBuilderUI...", {"world_builder_ui": world_builder_ui})
 	
 	# Update progress: Loading UI scene
 	LoadingOverlay.update_progress("Loading UI scene...", 45.0)
 	await get_tree().process_frame
 	
 	# Load WorldBuilderWeb scene (WebView-based UI)
+	MythosLogger.debug("World", "Attempting to load WorldBuilderWeb scene", {"path": "res://ui/world_builder/WorldBuilderWeb.tscn"})
 	var ui_scene: PackedScene = load("res://ui/world_builder/WorldBuilderWeb.tscn")
 	if ui_scene == null:
 		MythosLogger.error("World", "Failed to load WorldBuilderWeb scene", {
@@ -133,13 +134,18 @@ func _setup_world_builder_ui_async() -> void:
 	await get_tree().process_frame
 	
 	# Instantiate WorldBuilderUI
+	MythosLogger.debug("World", "Instantiating UI scene...")
 	world_builder_ui = ui_scene.instantiate()
 	if world_builder_ui == null:
 		MythosLogger.error("World", "Failed to instantiate WorldBuilderUI")
 		LoadingOverlay.hide_loading()
 		return
 	
-	MythosLogger.info("World", "WorldBuilderUI instantiated successfully")
+	MythosLogger.info("World", "WorldBuilderUI instantiated successfully", {
+		"node_name": world_builder_ui.name,
+		"node_class": world_builder_ui.get_class(),
+		"has_webview": world_builder_ui.has_node("WebView")
+	})
 	
 	# Note: set_terrain_manager() method is optional - some UI implementations may not support it
 	
@@ -160,13 +166,18 @@ func _setup_world_builder_ui_async() -> void:
 	await get_tree().process_frame
 	
 	# Add UI to scene tree as a CanvasLayer child for proper overlay
+	MythosLogger.debug("World", "Creating CanvasLayer for UI overlay...")
 	var canvas_layer: CanvasLayer = CanvasLayer.new()
 	canvas_layer.name = "UICanvasLayer"
 	canvas_layer.layer = 0  # Keep WorldBuilderUI on default layer (0) so DebugMenu can be on top
 	add_child(canvas_layer, true)
+	MythosLogger.debug("World", "CanvasLayer added to scene tree", {"canvas_layer": canvas_layer.name})
 	canvas_layer.add_child(world_builder_ui, true)
-	
-	MythosLogger.debug("World", "WorldBuilderUI added to scene tree")
+	MythosLogger.info("World", "WorldBuilderUI added to scene tree", {
+		"parent": canvas_layer.name,
+		"ui_node": world_builder_ui.name,
+		"is_inside_tree": world_builder_ui.is_inside_tree()
+	})
 	
 	# Update progress: Finalizing
 	LoadingOverlay.update_progress("Finalizing...", 70.0)
