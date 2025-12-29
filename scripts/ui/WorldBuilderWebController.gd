@@ -70,8 +70,13 @@ func _ready() -> void:
 	# Load step definitions from JSON
 	_load_step_definitions()
 	
-	# Load the World Builder HTML file (custom template with 8-step sidebar)
-	var html_url: String = "res://assets/ui_web/templates/world_builder.html"
+	# Load the World Builder HTML file (use fork template if testing)
+	var html_url: String
+	if DEBUG_TEST_FORK:
+		html_url = "res://assets/ui_web/templates/world_builder_v2.html"
+		MythosLogger.info("WorldBuilderWebController", "DEBUG: Loading fork template for testing")
+	else:
+		html_url = "res://assets/ui_web/templates/world_builder.html"
 	web_view.load_url(html_url)
 	MythosLogger.info("WorldBuilderWebController", "Loaded World Builder HTML", {"url": html_url})
 	
@@ -104,7 +109,7 @@ func _ready() -> void:
 	
 	# Debug: Test fork headless generation if enabled
 	if DEBUG_TEST_FORK:
-		await get_tree().create_timer(2.0).timeout  # Wait for fork to initialize
+		await get_tree().create_timer(3.0).timeout  # Wait for fork to initialize
 		_test_fork_headless_generation()
 	
 	# WebView automatically sizes via anchors/size flags - no manual resize needed
@@ -1183,13 +1188,11 @@ func _test_fork_headless_generation() -> void:
 		MythosLogger.error("WorldBuilderWebController", "Cannot run test - WebView is null")
 		return
 	
-	# Load fork template instead of regular template
-	var fork_html_url: String = "res://assets/ui_web/templates/world_builder_v2.html"
-	web_view.load_url(fork_html_url)
-	MythosLogger.info("WorldBuilderWebController", "Loaded fork template for testing", {"url": fork_html_url})
+	# Fork template already loaded in _ready() if DEBUG_TEST_FORK is true
+	MythosLogger.info("WorldBuilderWebController", "Fork template should be loaded, waiting for initialization...")
 	
-	# Wait for fork to initialize
-	await get_tree().create_timer(3.0).timeout
+	# Wait a bit more for fork to fully initialize
+	await get_tree().create_timer(2.0).timeout
 	
 	# Test parameters (small map for speed)
 	var test_options: Dictionary = {
