@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>World Builder - Genesis Mythos (Fork Prototype)</title>
+    <link rel="stylesheet" href="../css/world_builder.css">
+    <script defer src="../js/alpine.min.js"></script>
+</head>
+<body>
+    <div class="world-builder-container" x-data="worldBuilder">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <h1 class="title-label">World Builder – Forging the World (Fork Prototype)</h1>
+        </div>
+
+        <!-- Error Message Display -->
+        <div x-show="errorMessage" class="error-message-container" style="background: rgba(200, 50, 50, 0.9); color: white; padding: 1rem; margin: 0.5rem; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+                <div style="flex: 1;">
+                    <strong style="font-size: 1.1em; display: block; margin-bottom: 0.5rem;" x-text="errorMessage"></strong>
+                    <p style="margin: 0; font-size: 0.9em; opacity: 0.9;" x-text="errorDetails"></p>
+                </div>
+                <button @click="errorMessage = null; errorDetails = null;" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 0.25rem 0.5rem; border-radius: 3px; cursor: pointer; margin-left: 1rem;">✕</button>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="main-hsplit">
+            <!-- Left Panel: Numbered Tab Bar (BG3-style) -->
+            <div class="left-tabs-panel">
+                <div class="left-tabs-container">
+                    <template x-for="(step, index) in steps" :key="index">
+                        <button 
+                            class="left-tab-button" 
+                            :class="{ 'active': currentStep === index }"
+                            @click="setStep(index)">
+                            <span class="tab-number" x-text="index + 1"></span>
+                            <span class="tab-label" x-text="step.title || `Step ${index + 1}`"></span>
+                        </button>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Center Panel: Status/Preview (No iframe - headless mode) -->
+            <div class="center-panel" style="background: #1a1a1a; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                <canvas id="azgaar-canvas" style="width: 100%; height: 100%; display: none; border: 1px solid #444;"></canvas>
+                <div id="azgaar-status" style="padding: 2rem; text-align: center; color: #aaa; font-size: 1.2em;">
+                    <p>Azgaar Genesis Fork - Ready</p>
+                    <p style="font-size: 0.8em; margin-top: 1rem; color: #666;">Using modular API (headless mode)</p>
+                </div>
+            </div>
+
+            <!-- Right Panel: Parameters (Floating Panel Style) -->
+            <div class="right-panel">
+                <div class="right-outer-vbox">
+                    <!-- Archetype Selector (Top) -->
+                    <div class="archetype-selector">
+                        <label>Archetype:</label>
+                        <select x-model="archetype" @change="loadArchetype($event.target.value)">
+                            <template x-for="arch in archetypeNames" :key="arch">
+                                <option :value="arch" x-text="arch"></option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <!-- Step Title -->
+                    <div class="step-title-section">
+                        <h2 class="step-title" x-text="currentStepTitle"></h2>
+                    </div>
+
+                    <!-- Parameters Tree (Step-specific curated parameters) -->
+                    <div class="param-scroll">
+                        <!-- Empty Step Info Text -->
+                        <div x-show="currentStepParams.length === 0 && currentStepInfoText" class="empty-step-info">
+                            <p class="info-text" x-text="currentStepInfoText"></p>
+                        </div>
+                        
+                        <!-- Parameters List -->
+                        <div class="param-list" x-show="currentStepParams.length > 0">
+                            <template x-for="param in currentStepParams" :key="param.azgaar_key">
+                                <div class="param-row">
+                                    <label class="param-label" :title="param.description || ''" x-text="(param.name || param.azgaar_key).replace(/([A-Z])/g, ' $1').trim() + ':'"></label>
+                                    <div class="param-control">
+                                        <!-- OptionButton -->
+                                        <template x-if="param.ui_type === 'OptionButton'">
+                                            <select 
+                                                x-model="params[param.azgaar_key]"
+                                                @change="updateParam(param.azgaar_key, $event.target.value)">
+                                                <template x-for="opt in param.options" :key="opt">
+                                                    <option :value="opt" x-text="opt"></option>
+                                                </template>
+                                            </select>
+                                        </template>
+
+                                        <!-- HSlider -->
+                                        <template x-if="param.ui_type === 'HSlider'">
+                                            <div class="slider-container">
+                                                <input 
+                                                    type="range" 
+                                                    x-model.number="params[param.azgaar_key]"
+                                                    @input="updateParam(param.azgaar_key, parseFloat($event.target.value))"
+                                                    :min="param.clamped_min !== undefined ? param.clamped_min : (param.min || 0)"
+                                                    :max="param.clamped_max !== undefined ? param.clamped_max : (param.max || 100)"
+                                                    :step="param.step || 1">
+                                                <span class="slider-value" x-text="params[param.azgaar_key] || param.default || 0"></span>
+                                            </div>
+                                        </template>
+
+                                        <!-- SpinBox -->
+                                        <template x-if="param.ui_type === 'SpinBox'">
+                                            <input 
+                                                type="number" 
+                                                x-model.number="params[param.azgaar_key]"
+                                                @change="updateParam(param.azgaar_key, parseFloat($event.target.value))"
+                                                :min="param.min"
+                                                :max="param.max"
+                                                :step="param.step || 1">
+                                        </template>
+
+                                        <!-- CheckBox -->
+                                        <template x-if="param.ui_type === 'CheckBox'">
+                                            <input 
+                                                type="checkbox" 
+                                                x-model="params[param.azgaar_key]"
+                                                @change="updateParam(param.azgaar_key, $event.target.checked)">
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Bar: Navigation & Generate -->
+        <div class="bottom-bar">
+            <button class="nav-button" @click="previousStep()" :disabled="currentStep === 0">Previous</button>
+            <button class="nav-button" @click="nextStep()" :disabled="currentStep >= totalSteps - 1">Next</button>
+            <button class="generate-button" @click="generate()" :disabled="isGenerating">
+                <span x-show="!isGenerating">Generate Map</span>
+                <span x-show="isGenerating">Generating...</span>
+            </button>
+            <div class="progress-container" x-show="isGenerating">
+                <div class="progress-bar" :style="'width: ' + progressValue + '%'"></div>
+                <span class="progress-text" x-text="statusText || 'Generating...'"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Azgaar Genesis Fork Integration -->
+    <script type="module">
+        /**
+         * Azgaar Genesis Fork Integration
+         * Uses modular API instead of iframe
+         */
+        
+        // Import Delaunator (peer dependency) from CDN
+        import Delaunator from 'https://cdn.jsdelivr.net/npm/delaunator@5.0.1/+esm';
+        
+        // Import Azgaar Genesis library
+        import { 
+            initGenerator, 
+            loadOptions, 
+            generateMap, 
+            getMapData, 
+            renderPreview 
+        } from '../js/azgaar/azgaar-genesis.esm.js';
+
+        // Initialize generator (headless mode - no canvas for now)
+        const canvas = document.getElementById('azgaar-canvas');
+        try {
+            initGenerator({ canvas: null }); // null = headless mode
+            console.log('[Azgaar Genesis] Generator initialized (headless mode)');
+        } catch (error) {
+            console.error('[Azgaar Genesis] Initialization error:', error);
+        }
+        
+        // Store generator functions globally for Alpine.js access
+        window.AzgaarGenesis = {
+            Delaunator,
+            loadOptions,
+            generateMap,
+            getMapData,
+            renderPreview,
+            initialized: true
+        };
+        
+        console.log('[Azgaar Genesis] Library loaded and ready');
+        
+        // Listen for IPC messages from Godot
+        if (window.GodotBridge && window.GodotBridge.onMessage) {
+            window.GodotBridge.onMessage((message) => {
+                console.log('[Azgaar Genesis] Received message from Godot:', message);
+                if (message.type === 'generate_map') {
+                    handleGenerateMap(message.options || {});
+                }
+            });
+        } else {
+            console.warn('[Azgaar Genesis] GodotBridge.onMessage not available');
+        }
+        
+        /**
+         * Handle map generation request
+         */
+        async function handleGenerateMap(options) {
+            const statusDiv = document.getElementById('azgaar-status');
+            const { Delaunator, loadOptions, generateMap, getMapData } = window.AzgaarGenesis;
+            
+            if (!window.AzgaarGenesis.initialized) {
+                console.error('[Azgaar Genesis] Generator not initialized');
+                statusDiv.innerHTML = '<p style="color: #f44;">Error: Generator not initialized</p>';
+                return;
+            }
+            
+            try {
+                statusDiv.innerHTML = '<p>Loading options...</p>';
+                console.log('[Azgaar Genesis] Loading options:', options);
+                
+                loadOptions(options);
+                
+                statusDiv.innerHTML = '<p>Generating map...</p>';
+                console.log('[Azgaar Genesis] Starting generation...');
+                
+                const startTime = performance.now();
+                const data = generateMap(Delaunator);
+                const generateTime = performance.now() - startTime;
+                
+                console.log('[Azgaar Genesis] Generation complete:', {
+                    seed: data.seed,
+                    time: generateTime.toFixed(2) + 'ms'
+                });
+                
+                statusDiv.innerHTML = '<p>Extracting JSON data...</p>';
+                const json = getMapData();
+                
+                console.log('[Azgaar Genesis] JSON extracted:', {
+                    size: JSON.stringify(json).length,
+                    hasGrid: !!json.grid,
+                    hasPack: !!json.pack
+                });
+                
+                // Send to Godot via IPC
+                if (window.GodotBridge && window.GodotBridge.postMessage) {
+                    window.GodotBridge.postMessage('map_generated', {
+                        data: json,
+                        seed: data.seed,
+                        generationTime: generateTime
+                    });
+                    console.log('[Azgaar Genesis] Sent map_generated message to Godot');
+                } else {
+                    console.warn('[Azgaar Genesis] GodotBridge.postMessage not available');
+                }
+                
+                statusDiv.innerHTML = `
+                    <p style="color: #4f4;">Map generated successfully!</p>
+                    <p style="font-size: 0.9em; color: #aaa; margin-top: 0.5rem;">
+                        Seed: ${data.seed}<br>
+                        Time: ${generateTime.toFixed(0)}ms
+                    </p>
+                `;
+            } catch (error) {
+                console.error('[Azgaar Genesis] Generation error:', error);
+                statusDiv.innerHTML = `
+                    <p style="color: #f44;">Error: ${error.message}</p>
+                    <p style="font-size: 0.8em; color: #aaa; margin-top: 0.5rem;">${error.stack || ''}</p>
+                `;
+                
+                // Send error to Godot
+                if (window.GodotBridge && window.GodotBridge.postMessage) {
+                    window.GodotBridge.postMessage('map_generation_failed', {
+                        error: error.message,
+                        stack: error.stack
+                    });
+                }
+            }
+        }
+        
+        // Make handleGenerateMap available globally for direct calls
+        window.handleGenerateMap = handleGenerateMap;
+    </script>
+    
+    <!-- Alpine.js World Builder Controller -->
+    <script src="../js/world_builder.js"></script>
+</body>
+</html>
