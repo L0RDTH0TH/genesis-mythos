@@ -77,10 +77,21 @@ func _ready() -> void:
 	_find_azgaar_controller()
 	
 	# Connect to Azgaar ready signal if available
-	if azgaar_controller and azgaar_controller.has_signal("azgaar_ready"):
-		if not azgaar_controller.azgaar_ready.is_connected(_on_azgaar_ready):
-			azgaar_controller.azgaar_ready.connect(_on_azgaar_ready)
-		MythosLogger.info("WorldBuilderWebController", "Connected to Azgaar ready signal")
+	if azgaar_controller:
+		MythosLogger.info("WorldBuilderWebController", "Azgaar controller found", {
+			"path": azgaar_controller.get_path(),
+			"has_signal": azgaar_controller.has_signal("azgaar_ready")
+		})
+		if azgaar_controller.has_signal("azgaar_ready"):
+			if not azgaar_controller.azgaar_ready.is_connected(_on_azgaar_ready):
+				azgaar_controller.azgaar_ready.connect(_on_azgaar_ready)
+				MythosLogger.info("WorldBuilderWebController", "Connected to Azgaar ready signal")
+			else:
+				MythosLogger.warn("WorldBuilderWebController", "Azgaar ready signal already connected")
+		else:
+			MythosLogger.warn("WorldBuilderWebController", "Azgaar controller does not have azgaar_ready signal")
+	else:
+		MythosLogger.error("WorldBuilderWebController", "Azgaar controller NOT FOUND - initial generation will not work")
 	
 	# Wait for page to load, then inject theme/constants
 	# Alpine.js readiness will be signaled via IPC message 'alpine_ready'
@@ -378,6 +389,23 @@ func _handle_alpine_ready(data: Dictionary) -> void:
 	await get_tree().create_timer(0.1).timeout
 	# Now that Alpine.js is ready, send step definitions and archetypes
 	_send_step_definitions()
+	
+	# FALLBACK: If Azgaar controller wasn't found earlier, try finding it again
+	if not azgaar_controller:
+		MythosLogger.warn("WorldBuilderWebController", "Azgaar controller not found earlier, retrying after Alpine ready")
+		_find_azgaar_controller()
+		if azgaar_controller:
+			MythosLogger.info("WorldBuilderWebController", "Azgaar controller found after retry", {"path": azgaar_controller.get_path()})
+			# Connect to signal if available
+			if azgaar_controller.has_signal("azgaar_ready"):
+				if not azgaar_controller.azgaar_ready.is_connected(_on_azgaar_ready):
+					azgaar_controller.azgaar_ready.connect(_on_azgaar_ready)
+					MythosLogger.info("WorldBuilderWebController", "Connected to Azgaar ready signal (after retry)")
+	
+	# FALLBACK: Poll for Azgaar readiness and trigger generation if signal didn't work
+	# Wait a bit for Azgaar to initialize, then check if it's ready
+	await get_tree().create_timer(3.0).timeout  # Give Azgaar time to load
+	_check_and_trigger_initial_generation()
 	_send_archetypes()
 
 
@@ -559,6 +587,37 @@ func _on_azgaar_ready() -> void:
 	
 	# Generate default map with default parameters
 	_generate_initial_default_map()
+
+
+func _check_and_trigger_initial_generation() -> void:
+	"""Fallback: Check if Azgaar is ready and trigger initial generation if signal didn't work."""
+	if not azgaar_controller:
+		MythosLogger.warn("WorldBuilderWebController", "Cannot check Azgaar readiness - controller not found")
+		return
+	
+	# Check if Azgaar WebView is ready by executing JS
+	if azgaar_controller.has_method("execute_azgaar_js"):
+		var check_code = """
+		(function() {
+			if (typeof azgaar !== 'undefined' && azgaar.options && typeof azgaar.generate === 'function') {
+				return 'ready';
+			}
+			return 'not_ready';
+		})();
+		"""
+		var result = azgaar_controller.execute_azgaar_js(check_code)
+		
+		if result == "ready":
+			MythosLogger.info("WorldBuilderWebController", "Azgaar is ready (fallback check), triggering initial generation")
+			_generate_initial_default_map()
+		else:
+			MythosLogger.warn("WorldBuilderWebController", "Azgaar not ready yet (fallback check)", {"result": result})
+	elif azgaar_controller.has_method("trigger_generation_with_options"):
+		# If we can't check readiness, just try to trigger generation anyway
+		MythosLogger.info("WorldBuilderWebController", "Cannot check Azgaar readiness, attempting generation anyway (fallback)")
+		_generate_initial_default_map()
+	else:
+		MythosLogger.warn("WorldBuilderWebController", "Cannot check or trigger Azgaar - methods not available")
 
 
 func _generate_initial_default_map() -> void:

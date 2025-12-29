@@ -105,8 +105,24 @@ func _initialize_webview() -> void:
 				# Wait a bit more for Azgaar to fully initialize, then emit ready signal
 				await tree.process_frame
 				await tree.process_frame
-				emit_signal("azgaar_ready")
-				MythosLogger.info("WorldBuilderAzgaar", "Azgaar is ready for generation")
+				
+				# Verify Azgaar is actually ready before emitting signal
+				var check_ready = """
+				(function() {
+					if (typeof azgaar !== 'undefined' && azgaar.options && typeof azgaar.generate === 'function') {
+						return 'ready';
+					}
+					return 'not_ready';
+				})();
+				"""
+				var ready_result = _execute_azgaar_js(check_ready)
+				
+				if ready_result == "ready":
+					emit_signal("azgaar_ready")
+					MythosLogger.info("WorldBuilderAzgaar", "Azgaar is ready for generation (verified)")
+				else:
+					MythosLogger.warn("WorldBuilderAzgaar", "Azgaar not ready yet, emitting signal anyway", {"check_result": ready_result})
+					emit_signal("azgaar_ready")
 			else:
 				MythosLogger.warn("WorldBuilderAzgaar", "Node not in tree, injecting bridge immediately")
 				_inject_azgaar_bridge()
@@ -165,6 +181,11 @@ func _execute_azgaar_js(code: String) -> Variant:
 			web_view.post_message(message)
 			MythosLogger.debug("WorldBuilderAzgaar", "Sent JS via post_message", {"code": code})
 		return null
+
+
+func execute_azgaar_js(code: String) -> Variant:
+	"""Public wrapper for _execute_azgaar_js to allow external access."""
+	return _execute_azgaar_js(code)
 
 func reload_azgaar() -> void:
 	"""Reload the Azgaar WebView."""
