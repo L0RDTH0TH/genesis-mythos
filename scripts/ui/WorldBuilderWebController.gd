@@ -544,16 +544,16 @@ func _handle_generate(data: Dictionary) -> void:
 		send_progress_update(0.0, "Error: Azgaar controller not found", false)
 
 
-func _on_generation_complete() -> void:
-	"""Handle generation complete signal (legacy - iframe handles generation now)."""
+func _on_azgaar_generation_complete() -> void:
+	"""Handle generation complete signal from Azgaar controller."""
 	send_progress_update(100.0, "Generation complete!", false)
-	MythosLogger.info("WorldBuilderWebController", "Generation complete")
+	MythosLogger.info("WorldBuilderWebController", "Azgaar generation completed")
 
 
-func _on_generation_failed(reason: String) -> void:
-	"""Handle generation failed signal (legacy - iframe handles generation now)."""
+func _on_azgaar_generation_failed(reason: String) -> void:
+	"""Handle generation failed signal from Azgaar controller."""
 	send_progress_update(0.0, "Generation failed: %s" % reason, false)
-	MythosLogger.error("WorldBuilderWebController", "Generation failed", {"reason": reason})
+	MythosLogger.error("WorldBuilderWebController", "Azgaar generation failed", {"reason": reason})
 
 
 func _handle_request_data(data: Dictionary) -> void:
