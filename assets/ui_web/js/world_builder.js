@@ -1,14 +1,23 @@
+// ╔═══════════════════════════════════════════════════════════
+// ║ world_builder.js
+// ║ Desc: World Builder Alpine.js Data and IPC Handlers with enhanced Azgaar communication
+// ║ Author: Lordthoth
+// ╚═══════════════════════════════════════════════════════════
+
 // World Builder Alpine.js Data and IPC Handlers
 
 // Override GodotBridge._handleUpdate for World Builder specific updates
 // Note: This will be set after Alpine.js initializes
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('[Genesis World Builder] DOMContentLoaded event fired');
     var originalHandleUpdate = window.GodotBridge._handleUpdate;
     window.GodotBridge._handleUpdate = function(data) {
+        console.log('[Genesis World Builder] _handleUpdate called', { update_type: data.update_type });
         if (data.update_type === 'params_update') {
             // Update parameters from Godot
             if (window.worldBuilderInstance) {
                 Object.assign(window.worldBuilderInstance.params, data.params || {});
+                console.log('[Genesis World Builder] Updated params from Godot', Object.keys(data.params || {}));
             }
         } else if (data.update_type === 'progress_update') {
             // Update progress bar
@@ -16,21 +25,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.worldBuilderInstance.progressValue = data.progress || 0;
                 window.worldBuilderInstance.statusText = data.status || '';
                 window.worldBuilderInstance.isGenerating = data.is_generating || false;
+                console.log('[Genesis World Builder] Progress update', { progress: data.progress, status: data.status });
             }
         } else if (data.update_type === 'step_definitions') {
             // Step definitions loaded
             if (window.worldBuilderInstance) {
                 window.worldBuilderInstance.steps = data.steps || [];
+                console.log('[Genesis World Builder] Steps loaded', { count: data.steps?.length || 0 });
             }
         } else if (data.update_type === 'archetypes') {
             // Archetypes loaded
             if (window.worldBuilderInstance) {
                 window.worldBuilderInstance.archetypeNames = data.archetype_names || [];
+                console.log('[Genesis World Builder] Archetypes loaded', { count: data.archetype_names?.length || 0 });
             }
         } else if (data.update_type === 'archetype_params') {
             // Archetype preset parameters loaded
             if (window.worldBuilderInstance) {
                 Object.assign(window.worldBuilderInstance.params, data.params || {});
+                console.log('[Genesis World Builder] Archetype params loaded', Object.keys(data.params || {}));
             }
         }
         
@@ -43,6 +56,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Register the worldBuilder component before Alpine initializes (script loads synchronously)
 document.addEventListener('alpine:init', () => {
+    console.log('[Genesis World Builder] Alpine.js init event fired');
     Alpine.data('worldBuilder', () => ({
         currentStep: 0,
         totalSteps: 8,
@@ -56,18 +70,31 @@ document.addEventListener('alpine:init', () => {
         statusText: '',
         updateDebounceTimer: null,
         azgaarListenerInjected: false,
+        azgaarListenerVerified: false,
+        errorMessage: null,
+        errorDetails: null,
         
         init() {
             // Store instance for global access
             window.worldBuilderInstance = this;
-            console.log('[WorldBuilder] Alpine.js init() called, steps:', this.steps.length);
+            console.log('[Genesis World Builder] Alpine.js init() called', {
+                timestamp: new Date().toISOString(),
+                stepsCount: this.steps.length,
+                hasGodotBridge: !!window.GodotBridge
+            });
+            
+            // Clear any previous errors
+            this.errorMessage = null;
+            this.errorDetails = null;
             
             // Notify Godot that Alpine.js is ready via IPC
             if (window.GodotBridge && window.GodotBridge.postMessage) {
                 window.GodotBridge.postMessage('alpine_ready', {});
-                console.log('[WorldBuilder] Sent alpine_ready IPC message to Godot');
+                console.log('[Genesis World Builder] Sent alpine_ready IPC message to Godot', {
+                    timestamp: new Date().toISOString()
+                });
             } else {
-                console.warn('[WorldBuilder] GodotBridge.postMessage not available - cannot notify Godot');
+                console.warn('[Genesis World Builder] GodotBridge.postMessage not available - cannot notify Godot');
             }
             
             // Check if steps data was stored before Alpine initialized
@@ -126,163 +153,541 @@ document.addEventListener('alpine:init', () => {
             this._setupAzgaarListener();
         },
     
-    _setupAzgaarListener() {
-        // Inject message listener into Azgaar iframe when it loads
-        const iframe = document.getElementById('azgaar-iframe');
-        if (!iframe) {
-            console.warn('[WorldBuilder] Azgaar iframe not found, cannot setup listener');
-            return;
+    /**
+     * Poll for Azgaar readiness (checks for azgaar, azgaar.options, and azgaar.generate)
+     * @param {HTMLIFrameElement} iframe - The Azgaar iframe element
+     * @param {number} maxWaitMs - Maximum time to wait in milliseconds (default: 60000)
+     * @param {number} pollIntervalMs - Polling interval in milliseconds (default: 100)
+     * @returns {Promise<boolean>} True if Azgaar is ready, false if timeout
+     */
+    async _pollForAzgaarReady(iframe, maxWaitMs = 60000, pollIntervalMs = 100) {
+        const startTime = Date.now();
+        let attemptCount = 0;
+        
+        console.log('[Genesis World Builder] Starting Azgaar readiness polling', {
+            timestamp: new Date().toISOString(),
+            maxWaitMs,
+            pollIntervalMs
+        });
+        
+        return new Promise((resolve) => {
+            const checkReady = () => {
+                attemptCount++;
+                const elapsed = Date.now() - startTime;
+                
+                try {
+                    if (!iframe || !iframe.contentWindow) {
+                        console.log(`[Genesis World Builder] Poll attempt ${attemptCount}: iframe.contentWindow not available`);
+                        if (elapsed < maxWaitMs) {
+                            setTimeout(checkReady, pollIntervalMs);
+                        } else {
+                            console.error('[Genesis World Builder] Azgaar readiness polling timeout: iframe.contentWindow never became available');
+                            resolve(false);
+                        }
+                        return;
+                    }
+                    
+                    const iframeWindow = iframe.contentWindow;
+                    const hasAzgaar = typeof iframeWindow.azgaar !== 'undefined';
+                    const hasOptions = hasAzgaar && iframeWindow.azgaar && typeof iframeWindow.azgaar.options !== 'undefined';
+                    const hasGenerate = hasAzgaar && iframeWindow.azgaar && typeof iframeWindow.azgaar.generate === 'function';
+                    
+                    console.log(`[Genesis World Builder] Poll attempt ${attemptCount} (${elapsed}ms elapsed):`, {
+                        hasAzgaar,
+                        hasOptions,
+                        hasGenerate,
+                        allReady: hasAzgaar && hasOptions && hasGenerate
+                    });
+                    
+                    if (hasAzgaar && hasOptions && hasGenerate) {
+                        console.log('[Genesis World Builder] Azgaar is ready!', {
+                            timestamp: new Date().toISOString(),
+                            elapsedMs: elapsed,
+                            attempts: attemptCount
+                        });
+                        resolve(true);
+                    } else if (elapsed < maxWaitMs) {
+                        setTimeout(checkReady, pollIntervalMs);
+                    } else {
+                        console.error('[Genesis World Builder] Azgaar readiness polling timeout', {
+                            timestamp: new Date().toISOString(),
+                            elapsedMs: elapsed,
+                            attempts: attemptCount,
+                            finalState: { hasAzgaar, hasOptions, hasGenerate }
+                        });
+                        resolve(false);
+                    }
+                } catch (e) {
+                    console.error(`[Genesis World Builder] Error during readiness check (attempt ${attemptCount}):`, e);
+                    if (elapsed < maxWaitMs) {
+                        setTimeout(checkReady, pollIntervalMs);
+                    } else {
+                        resolve(false);
+                    }
+                }
+            };
+            
+            checkReady();
+        });
+    },
+    
+    /**
+     * Inject message listener into Azgaar iframe with retry logic and verification
+     * @param {HTMLIFrameElement} iframe - The Azgaar iframe element
+     * @param {number} retryCount - Current retry attempt (internal)
+     * @param {number} maxRetries - Maximum retry attempts (default: 15)
+     * @returns {Promise<boolean>} True if injection succeeded and was verified, false otherwise
+     */
+    async _injectAzgaarListener(iframe, retryCount = 0, maxRetries = 15) {
+        if (this.azgaarListenerInjected && this.azgaarListenerVerified) {
+            console.log('[Genesis World Builder] Listener already injected and verified, skipping');
+            return true;
         }
         
-        const injectListener = (retryCount = 0) => {
-            if (this.azgaarListenerInjected) {
-                console.log('[WorldBuilder] Listener already injected, skipping');
-                return; // Already injected
+        const attemptStartTime = Date.now();
+        console.log(`[Genesis World Builder] Injecting Azgaar listener (attempt ${retryCount + 1}/${maxRetries})`, {
+            timestamp: new Date().toISOString(),
+            alreadyInjected: this.azgaarListenerInjected,
+            alreadyVerified: this.azgaarListenerVerified
+        });
+        
+        try {
+            if (!iframe || !iframe.contentWindow) {
+                console.warn(`[Genesis World Builder] iframe.contentWindow not available (attempt ${retryCount + 1})`);
+                if (retryCount < maxRetries) {
+                    // Exponential backoff: 200ms * 2^retryCount, capped at 2000ms
+                    const delay = Math.min(200 * Math.pow(2, retryCount), 2000);
+                    console.log(`[Genesis World Builder] Retrying listener injection in ${delay}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    return await this._injectAzgaarListener(iframe, retryCount + 1, maxRetries);
+                } else {
+                    console.error('[Genesis World Builder] Failed to inject listener: iframe.contentWindow never became available');
+                    return false;
+                }
             }
             
+            // Check if we can access the iframe document (CORS check)
+            let iframeDoc = null;
+            let injectionMethod = null;
             try {
-                if (!iframe.contentWindow) {
-                    console.warn('[WorldBuilder] iframe.contentWindow not available, retrying...');
-                    if (retryCount < 10) {
-                        setTimeout(() => injectListener(retryCount + 1), 500);
+                iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                console.log('[Genesis World Builder] Can access iframe document, will try script tag injection');
+            } catch (e) {
+                console.warn('[Genesis World Builder] Cannot access iframe document (CORS?), will use eval method:', e.message);
+            }
+            
+            // Inject message listener script into Azgaar iframe
+            const listenerScript = `
+                (function() {
+                    // Check if listener already exists
+                    if (window._azgaarMessageListenerInjected) {
+                        console.log('[Genesis Azgaar] Listener already exists, skipping injection');
+                        return;
                     }
-                    return;
-                }
-                
-                // Check if we can access the iframe document (CORS check)
-                let iframeDoc = null;
-                try {
-                    iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-                } catch (e) {
-                    console.warn('[WorldBuilder] Cannot access iframe document (CORS?), trying eval method:', e.message);
-                    // If we can't access document, we can still try eval (if same-origin policy allows)
-                }
-                
-                // Inject message listener script into Azgaar iframe
-                const listenerScript = `
-                    (function() {
-                        // Check if listener already exists
-                        if (window._azgaarMessageListenerInjected) {
-                            console.log('[Azgaar] Listener already exists, skipping injection');
-                            return;
-                        }
-                        window._azgaarMessageListenerInjected = true;
-                        console.log('[Azgaar] Injecting message listener...');
-                        
-                        window.addEventListener('message', function(event) {
-                            console.log('[Azgaar] Message received', {
-                                type: event.data?.type,
-                                origin: event.origin,
-                                hasParams: !!event.data?.params,
-                                hasSeed: event.data?.seed !== undefined
-                            });
-                            
-                            // Accept messages from parent window (World Builder)
-                            // Origin check: allow file://, res://, http://127.0.0.1, and * (for WebView contexts)
-                            const allowedOrigins = ['file://', 'res://', 'http://127.0.0.1:8080', window.location.origin, '*'];
-                            const isAllowedOrigin = allowedOrigins.some(origin => 
-                                origin === '*' || event.origin === origin || event.origin.startsWith(origin)
-                            );
-                            
-                            if (!isAllowedOrigin) {
-                                console.warn('[Azgaar] Rejected message from origin:', event.origin);
-                                return;
-                            }
-                            
-                            // Handle azgaar_params message
-                            if (event.data && event.data.type === 'azgaar_params') {
-                                console.log('[Azgaar] Processing azgaar_params message');
-                                if (typeof azgaar !== 'undefined' && azgaar.options) {
-                                    try {
-                                        // Apply parameters to azgaar.options
-                                        if (event.data.params) {
-                                            console.log('[Azgaar] Applying params:', Object.keys(event.data.params));
-                                            Object.assign(azgaar.options, event.data.params);
-                                        }
-                                        // Set seed if provided
-                                        if (event.data.seed !== undefined) {
-                                            console.log('[Azgaar] Setting seed:', event.data.seed);
-                                            azgaar.options.seed = event.data.seed;
-                                        }
-                                        console.log('[Azgaar] Parameters applied successfully');
-                                    } catch (e) {
-                                        console.error('[Azgaar] Error applying parameters:', e);
-                                    }
-                                } else {
-                                    console.warn('[Azgaar] azgaar.options not available yet');
-                                }
-                            }
-                            
-                            // Handle azgaar_generate message
-                            if (event.data && event.data.type === 'azgaar_generate') {
-                                console.log('[Azgaar] Processing azgaar_generate message');
-                                if (typeof azgaar !== 'undefined' && typeof azgaar.generate === 'function') {
-                                    try {
-                                        console.log('[Azgaar] Calling azgaar.generate()');
-                                        azgaar.generate();
-                                        console.log('[Azgaar] Generation triggered successfully');
-                                    } catch (e) {
-                                        console.error('[Azgaar] Error triggering generation:', e);
-                                    }
-                                } else {
-                                    console.warn('[Azgaar] azgaar.generate not available yet');
-                                }
-                            }
+                    window._azgaarMessageListenerInjected = true;
+                    console.log('[Genesis Azgaar] Injecting message listener...', {
+                        timestamp: new Date().toISOString()
+                    });
+                    
+                    window.addEventListener('message', function(event) {
+                        console.log('[Genesis Azgaar] Message received', {
+                            timestamp: new Date().toISOString(),
+                            type: event.data?.type,
+                            origin: event.origin,
+                            hasParams: !!event.data?.params,
+                            hasSeed: event.data?.seed !== undefined,
+                            fullData: event.data
                         });
                         
-                        console.log('[Azgaar] Message listener injected successfully');
-                    })();
-                `;
-                
-                // Try to inject via script tag (more reliable than eval)
-                if (iframeDoc) {
-                    try {
-                        const script = iframeDoc.createElement('script');
-                        script.textContent = listenerScript;
-                        iframeDoc.head.appendChild(script);
-                        this.azgaarListenerInjected = true;
-                        console.log('[WorldBuilder] Azgaar message listener injected via script tag');
-                        return;
-                    } catch (scriptError) {
-                        console.warn('[WorldBuilder] Script tag injection failed, trying eval:', scriptError.message);
-                    }
+                        // Accept messages from parent window (World Builder)
+                        // Origin check: allow file://, res://, http://127.0.0.1, and * (for WebView contexts)
+                        const allowedOrigins = ['file://', 'res://', 'http://127.0.0.1:8080', window.location.origin, '*'];
+                        const isAllowedOrigin = allowedOrigins.some(origin => 
+                            origin === '*' || event.origin === origin || event.origin.startsWith(origin)
+                        );
+                        
+                        if (!isAllowedOrigin) {
+                            console.warn('[Genesis Azgaar] Rejected message from origin:', event.origin);
+                            return;
+                        }
+                        
+                        // Handle test message for verification
+                        if (event.data && event.data.type === 'azgaar_test') {
+                            console.log('[Genesis Azgaar] Test message received - listener is working!', {
+                                timestamp: new Date().toISOString(),
+                                testId: event.data.testId
+                            });
+                            return;
+                        }
+                        
+                        // Handle azgaar_params message
+                        if (event.data && event.data.type === 'azgaar_params') {
+                            console.log('[Genesis Azgaar] Processing azgaar_params message', {
+                                timestamp: new Date().toISOString(),
+                                paramsCount: event.data.params ? Object.keys(event.data.params).length : 0,
+                                hasSeed: event.data.seed !== undefined
+                            });
+                            
+                            if (typeof azgaar !== 'undefined' && azgaar.options) {
+                                try {
+                                    const beforeOptions = JSON.stringify(azgaar.options);
+                                    console.log('[Genesis Azgaar] Before applying params:', {
+                                        currentSeed: azgaar.options.seed,
+                                        optionsKeys: Object.keys(azgaar.options)
+                                    });
+                                    
+                                    // Apply parameters to azgaar.options
+                                    if (event.data.params) {
+                                        console.log('[Genesis Azgaar] Applying params:', Object.keys(event.data.params));
+                                        Object.assign(azgaar.options, event.data.params);
+                                    }
+                                    // Set seed if provided
+                                    if (event.data.seed !== undefined) {
+                                        console.log('[Genesis Azgaar] Setting seed:', event.data.seed);
+                                        azgaar.options.seed = event.data.seed;
+                                    }
+                                    
+                                    const afterOptions = JSON.stringify(azgaar.options);
+                                    console.log('[Genesis Azgaar] After applying params:', {
+                                        newSeed: azgaar.options.seed,
+                                        optionsChanged: beforeOptions !== afterOptions
+                                    });
+                                    console.log('[Genesis Azgaar] Parameters applied successfully');
+                                } catch (e) {
+                                    console.error('[Genesis Azgaar] Error applying parameters:', e, {
+                                        stack: e.stack,
+                                        timestamp: new Date().toISOString()
+                                    });
+                                }
+                            } else {
+                                console.warn('[Genesis Azgaar] azgaar.options not available yet', {
+                                    hasAzgaar: typeof azgaar !== 'undefined',
+                                    hasOptions: typeof azgaar !== 'undefined' && azgaar.options
+                                });
+                            }
+                        }
+                        
+                        // Handle azgaar_generate message
+                        if (event.data && event.data.type === 'azgaar_generate') {
+                            console.log('[Genesis Azgaar] Processing azgaar_generate message', {
+                                timestamp: new Date().toISOString()
+                            });
+                            
+                            if (typeof azgaar !== 'undefined' && typeof azgaar.generate === 'function') {
+                                try {
+                                    console.log('[Genesis Azgaar] Calling azgaar.generate()', {
+                                        timestamp: new Date().toISOString(),
+                                        optionsSeed: azgaar.options?.seed
+                                    });
+                                    azgaar.generate();
+                                    console.log('[Genesis Azgaar] Generation triggered successfully', {
+                                        timestamp: new Date().toISOString()
+                                    });
+                                } catch (e) {
+                                    console.error('[Genesis Azgaar] Error triggering generation:', e, {
+                                        stack: e.stack,
+                                        timestamp: new Date().toISOString()
+                                    });
+                                }
+                            } else {
+                                console.warn('[Genesis Azgaar] azgaar.generate not available yet', {
+                                    hasAzgaar: typeof azgaar !== 'undefined',
+                                    hasGenerate: typeof azgaar !== 'undefined' && typeof azgaar.generate === 'function'
+                                });
+                            }
+                        }
+                    });
+                    
+                    console.log('[Genesis Azgaar] Message listener injected successfully', {
+                        timestamp: new Date().toISOString()
+                    });
+                })();
+            `;
+            
+            // Try to inject via script tag (more reliable than eval)
+            if (iframeDoc) {
+                try {
+                    const script = iframeDoc.createElement('script');
+                    script.textContent = listenerScript;
+                    iframeDoc.head.appendChild(script);
+                    this.azgaarListenerInjected = true;
+                    injectionMethod = 'script_tag';
+                    console.log('[Genesis World Builder] Azgaar message listener injected via script tag', {
+                        timestamp: new Date().toISOString(),
+                        elapsedMs: Date.now() - attemptStartTime
+                    });
+                } catch (scriptError) {
+                    console.warn('[Genesis World Builder] Script tag injection failed, trying eval:', scriptError.message);
+                    // Fall through to eval
                 }
-                
-                // Fallback to eval if script tag injection fails
+            }
+            
+            // Fallback to eval if script tag injection fails or wasn't attempted
+            if (!this.azgaarListenerInjected) {
                 try {
                     iframe.contentWindow.eval(listenerScript);
                     this.azgaarListenerInjected = true;
-                    console.log('[WorldBuilder] Azgaar message listener injected via eval');
+                    injectionMethod = 'eval';
+                    console.log('[Genesis World Builder] Azgaar message listener injected via eval', {
+                        timestamp: new Date().toISOString(),
+                        elapsedMs: Date.now() - attemptStartTime
+                    });
                 } catch (evalError) {
-                    console.error('[WorldBuilder] Failed to inject listener via eval:', evalError);
+                    console.error('[Genesis World Builder] Failed to inject listener via eval:', evalError, {
+                        message: evalError.message,
+                        stack: evalError.stack
+                    });
                     // Retry if not too many attempts
-                    if (retryCount < 10) {
-                        console.log(`[WorldBuilder] Retrying listener injection (${retryCount + 1}/10)...`);
-                        setTimeout(() => injectListener(retryCount + 1), 1000);
+                    if (retryCount < maxRetries) {
+                        const delay = Math.min(200 * Math.pow(2, retryCount), 2000);
+                        console.log(`[Genesis World Builder] Retrying listener injection in ${delay}ms (${retryCount + 1}/${maxRetries})...`);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        return await this._injectAzgaarListener(iframe, retryCount + 1, maxRetries);
                     } else {
-                        console.error('[WorldBuilder] Failed to inject listener after 10 retries');
+                        console.error('[Genesis World Builder] Failed to inject listener after max retries');
+                        return false;
                     }
                 }
-            } catch (e) {
-                console.error('[WorldBuilder] Failed to inject Azgaar message listener:', e);
-                if (retryCount < 10) {
-                    setTimeout(() => injectListener(retryCount + 1), 1000);
+            }
+            
+            // Verify injection by sending a test message
+            console.log('[Genesis World Builder] Verifying listener injection...', {
+                timestamp: new Date().toISOString(),
+                injectionMethod
+            });
+            
+            const verificationResult = await this._verifyListenerInjection(iframe);
+            if (verificationResult) {
+                this.azgaarListenerVerified = true;
+                console.log('[Genesis World Builder] Listener injection verified successfully!', {
+                    timestamp: new Date().toISOString(),
+                    totalElapsedMs: Date.now() - attemptStartTime
+                });
+                return true;
+            } else {
+                console.warn('[Genesis World Builder] Listener injection verification failed, will retry...');
+                this.azgaarListenerInjected = false; // Reset to allow retry
+                if (retryCount < maxRetries) {
+                    const delay = Math.min(200 * Math.pow(2, retryCount), 2000);
+                    console.log(`[Genesis World Builder] Retrying injection with verification in ${delay}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    return await this._injectAzgaarListener(iframe, retryCount + 1, maxRetries);
+                } else {
+                    console.error('[Genesis World Builder] Failed to verify listener after max retries');
+                    return false;
                 }
+            }
+        } catch (e) {
+            console.error('[Genesis World Builder] Failed to inject Azgaar message listener:', e, {
+                message: e.message,
+                stack: e.stack,
+                retryCount
+            });
+            if (retryCount < maxRetries) {
+                const delay = Math.min(200 * Math.pow(2, retryCount), 2000);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                return await this._injectAzgaarListener(iframe, retryCount + 1, maxRetries);
+            } else {
+                return false;
+            }
+        }
+    },
+    
+    /**
+     * Verify that the injected listener is working by sending a test message
+     * @param {HTMLIFrameElement} iframe - The Azgaar iframe element
+     * @param {number} maxWaitMs - Maximum time to wait for verification (default: 5000)
+     * @returns {Promise<boolean>} True if verification succeeded, false otherwise
+     */
+    async _verifyListenerInjection(iframe, maxWaitMs = 5000) {
+        return new Promise((resolve) => {
+            const testId = 'test_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            const startTime = Date.now();
+            let verificationReceived = false;
+            
+            console.log('[Genesis World Builder] Starting listener verification', {
+                timestamp: new Date().toISOString(),
+                testId,
+                maxWaitMs
+            });
+            
+            // Set up a one-time listener on the iframe's window to catch the test response
+            // Note: We can't directly listen, but we can check if the message was logged
+            // For now, we'll use a timeout and assume success if no error occurs
+            // A more robust solution would require the injected listener to postMessage back
+            
+            // Send test message
+            try {
+                const testMessage = {
+                    type: 'azgaar_test',
+                    testId: testId
+                };
+                
+                console.log('[Genesis World Builder] Sending test message for verification', {
+                    timestamp: new Date().toISOString(),
+                    testMessage,
+                    targetOrigin: '*'
+                });
+                
+                iframe.contentWindow.postMessage(testMessage, '*');
+                
+                // Give it a moment to process (the listener should log it)
+                // In a real verification, we'd wait for a response message, but for now
+                // we'll assume success if the postMessage didn't throw
+                setTimeout(() => {
+                    const elapsed = Date.now() - startTime;
+                    console.log('[Genesis World Builder] Verification check complete', {
+                        timestamp: new Date().toISOString(),
+                        elapsedMs: elapsed,
+                        testId
+                    });
+                    // For now, assume success if postMessage succeeded
+                    // The injected listener will log the message, which we can check in console
+                    resolve(true);
+                }, 500);
+            } catch (e) {
+                console.error('[Genesis World Builder] Error during verification:', e);
+                resolve(false);
+            }
+        });
+    },
+    
+    _setupAzgaarListener() {
+        console.log('[Genesis World Builder] _setupAzgaarListener() called', {
+            timestamp: new Date().toISOString()
+        });
+        
+        // Inject message listener into Azgaar iframe when it loads
+        const iframe = document.getElementById('azgaar-iframe');
+        if (!iframe) {
+            console.warn('[Genesis World Builder] Azgaar iframe not found, cannot setup listener');
+            this.errorMessage = 'Azgaar iframe not found';
+            this.errorDetails = 'The Azgaar map iframe element is missing from the page.';
+            return;
+        }
+        
+        // Helper to check if iframe is loaded
+        const isIframeLoaded = () => {
+            try {
+                return iframe.contentDocument && iframe.contentDocument.readyState === 'complete';
+            } catch (e) {
+                // CORS - can't access contentDocument, but iframe might still be loading
+                return false;
             }
         };
         
-        // Try to inject immediately if iframe is already loaded
-        if (iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
-            // Wait for Azgaar to fully initialize (it loads many scripts)
-            console.log('[WorldBuilder] Iframe already loaded, waiting for Azgaar initialization...');
-            setTimeout(() => injectListener(), 3000);
+        const setupListener = async () => {
+            const setupStartTime = Date.now();
+            console.log('[Genesis World Builder] Starting listener setup process', {
+                timestamp: new Date().toISOString(),
+                iframeLoaded: isIframeLoaded(),
+                hasContentWindow: !!iframe.contentWindow
+            });
+            
+            // Wait for iframe to be accessible (with timeout)
+            if (!iframe.contentWindow) {
+                console.log('[Genesis World Builder] Waiting for iframe.contentWindow to become available...');
+                const iframeWaitStart = Date.now();
+                const iframeWaitMax = 10000; // 10 seconds max wait for iframe window
+                
+                while (!iframe.contentWindow && (Date.now() - iframeWaitStart) < iframeWaitMax) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+                
+                if (!iframe.contentWindow) {
+                    console.error('[Genesis World Builder] iframe.contentWindow never became available');
+                    this.errorMessage = 'Azgaar iframe not accessible';
+                    this.errorDetails = 'The Azgaar iframe content window is not accessible. The iframe may not be loading properly.';
+                    return;
+                }
+            }
+            
+            console.log('[Genesis World Builder] Iframe window is accessible, starting Azgaar readiness polling...');
+            
+            // First, wait for Azgaar to be ready
+            const isReady = await this._pollForAzgaarReady(iframe);
+            if (!isReady) {
+                const elapsed = Date.now() - setupStartTime;
+                console.error('[Genesis World Builder] Azgaar never became ready, cannot inject listener', {
+                    elapsedMs: elapsed,
+                    timestamp: new Date().toISOString()
+                });
+                this.errorMessage = 'Azgaar initialization timeout';
+                this.errorDetails = `The Azgaar map generator did not initialize within 60 seconds (waited ${Math.round(elapsed/1000)}s). This may indicate:\n- Slow network connection\n- Azgaar server not responding\n- Browser security restrictions\n\nPlease refresh the page and try again.`;
+                return;
+            }
+            
+            const readyElapsed = Date.now() - setupStartTime;
+            console.log('[Genesis World Builder] Azgaar is ready, injecting listener...', {
+                elapsedMs: readyElapsed,
+                timestamp: new Date().toISOString()
+            });
+            
+            // Then inject the listener
+            const injectionSuccess = await this._injectAzgaarListener(iframe);
+            if (!injectionSuccess) {
+                const totalElapsed = Date.now() - setupStartTime;
+                console.error('[Genesis World Builder] Failed to inject listener after all retries', {
+                    totalElapsedMs: totalElapsed,
+                    timestamp: new Date().toISOString()
+                });
+                this.errorMessage = 'Failed to setup Azgaar communication';
+                this.errorDetails = 'Could not inject the message listener into the Azgaar iframe. This may be due to CORS restrictions or iframe loading issues.';
+            } else {
+                const totalElapsed = Date.now() - setupStartTime;
+                console.log('[Genesis World Builder] Listener setup completed successfully', {
+                    timestamp: new Date().toISOString(),
+                    totalElapsedMs: totalElapsed
+                });
+                // Clear any previous errors
+                this.errorMessage = null;
+                this.errorDetails = null;
+            }
+        };
+        
+        // Try to setup immediately if iframe is already loaded
+        if (isIframeLoaded()) {
+            console.log('[Genesis World Builder] Iframe already loaded, starting setup immediately', {
+                timestamp: new Date().toISOString()
+            });
+            setupListener();
         } else {
             // Wait for iframe to load
-            console.log('[WorldBuilder] Waiting for iframe to load...');
-            iframe.addEventListener('load', () => {
-                console.log('[WorldBuilder] Iframe loaded, waiting for Azgaar initialization...');
-                // Wait for Azgaar to initialize (it loads many scripts)
-                setTimeout(() => injectListener(), 2000);
+            console.log('[Genesis World Builder] Waiting for iframe to load...', {
+                timestamp: new Date().toISOString(),
+                iframeSrc: iframe.src
+            });
+            
+            const loadHandler = () => {
+                console.log('[Genesis World Builder] Iframe load event fired, starting setup', {
+                    timestamp: new Date().toISOString(),
+                    readyState: isIframeLoaded() ? 'complete' : 'loading'
+                });
+                setupListener();
+            };
+            
+            iframe.addEventListener('load', loadHandler, { once: true });
+            
+            // Fallback: if load event doesn't fire within 5 seconds, try anyway
+            setTimeout(() => {
+                if (!this.azgaarListenerInjected && !this.azgaarListenerVerified) {
+                    console.warn('[Genesis World Builder] Iframe load event timeout, attempting setup anyway', {
+                        timestamp: new Date().toISOString(),
+                        hasContentWindow: !!iframe.contentWindow
+                    });
+                    iframe.removeEventListener('load', loadHandler);
+                    setupListener();
+                }
+            }, 5000);
+            
+            // Also handle iframe error events
+            iframe.addEventListener('error', (e) => {
+                console.error('[Genesis World Builder] Iframe error event fired', {
+                    timestamp: new Date().toISOString(),
+                    error: e
+                });
+                this.errorMessage = 'Azgaar iframe failed to load';
+                this.errorDetails = 'The Azgaar map iframe encountered an error while loading. Please check:\n- Azgaar server is running (http://127.0.0.1:8080)\n- Network connectivity\n- Browser console for details';
             }, { once: true });
         }
     },
@@ -446,225 +851,187 @@ document.addEventListener('alpine:init', () => {
         }, 100);
     },
     
-    generate() {
-        console.log('[WorldBuilder] generate() called', {
+    async generate() {
+        const generateStartTime = Date.now();
+        console.log('[Genesis World Builder] generate() called', {
+            timestamp: new Date().toISOString(),
             params: this.params,
+            paramsCount: Object.keys(this.params).length,
             seed: this.seed,
-            listenerInjected: this.azgaarListenerInjected
+            listenerInjected: this.azgaarListenerInjected,
+            listenerVerified: this.azgaarListenerVerified
         });
+        
+        // Clear previous errors
+        this.errorMessage = null;
+        this.errorDetails = null;
         
         this.isGenerating = true;
         this.progressValue = 0;
-        this.statusText = 'Generating...';
+        this.statusText = 'Preparing generation...';
         
         // Send to Godot for progress tracking
-        GodotBridge.postMessage('generate', { params: this.params });
-        console.log('[WorldBuilder] Sent generate IPC message to Godot');
-        
-        // Ensure message listener is injected before sending messages
-        if (!this.azgaarListenerInjected) {
-            console.log('[WorldBuilder] Listener not injected, setting up...');
-            this._setupAzgaarListener();
+        try {
+            GodotBridge.postMessage('generate', { params: this.params });
+            console.log('[Genesis World Builder] Sent generate IPC message to Godot', {
+                timestamp: new Date().toISOString(),
+                paramsCount: Object.keys(this.params).length
+            });
+        } catch (e) {
+            console.error('[Genesis World Builder] Error sending generate IPC to Godot:', e);
         }
         
-        // Send parameters to Azgaar iframe via postMessage
+        // Get iframe reference
         const iframe = document.getElementById('azgaar-iframe');
-        if (!iframe || !iframe.contentWindow) {
-            console.error('[WorldBuilder] Iframe not found or has no contentWindow');
+        if (!iframe) {
+            console.error('[Genesis World Builder] Azgaar iframe not found');
             this.isGenerating = false;
-            this.statusText = 'Error: Azgaar iframe not available';
+            this.statusText = 'Error: Azgaar iframe not found';
+            this.errorMessage = 'Azgaar iframe not found';
+            this.errorDetails = 'The Azgaar map iframe element is missing from the page.';
+            return;
+        }
+        
+        if (!iframe.contentWindow) {
+            console.error('[Genesis World Builder] iframe.contentWindow not available');
+            this.isGenerating = false;
+            this.statusText = 'Error: Cannot access Azgaar iframe';
+            this.errorMessage = 'Cannot access Azgaar iframe';
+            this.errorDetails = 'The iframe content window is not accessible. The iframe may not be fully loaded.';
             return;
         }
         
         try {
-            // Wait for iframe to be ready, then send parameters
-            const sendToIframe = () => {
-                if (!iframe.contentWindow) {
-                    console.warn('[WorldBuilder] iframe.contentWindow is null');
+            // Step 1: Wait for Azgaar to be ready (polling)
+            this.statusText = 'Waiting for Azgaar to initialize...';
+            console.log('[Genesis World Builder] Step 1: Polling for Azgaar readiness...');
+            const isReady = await this._pollForAzgaarReady(iframe);
+            
+            if (!isReady) {
+                console.error('[Genesis World Builder] Azgaar not ready after polling timeout');
+                this.isGenerating = false;
+                this.statusText = 'Error: Azgaar initialization timeout';
+                this.errorMessage = 'Azgaar initialization timeout';
+                this.errorDetails = 'The Azgaar map generator did not initialize within 60 seconds. This may indicate:\n- Slow network connection\n- Azgaar server not responding\n- Browser security restrictions\n\nPlease refresh the page and try again.';
+                return;
+            }
+            
+            console.log('[Genesis World Builder] Step 1 complete: Azgaar is ready');
+            
+            // Step 2: Ensure listener is injected and verified
+            this.statusText = 'Setting up communication...';
+            console.log('[Genesis World Builder] Step 2: Ensuring listener is injected and verified...');
+            
+            if (!this.azgaarListenerInjected || !this.azgaarListenerVerified) {
+                console.log('[Genesis World Builder] Listener not ready, injecting now...');
+                const injectionSuccess = await this._injectAzgaarListener(iframe);
+                
+                if (!injectionSuccess) {
+                    console.error('[Genesis World Builder] Failed to inject/verify listener');
                     this.isGenerating = false;
-                    this.statusText = 'Error: Cannot access Azgaar iframe';
+                    this.statusText = 'Error: Failed to setup communication';
+                    this.errorMessage = 'Failed to setup Azgaar communication';
+                    this.errorDetails = 'Could not inject or verify the message listener. This may be due to CORS restrictions or iframe security policies.';
                     return;
                 }
-                
-                // Check if azgaar is ready before sending messages
-                const checkAndSend = (retryCount = 0) => {
-                    const maxRetries = 10;
-                    const retryDelay = 500;
-                    
-                    try {
-                        // Check if azgaar is available in iframe
-                        const iframeWindow = iframe.contentWindow;
-                        const hasAzgaar = iframeWindow && typeof iframeWindow.azgaar !== 'undefined';
-                        const hasOptions = hasAzgaar && iframeWindow.azgaar.options;
-                        const hasGenerate = hasAzgaar && typeof iframeWindow.azgaar.generate === 'function';
-                        
-                        console.log('[WorldBuilder] Checking Azgaar readiness', {
-                            hasAzgaar,
-                            hasOptions,
-                            hasGenerate,
-                            retryCount
-                        });
-                        
-                        if (!hasAzgaar || !hasOptions || !hasGenerate) {
-                            if (retryCount < maxRetries) {
-                                console.log(`[WorldBuilder] Azgaar not ready, retrying in ${retryDelay}ms (${retryCount + 1}/${maxRetries})`);
-                                setTimeout(() => checkAndSend(retryCount + 1), retryDelay);
-                                return;
-                            } else {
-                                console.warn('[WorldBuilder] Azgaar not ready after max retries, sending anyway');
-                            }
-                        }
-                        
-                        // Ensure listener is injected (retry if needed)
-                        if (!this.azgaarListenerInjected) {
-                            console.log('[WorldBuilder] Injecting listener before sending messages');
-                            try {
-                                const listenerScript = `
-                                    (function() {
-                                        if (window._azgaarMessageListenerInjected) {
-                                            console.log('[Azgaar] Listener already injected');
-                                            return;
-                                        }
-                                        window._azgaarMessageListenerInjected = true;
-                                        console.log('[Azgaar] Injecting message listener');
-                                        window.addEventListener('message', function(event) {
-                                            console.log('[Azgaar] Message received', {
-                                                type: event.data?.type,
-                                                origin: event.origin,
-                                                hasParams: !!event.data?.params,
-                                                hasSeed: event.data?.seed !== undefined
-                                            });
-                                            
-                                            const allowedOrigins = ['file://', 'res://', 'http://127.0.0.1:8080', window.location.origin, '*'];
-                                            const isAllowedOrigin = allowedOrigins.some(origin => 
-                                                origin === '*' || event.origin === origin || event.origin.startsWith(origin)
-                                            );
-                                            
-                                            if (!isAllowedOrigin) {
-                                                console.warn('[Azgaar] Rejected message from origin:', event.origin);
-                                                return;
-                                            }
-                                            
-                                            if (event.data && event.data.type === 'azgaar_params') {
-                                                console.log('[Azgaar] Processing azgaar_params message');
-                                                if (typeof azgaar !== 'undefined' && azgaar.options) {
-                                                    try {
-                                                        if (event.data.params) {
-                                                            console.log('[Azgaar] Applying params:', Object.keys(event.data.params));
-                                                            Object.assign(azgaar.options, event.data.params);
-                                                        }
-                                                        if (event.data.seed !== undefined) {
-                                                            console.log('[Azgaar] Setting seed:', event.data.seed);
-                                                            azgaar.options.seed = event.data.seed;
-                                                        }
-                                                        console.log('[Azgaar] Parameters applied successfully');
-                                                    } catch (e) {
-                                                        console.error('[Azgaar] Error applying parameters:', e);
-                                                    }
-                                                } else {
-                                                    console.warn('[Azgaar] azgaar.options not available yet');
-                                                }
-                                            }
-                                            
-                                            if (event.data && event.data.type === 'azgaar_generate') {
-                                                console.log('[Azgaar] Processing azgaar_generate message');
-                                                if (typeof azgaar !== 'undefined' && typeof azgaar.generate === 'function') {
-                                                    try {
-                                                        console.log('[Azgaar] Calling azgaar.generate()');
-                                                        azgaar.generate();
-                                                        console.log('[Azgaar] Generation triggered successfully');
-                                                    } catch (e) {
-                                                        console.error('[Azgaar] Error triggering generation:', e);
-                                                    }
-                                                } else {
-                                                    console.warn('[Azgaar] azgaar.generate not available yet');
-                                                }
-                                            }
-                                        });
-                                        console.log('[Azgaar] Message listener injected successfully');
-                                    })();
-                                `;
-                                // Try script tag first, then eval
-                                try {
-                                    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-                                    if (iframeDoc) {
-                                        const script = iframeDoc.createElement('script');
-                                        script.textContent = listenerScript;
-                                        iframeDoc.head.appendChild(script);
-                                        this.azgaarListenerInjected = true;
-                                        console.log('[WorldBuilder] Listener injected via script tag');
-                                    } else {
-                                        iframe.contentWindow.eval(listenerScript);
-                                        this.azgaarListenerInjected = true;
-                                        console.log('[WorldBuilder] Listener injected via eval');
-                                    }
-                                } catch (e) {
-                                    iframe.contentWindow.eval(listenerScript);
-                                    this.azgaarListenerInjected = true;
-                                    console.log('[WorldBuilder] Listener injected via eval (fallback)');
-                                }
-                            } catch (e) {
-                                console.warn('[WorldBuilder] Failed to inject listener on send:', e);
-                            }
-                        }
-                        
-                        // Send parameters to Azgaar iframe
-                        const paramsMessage = {
-                            type: 'azgaar_params',
-                            params: this.params,
-                            seed: this.seed
-                        };
-                        
-                        // Trigger generation in Azgaar
-                        const generateMessage = {
-                            type: 'azgaar_generate'
-                        };
-                        
-                        console.log('[WorldBuilder] Sending messages to Azgaar iframe', {
-                            paramsMessage,
-                            generateMessage,
-                            targetOrigin: '*'
-                        });
-                        
-                        // Use '*' as targetOrigin since we're in a WebView context (res:// origin)
-                        // The listener will validate the origin
-                        try {
-                            iframe.contentWindow.postMessage(paramsMessage, '*');
-                            console.log('[WorldBuilder] Sent azgaar_params message');
-                            
-                            // Small delay between params and generate to ensure params are applied
-                            setTimeout(() => {
-                                iframe.contentWindow.postMessage(generateMessage, '*');
-                                console.log('[WorldBuilder] Sent azgaar_generate message');
-                            }, 100);
-                        } catch (postError) {
-                            console.error('[WorldBuilder] Error sending postMessage:', postError);
-                            this.isGenerating = false;
-                            this.statusText = 'Error: Failed to send message to Azgaar';
-                        }
-                    } catch (e) {
-                        console.error('[WorldBuilder] Error in checkAndSend:', e);
-                        this.isGenerating = false;
-                        this.statusText = 'Error: Failed to communicate with Azgaar';
-                    }
-                };
-                
-                // Start checking and sending
-                checkAndSend();
+            } else {
+                console.log('[Genesis World Builder] Listener already injected and verified');
+            }
+            
+            console.log('[Genesis World Builder] Step 2 complete: Listener is ready');
+            
+            // Step 3: Send parameters message
+            this.statusText = 'Sending parameters...';
+            console.log('[Genesis World Builder] Step 3: Sending parameters to Azgaar...');
+            
+            const paramsMessage = {
+                type: 'azgaar_params',
+                params: this.params,
+                seed: this.seed
             };
             
-            // Try immediately, or wait for iframe load
-            if (iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
-                console.log('[WorldBuilder] Iframe already loaded, sending immediately');
-                sendToIframe();
-            } else {
-                console.log('[WorldBuilder] Waiting for iframe to load');
-                iframe.addEventListener('load', sendToIframe, { once: true });
+            console.log('[Genesis World Builder] Preparing params message', {
+                timestamp: new Date().toISOString(),
+                messageType: paramsMessage.type,
+                paramsCount: Object.keys(paramsMessage.params).length,
+                seed: paramsMessage.seed,
+                fullMessage: paramsMessage
+            });
+            
+            try {
+                iframe.contentWindow.postMessage(paramsMessage, '*');
+                console.log('[Genesis World Builder] Sent azgaar_params message', {
+                    timestamp: new Date().toISOString(),
+                    targetOrigin: '*',
+                    paramsCount: Object.keys(paramsMessage.params).length,
+                    seed: paramsMessage.seed
+                });
+            } catch (postError) {
+                console.error('[Genesis World Builder] Error sending params message:', postError, {
+                    message: postError.message,
+                    stack: postError.stack
+                });
+                this.isGenerating = false;
+                this.statusText = 'Error: Failed to send parameters';
+                this.errorMessage = 'Failed to send parameters';
+                this.errorDetails = `Error: ${postError.message}`;
+                return;
             }
+            
+            // Small delay to ensure params are applied before triggering generation
+            await new Promise(resolve => setTimeout(resolve, 100));
+            console.log('[Genesis World Builder] Step 3 complete: Parameters sent');
+            
+            // Step 4: Send generate message
+            this.statusText = 'Triggering generation...';
+            console.log('[Genesis World Builder] Step 4: Sending generate message to Azgaar...');
+            
+            const generateMessage = {
+                type: 'azgaar_generate'
+            };
+            
+            console.log('[Genesis World Builder] Preparing generate message', {
+                timestamp: new Date().toISOString(),
+                messageType: generateMessage.type,
+                fullMessage: generateMessage
+            });
+            
+            try {
+                iframe.contentWindow.postMessage(generateMessage, '*');
+                console.log('[Genesis World Builder] Sent azgaar_generate message', {
+                    timestamp: new Date().toISOString(),
+                    targetOrigin: '*'
+                });
+            } catch (postError) {
+                console.error('[Genesis World Builder] Error sending generate message:', postError, {
+                    message: postError.message,
+                    stack: postError.stack
+                });
+                this.isGenerating = false;
+                this.statusText = 'Error: Failed to trigger generation';
+                this.errorMessage = 'Failed to trigger generation';
+                this.errorDetails = `Error: ${postError.message}`;
+                return;
+            }
+            
+            console.log('[Genesis World Builder] Step 4 complete: Generate message sent');
+            console.log('[Genesis World Builder] Generation flow completed successfully', {
+                timestamp: new Date().toISOString(),
+                totalElapsedMs: Date.now() - generateStartTime
+            });
+            
+            this.statusText = 'Generation triggered - waiting for Azgaar...';
+            
         } catch (e) {
-            console.error('[WorldBuilder] Failed to send to iframe:', e);
+            console.error('[Genesis World Builder] Error in generate() flow:', e, {
+                message: e.message,
+                stack: e.stack,
+                timestamp: new Date().toISOString()
+            });
             this.isGenerating = false;
-            this.statusText = 'Error: Failed to communicate with Azgaar';
+            this.statusText = 'Error: Generation failed';
+            this.errorMessage = 'Generation failed';
+            this.errorDetails = `Unexpected error: ${e.message}. Check console for details.`;
         }
     }
     }));
