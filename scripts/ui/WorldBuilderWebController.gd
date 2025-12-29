@@ -434,7 +434,11 @@ func _handle_update_param(data: Dictionary) -> void:
 
 func _handle_generate(data: Dictionary) -> void:
 	"""Handle generate message from WebView."""
+	MythosLogger.debug("WorldBuilderWebController", "_handle_generate() called", {"data_keys": data.keys()})
+	
 	var params: Dictionary = data.get("params", {})
+	MythosLogger.debug("WorldBuilderWebController", "Received params from WebView", {"params_count": params.size(), "params": params})
+	
 	current_params.merge(params)
 	
 	# Ensure seed is set
@@ -448,7 +452,11 @@ func _handle_generate(data: Dictionary) -> void:
 	
 	current_params = clamped_params
 	
-	MythosLogger.info("WorldBuilderWebController", "Generation requested", {"params_count": current_params.size(), "seed": current_seed})
+	MythosLogger.info("WorldBuilderWebController", "Generation requested", {
+		"params_count": current_params.size(), 
+		"seed": current_seed,
+		"sample_params": _get_sample_params(current_params, 5)
+	})
 	
 	# Generation is handled via iframe postMessage in JavaScript
 	# The JS generate() function sends postMessage to the Azgaar iframe
@@ -589,6 +597,17 @@ func set_terrain_manager(manager: Node) -> void:
 	MythosLogger.debug("WorldBuilderWebController", "Terrain manager set", {"manager": manager})
 
 
+func _get_sample_params(params: Dictionary, count: int) -> Dictionary:
+	"""Get a sample of parameters for logging (to avoid huge log entries)."""
+	var sample: Dictionary = {}
+	var keys: Array = params.keys()
+	var sample_size: int = min(count, keys.size())
+	for i in range(sample_size):
+		var key = keys[i]
+		sample[key] = params[key]
+	return sample
+
+
 func send_progress_update(progress: float, status: String, is_generating: bool) -> void:
 	"""Send progress update to WebView."""
 	if not web_view:
@@ -600,6 +619,8 @@ func send_progress_update(progress: float, status: String, is_generating: bool) 
 		"status": status,
 		"is_generating": is_generating
 	}
+	
+	MythosLogger.debug("WorldBuilderWebController", "Sending progress update", update_data)
 	
 	var update_script: String = """
 		if (window.GodotBridge && window.GodotBridge._handleUpdate) {
