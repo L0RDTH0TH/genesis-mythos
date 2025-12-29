@@ -21,6 +21,10 @@ var azgaar_readiness_timer: Timer = null
 var azgaar_readiness_poll_count: int = 0
 const MAX_READINESS_POLLS: int = 20  # 20 * 0.5s = 10 seconds max
 
+## Timer for generation completion timeout (fallback)
+var generation_timeout_timer: Timer = null
+const GENERATION_TIMEOUT_SECONDS: float = 60.0  # 60 seconds timeout
+
 ## Current step index (synced with WebView)
 var current_step: int = 0
 
@@ -33,6 +37,14 @@ var current_archetype: String = "High Fantasy"
 ## Step definitions loaded from JSON
 var step_definitions: Dictionary = {}
 const STEP_PARAMETERS_PATH: String = "res://data/config/azgaar_step_parameters.json"
+
+## Debug: Test Azgaar fork headless generation
+const DEBUG_TEST_FORK: bool = true  # Set to true to run test on _ready()
+var test_json_data: Dictionary = {}  # Store test JSON output
+
+## Debug: Test Azgaar fork headless generation
+const DEBUG_TEST_FORK: bool = true  # Set to true to run test on _ready()
+var test_json_data: Dictionary = {}  # Store test JSON output
 
 ## Archetype presets (same as WorldBuilderUI)
 const ARCHETYPES: Dictionary = {
@@ -89,6 +101,11 @@ func _ready() -> void:
 	# Alpine.js readiness will be signaled via IPC message 'alpine_ready'
 	await get_tree().create_timer(0.5).timeout
 	_inject_theme_and_constants()
+	
+	# Debug: Test fork headless generation if enabled
+	if DEBUG_TEST_FORK:
+		await get_tree().create_timer(2.0).timeout  # Wait for fork to initialize
+		_test_fork_headless_generation()
 	
 	# WebView automatically sizes via anchors/size flags - no manual resize needed
 
@@ -335,8 +352,16 @@ func _on_ipc_message(message: String) -> void:
 			_handle_update_param(message_data)
 		"generate":
 			_handle_generate(message_data)
+		"generation_complete":
+			_handle_generation_complete(message_data)
+		"generation_failed":
+			_handle_generation_failed(message_data)
 		"request_data":
 			_handle_request_data(message_data)
+		"map_generated":
+			_handle_map_generated(message_data)
+		"map_generation_failed":
+			_handle_map_generation_failed(message_data)
 		_:
 			MythosLogger.warn("WorldBuilderWebController", "Unknown IPC message type", {"type": message_type, "data": data})
 
@@ -606,12 +631,14 @@ func _handle_generate(data: Dictionary) -> void:
 		var result = web_view.execute_js(generate_script)
 		if result == "generated":
 			MythosLogger.info("WorldBuilderWebController", "Generation triggered via iframe")
+			_start_generation_timeout()
 		else:
 			MythosLogger.error("WorldBuilderWebController", "Failed to trigger generation via iframe", {"result": result})
 			send_progress_update(0.0, "Error: Failed to trigger generation", false)
 	elif web_view.has_method("eval"):
 		web_view.eval(generate_script)
 		MythosLogger.info("WorldBuilderWebController", "Generation triggered via iframe (eval)")
+		_start_generation_timeout()
 
 
 # Removed _on_azgaar_ready() - replaced by _handle_azgaar_ready_ipc() for iframe-based access
@@ -801,9 +828,56 @@ func _generate_initial_default_map() -> void:
 	current_params = clamped_params.duplicate()
 
 
-# Removed _on_azgaar_generation_complete() and _on_azgaar_generation_failed() - 
-# These were for node-based signals. For iframe, generation completion would need
-# to be detected via polling or iframe postMessage (future enhancement)
+func _handle_generation_complete(data: Dictionary) -> void:
+	"""Handle generation_complete IPC message from WebView."""
+	MythosLogger.info("WorldBuilderWebController", "Generation completed", {"timestamp": data.get("timestamp", "unknown")})
+	
+	# Stop timeout timer if running
+	if generation_timeout_timer and not generation_timeout_timer.is_stopped():
+		generation_timeout_timer.stop()
+	
+	# Send final progress update to reset UI state
+	send_progress_update(100.0, "Generation complete!", false)
+
+
+func _handle_generation_failed(data: Dictionary) -> void:
+	"""Handle generation_failed IPC message from WebView."""
+	var error_msg: String = data.get("error", "Unknown error")
+	MythosLogger.error("WorldBuilderWebController", "Generation failed", {"error": error_msg, "timestamp": data.get("timestamp", "unknown")})
+	
+	# Stop timeout timer if running
+	if generation_timeout_timer and not generation_timeout_timer.is_stopped():
+		generation_timeout_timer.stop()
+	
+	# Send error progress update to reset UI state
+	send_progress_update(0.0, "Error: Generation failed - %s" % error_msg, false)
+
+
+func _start_generation_timeout() -> void:
+	"""Start timeout timer as fallback if generation completion not detected."""
+	# Stop existing timer if any
+	if generation_timeout_timer:
+		if not generation_timeout_timer.is_stopped():
+			generation_timeout_timer.stop()
+		generation_timeout_timer.queue_free()
+	
+	# Create new timeout timer
+	generation_timeout_timer = Timer.new()
+	generation_timeout_timer.one_shot = true
+	generation_timeout_timer.wait_time = GENERATION_TIMEOUT_SECONDS
+	generation_timeout_timer.timeout.connect(_on_generation_timeout)
+	add_child(generation_timeout_timer)
+	generation_timeout_timer.start()
+	
+	MythosLogger.debug("WorldBuilderWebController", "Started generation timeout timer", {"timeout_seconds": GENERATION_TIMEOUT_SECONDS})
+
+
+func _on_generation_timeout() -> void:
+	"""Timeout fallback - reset UI state if completion not detected."""
+	MythosLogger.warn("WorldBuilderWebController", "Generation timeout - resetting UI state as fallback")
+	
+	# Reset UI state
+	send_progress_update(0.0, "Generation timeout - please try again", false)
 
 
 func _handle_request_data(data: Dictionary) -> void:
@@ -1099,3 +1173,211 @@ func send_progress_update(progress: float, status: String, is_generating: bool) 
 		web_view.execute_js(update_script)
 	elif web_view.has_method("eval"):
 		web_view.eval(update_script)
+
+
+func _test_fork_headless_generation() -> void:
+	"""Debug test: Run headless Azgaar fork generation with fixed parameters."""
+	MythosLogger.info("WorldBuilderWebController", "=== DEBUG TEST: Fork Headless Generation ===")
+	
+	if not web_view:
+		MythosLogger.error("WorldBuilderWebController", "Cannot run test - WebView is null")
+		return
+	
+	# Load fork template instead of regular template
+	var fork_html_url: String = "res://assets/ui_web/templates/world_builder_v2.html"
+	web_view.load_url(fork_html_url)
+	MythosLogger.info("WorldBuilderWebController", "Loaded fork template for testing", {"url": fork_html_url})
+	
+	# Wait for fork to initialize
+	await get_tree().create_timer(3.0).timeout
+	
+	# Test parameters (small map for speed)
+	var test_options: Dictionary = {
+		"seed": "12345",
+		"mapWidth": 512,
+		"mapHeight": 512,
+		"cellsDesired": 3000,
+		"template": "continents",
+		"heightExponent": 1.0,
+		"allowErosion": true,
+		"plateCount": 5,
+		"statesNumber": 10,
+		"cultures": 8,
+		"religionsNumber": 5
+	}
+	
+	MythosLogger.info("WorldBuilderWebController", "Triggering test generation", {"options": test_options})
+	
+	# Execute test generation via JavaScript
+	var test_script: String = """
+		(async function() {
+			try {
+				console.log('[Test] Checking AzgaarGenesis availability...');
+				if (!window.AzgaarGenesis || !window.AzgaarGenesis.initialized) {
+					console.error('[Test] AzgaarGenesis not initialized');
+					return 'error: not initialized';
+				}
+				
+				console.log('[Test] Loading options...');
+				window.AzgaarGenesis.loadOptions(%s);
+				
+				console.log('[Test] Generating map...');
+				const startTime = performance.now();
+				const data = window.AzgaarGenesis.generateMap(window.AzgaarGenesis.Delaunator);
+				const generateTime = performance.now() - startTime;
+				
+				console.log('[Test] Generation complete:', { seed: data.seed, time: generateTime });
+				
+				console.log('[Test] Extracting JSON...');
+				const json = window.AzgaarGenesis.getMapData();
+				
+				console.log('[Test] JSON extracted, keys:', Object.keys(json));
+				
+				// Send to Godot
+				if (window.GodotBridge && window.GodotBridge.postMessage) {
+					window.GodotBridge.postMessage('map_generated', {
+						data: json,
+						seed: data.seed,
+						generationTime: generateTime
+					});
+					return 'success';
+				} else {
+					return 'error: no GodotBridge';
+				}
+			} catch (error) {
+				console.error('[Test] Generation error:', error);
+				if (window.GodotBridge && window.GodotBridge.postMessage) {
+					window.GodotBridge.postMessage('map_generation_failed', {
+						error: error.message,
+						stack: error.stack
+					});
+				}
+				return 'error: ' + error.message;
+			}
+		})();
+	""" % JSON.stringify(test_options)
+	
+	if web_view.has_method("execute_js"):
+		var result = web_view.execute_js(test_script)
+		MythosLogger.info("WorldBuilderWebController", "Test generation triggered", {"result": result})
+	elif web_view.has_method("eval"):
+		web_view.eval(test_script)
+		MythosLogger.info("WorldBuilderWebController", "Test generation triggered via eval")
+
+
+func _handle_map_generated(data: Dictionary) -> void:
+	"""Handle successful map generation from fork."""
+	MythosLogger.info("WorldBuilderWebController", "=== MAP GENERATED (Fork Test) ===")
+	
+	var map_data: Dictionary = data.get("data", {})
+	var seed_value: String = data.get("seed", "")
+	var gen_time: float = data.get("generationTime", 0.0)
+	
+	# Store for analysis
+	test_json_data = map_data
+	
+	# Print top-level keys
+	var top_keys: Array = map_data.keys()
+	MythosLogger.info("WorldBuilderWebController", "JSON Top-Level Keys", {"keys": top_keys, "count": top_keys.size()})
+	
+	# Print structure summary
+	if map_data.has("settings"):
+		var settings: Dictionary = map_data.get("settings", {})
+		MythosLogger.info("WorldBuilderWebController", "Settings", {"keys": settings.keys()})
+	
+	if map_data.has("grid"):
+		var grid: Dictionary = map_data.get("grid", {})
+		var grid_keys: Array = grid.keys()
+		MythosLogger.info("WorldBuilderWebController", "Grid", {"keys": grid_keys})
+		
+		if grid.has("cells"):
+			var cells: Dictionary = grid.get("cells", {})
+			var cell_keys: Array = cells.keys()
+			MythosLogger.info("WorldBuilderWebController", "Grid.Cells", {"keys": cell_keys})
+			if cells.has("h"):
+				var heights: Array = cells.get("h", [])
+				MythosLogger.info("WorldBuilderWebController", "Grid.Cells.Heights", {"count": heights.size(), "sample": heights.slice(0, 5) if heights.size() > 5 else heights})
+		
+		if grid.has("points"):
+			var points: Array = grid.get("points", [])
+			MythosLogger.info("WorldBuilderWebController", "Grid.Points", {"count": points.size(), "sample": points.slice(0, 2) if points.size() > 2 else points})
+	
+	if map_data.has("pack"):
+		var pack: Dictionary = map_data.get("pack", {})
+		var pack_keys: Array = pack.keys()
+		MythosLogger.info("WorldBuilderWebController", "Pack", {"keys": pack_keys})
+		
+		if pack.has("cells"):
+			var pack_cells: Dictionary = pack.get("cells", {})
+			var pack_cell_keys: Array = pack_cells.keys()
+			MythosLogger.info("WorldBuilderWebController", "Pack.Cells", {"keys": pack_cell_keys})
+		
+		if pack.has("biomes"):
+			var biomes: Array = pack.get("biomes", [])
+			MythosLogger.info("WorldBuilderWebController", "Pack.Biomes", {"count": biomes.size(), "sample": biomes.slice(0, 5) if biomes.size() > 5 else biomes})
+		
+		if pack.has("rivers"):
+			var rivers: Array = pack.get("rivers", [])
+			MythosLogger.info("WorldBuilderWebController", "Pack.Rivers", {"count": rivers.size()})
+	
+	# Save to file
+	_save_test_json_to_file(map_data, seed_value)
+	
+	MythosLogger.info("WorldBuilderWebController", "=== END MAP GENERATED ===", {
+		"seed": seed_value,
+		"generation_time_ms": gen_time,
+		"json_size_bytes": JSON.stringify(map_data).length()
+	})
+
+
+func _handle_map_generation_failed(data: Dictionary) -> void:
+	"""Handle map generation failure from fork."""
+	var error_msg: String = data.get("error", "Unknown error")
+	var stack: String = data.get("stack", "")
+	
+	MythosLogger.error("WorldBuilderWebController", "Map generation failed", {
+		"error": error_msg,
+		"stack": stack
+	})
+	
+	push_error("Azgaar Fork Test Failed: " + error_msg)
+
+
+func _save_test_json_to_file(json_data: Dictionary, seed: String) -> void:
+	"""Save test JSON to user://debug/azgaar_sample_map.json"""
+	# Create debug directory if needed
+	var debug_dir := DirAccess.open("user://")
+	if not debug_dir:
+		MythosLogger.error("WorldBuilderWebController", "Cannot open user:// directory")
+		return
+	
+	if not debug_dir.dir_exists("debug"):
+		var err := debug_dir.make_dir("debug")
+		if err != OK:
+			MythosLogger.error("WorldBuilderWebController", "Failed to create debug directory", {"error": err})
+			return
+	
+	# Save JSON file
+	var file_path: String = "user://debug/azgaar_sample_map.json"
+	var file := FileAccess.open(file_path, FileAccess.WRITE)
+	if not file:
+		MythosLogger.error("WorldBuilderWebController", "Failed to open file for writing", {
+			"path": file_path,
+			"error": FileAccess.get_open_error()
+		})
+		return
+	
+	var json_string := JSON.stringify(json_data, "  ", false)
+	file.store_string(json_string)
+	file.close()
+	
+	MythosLogger.info("WorldBuilderWebController", "Saved test JSON to file", {
+		"path": file_path,
+		"size_bytes": json_string.length(),
+		"seed": seed
+	})
+	
+	print("=== AZGAAR TEST JSON SAVED ===")
+	print("File: " + file_path)
+	print("Size: " + str(json_string.length()) + " bytes")
+	print("Seed: " + seed)
