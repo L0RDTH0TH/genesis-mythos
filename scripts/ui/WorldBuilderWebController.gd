@@ -10,17 +10,22 @@ extends Control
 ## Reference to the WebView node (for UI)
 @onready var web_view: WebView = $WebView
 
-## Reference to WorldBuilderAzgaar controller (for direct JS injection)
-var azgaar_controller: Node = null
+## Iframe ID for Azgaar embedding (for iframe-based JS injection)
+const IFRAME_ID: String = "azgaar-iframe"
+
+## Flag to track if Azgaar is ready via iframe
+var azgaar_ready_via_iframe: bool = false
+
+## Timer for polling Azgaar readiness
+var azgaar_readiness_timer: Timer = null
+var azgaar_readiness_poll_count: int = 0
+const MAX_READINESS_POLLS: int = 20  # 20 * 0.5s = 10 seconds max
 
 ## Current step index (synced with WebView)
 var current_step: int = 0
 
 ## Current parameters dictionary (synced with WebView)
 var current_params: Dictionary = {}
-
-## Current seed value
-var current_seed: int = 12345
 
 ## Current archetype name
 var current_archetype: String = "High Fantasy"
@@ -42,6 +47,9 @@ const ARCHETYPES: Dictionary = {
 func _ready() -> void:
 	"""Initialize the WebView and load the World Builder HTML."""
 	MythosLogger.info("WorldBuilderWebController", "_ready() called")
+	
+	# DIAGNOSTIC: Log scene tree structure
+	_print_scene_tree_diagnostics()
 	
 	if not web_view:
 		MythosLogger.error("WorldBuilderWebController", "WebView node not found!")
@@ -73,25 +81,9 @@ func _ready() -> void:
 		"has_console": web_view.has_signal("console_message")
 	})
 	
-	# Find WorldBuilderAzgaar controller for direct JS injection
-	_find_azgaar_controller()
-	
-	# Connect to Azgaar ready signal if available
-	if azgaar_controller:
-		MythosLogger.info("WorldBuilderWebController", "Azgaar controller found", {
-			"path": azgaar_controller.get_path(),
-			"has_signal": azgaar_controller.has_signal("azgaar_ready")
-		})
-		if azgaar_controller.has_signal("azgaar_ready"):
-			if not azgaar_controller.azgaar_ready.is_connected(_on_azgaar_ready):
-				azgaar_controller.azgaar_ready.connect(_on_azgaar_ready)
-				MythosLogger.info("WorldBuilderWebController", "Connected to Azgaar ready signal")
-			else:
-				MythosLogger.warn("WorldBuilderWebController", "Azgaar ready signal already connected")
-		else:
-			MythosLogger.warn("WorldBuilderWebController", "Azgaar controller does not have azgaar_ready signal")
-	else:
-		MythosLogger.error("WorldBuilderWebController", "Azgaar controller NOT FOUND - initial generation will not work")
+	# Note: Azgaar is now embedded as iframe in world_builder.html
+	# Readiness will be signaled via IPC message 'azgaar_loaded' and 'azgaar_ready'
+	MythosLogger.info("WorldBuilderWebController", "Azgaar will be accessed via iframe embedding")
 	
 	# Wait for page to load, then inject theme/constants
 	# Alpine.js readiness will be signaled via IPC message 'alpine_ready'
@@ -101,42 +93,7 @@ func _ready() -> void:
 	# WebView automatically sizes via anchors/size flags - no manual resize needed
 
 
-func _find_azgaar_controller() -> void:
-	"""Find the WorldBuilderAzgaar controller in the scene tree."""
-	# Try to find it as a sibling or in parent
-	var parent_node = get_parent()
-	if parent_node:
-		# Look for WorldBuilderAzgaar as sibling
-		for child in parent_node.get_children():
-			if child.has_method("trigger_generation_with_options"):
-				azgaar_controller = child
-				MythosLogger.info("WorldBuilderWebController", "Found WorldBuilderAzgaar controller", {"path": child.get_path()})
-				return
-		
-		# Look in parent's parent
-		var grandparent = parent_node.get_parent()
-		if grandparent:
-			for child in grandparent.get_children():
-				if child.has_method("trigger_generation_with_options"):
-					azgaar_controller = child
-					MythosLogger.info("WorldBuilderWebController", "Found WorldBuilderAzgaar controller in grandparent", {"path": child.get_path()})
-					return
-	
-	# Try to find by node path (common structure)
-	var azgaar_node = get_node_or_null("../WorldBuilderAzgaar")
-	if azgaar_node and azgaar_node.has_method("trigger_generation_with_options"):
-		azgaar_controller = azgaar_node
-		MythosLogger.info("WorldBuilderWebController", "Found WorldBuilderAzgaar controller via path")
-		return
-	
-	# Try to find by autoload/singleton if it exists
-	azgaar_node = get_node_or_null("/root/WorldBuilderAzgaar")
-	if azgaar_node and azgaar_node.has_method("trigger_generation_with_options"):
-		azgaar_controller = azgaar_node
-		MythosLogger.info("WorldBuilderWebController", "Found WorldBuilderAzgaar controller via autoload")
-		return
-	
-	MythosLogger.warn("WorldBuilderWebController", "WorldBuilderAzgaar controller not found - direct injection will not work")
+# Removed _find_azgaar_controller() - Azgaar is now accessed via iframe in HTML
 
 
 func _notification(what: int) -> void:
@@ -366,12 +323,14 @@ func _on_ipc_message(message: String) -> void:
 	match message_type:
 		"alpine_ready":
 			_handle_alpine_ready(message_data)
+		"azgaar_loaded":
+			_handle_azgaar_loaded(message_data)
+		"azgaar_ready":
+			_handle_azgaar_ready_ipc(message_data)
 		"set_step":
 			_handle_set_step(message_data)
 		"load_archetype":
 			_handle_load_archetype(message_data)
-		"set_seed":
-			_handle_set_seed(message_data)
 		"update_param":
 			_handle_update_param(message_data)
 		"generate":
@@ -389,24 +348,83 @@ func _handle_alpine_ready(data: Dictionary) -> void:
 	await get_tree().create_timer(0.1).timeout
 	# Now that Alpine.js is ready, send step definitions and archetypes
 	_send_step_definitions()
-	
-	# FALLBACK: If Azgaar controller wasn't found earlier, try finding it again
-	if not azgaar_controller:
-		MythosLogger.warn("WorldBuilderWebController", "Azgaar controller not found earlier, retrying after Alpine ready")
-		_find_azgaar_controller()
-		if azgaar_controller:
-			MythosLogger.info("WorldBuilderWebController", "Azgaar controller found after retry", {"path": azgaar_controller.get_path()})
-			# Connect to signal if available
-			if azgaar_controller.has_signal("azgaar_ready"):
-				if not azgaar_controller.azgaar_ready.is_connected(_on_azgaar_ready):
-					azgaar_controller.azgaar_ready.connect(_on_azgaar_ready)
-					MythosLogger.info("WorldBuilderWebController", "Connected to Azgaar ready signal (after retry)")
-	
-	# FALLBACK: Poll for Azgaar readiness and trigger generation if signal didn't work
-	# Wait a bit for Azgaar to initialize, then check if it's ready
-	await get_tree().create_timer(3.0).timeout  # Give Azgaar time to load
-	_check_and_trigger_initial_generation()
 	_send_archetypes()
+
+
+func _handle_azgaar_loaded(data: Dictionary) -> void:
+	"""Handle azgaar_loaded IPC message - iframe has loaded, start polling for readiness."""
+	MythosLogger.info("WorldBuilderWebController", "Azgaar iframe loaded, starting readiness polling")
+	
+	# Start polling for Azgaar readiness
+	azgaar_readiness_poll_count = 0
+	if azgaar_readiness_timer == null:
+		azgaar_readiness_timer = Timer.new()
+		azgaar_readiness_timer.one_shot = false
+		azgaar_readiness_timer.wait_time = 0.5
+		azgaar_readiness_timer.timeout.connect(_poll_azgaar_readiness)
+		add_child(azgaar_readiness_timer)
+	
+	azgaar_readiness_timer.start()
+	MythosLogger.debug("WorldBuilderWebController", "Started Azgaar readiness polling timer")
+
+
+func _poll_azgaar_readiness() -> void:
+	"""Poll iframe to check if Azgaar JS is ready."""
+	if azgaar_readiness_poll_count >= MAX_READINESS_POLLS:
+		azgaar_readiness_timer.stop()
+		MythosLogger.warn("WorldBuilderWebController", "Azgaar readiness polling timeout after %d attempts" % MAX_READINESS_POLLS)
+		return
+	
+	azgaar_readiness_poll_count += 1
+	
+	# Check if Azgaar is ready via iframe
+	var check_script: String = """
+		(function() {
+			try {
+				var iframe = document.getElementById('%s');
+				if (iframe && iframe.contentWindow && iframe.contentWindow.azgaar && 
+				    iframe.contentWindow.azgaar.options && typeof iframe.contentWindow.azgaar.generate === 'function') {
+					if (window.GodotBridge && window.GodotBridge.postMessage) {
+						window.GodotBridge.postMessage({
+							type: 'azgaar_ready',
+							data: {}
+						});
+					}
+					return 'ready';
+				}
+				return 'not_ready';
+			} catch (e) {
+				console.error('[WorldBuilder] Error checking Azgaar readiness:', e);
+				return 'error: ' + e.message;
+			}
+		})();
+	""" % IFRAME_ID
+	
+	if web_view.has_method("execute_js"):
+		var result = web_view.execute_js(check_script)
+		if result == "ready":
+			azgaar_readiness_timer.stop()
+			MythosLogger.info("WorldBuilderWebController", "Azgaar is ready via iframe (poll attempt %d)" % azgaar_readiness_poll_count)
+		elif result != null and result.begins_with("error"):
+			MythosLogger.warn("WorldBuilderWebController", "Error checking Azgaar readiness: %s" % result)
+	elif web_view.has_method("eval"):
+		web_view.eval(check_script)
+
+
+func _handle_azgaar_ready_ipc(data: Dictionary) -> void:
+	"""Handle azgaar_ready IPC message - Azgaar JS is ready for generation."""
+	MythosLogger.info("WorldBuilderWebController", "Azgaar ready via iframe, triggering initial generation")
+	azgaar_ready_via_iframe = true
+	
+	# Stop polling if still running
+	if azgaar_readiness_timer and azgaar_readiness_timer.is_stopped() == false:
+		azgaar_readiness_timer.stop()
+	
+	# Wait a moment for Azgaar to be fully ready
+	await get_tree().create_timer(0.5).timeout
+	
+	# Trigger initial default map generation
+	_generate_initial_default_map()
 
 
 func _handle_set_step(data: Dictionary) -> void:
@@ -456,12 +474,6 @@ func _handle_load_archetype(data: Dictionary) -> void:
 		# Send params update to WebView
 		_send_params_update()
 		MythosLogger.info("WorldBuilderWebController", "Loaded archetype preset", {"archetype": archetype_name, "params": preset_mapped})
-
-
-func _handle_set_seed(data: Dictionary) -> void:
-	"""Handle set_seed message from WebView."""
-	current_seed = int(data.get("seed", 12345))
-	MythosLogger.debug("WorldBuilderWebController", "Seed changed", {"seed": current_seed})
 
 
 func _clamp_parameter_value(azgaar_key: String, value: Variant) -> Variant:
@@ -518,23 +530,34 @@ func _handle_generate(data: Dictionary) -> void:
 	"""Handle generate message from WebView."""
 	MythosLogger.debug("WorldBuilderWebController", "_handle_generate() called", {"data_keys": data.keys()})
 	
+	# DIAGNOSTIC: Log iframe readiness state before generation
+	MythosLogger.info("WorldBuilderWebController", "DIAGNOSTIC: _handle_generate() iframe readiness", {
+		"azgaar_ready_via_iframe": azgaar_ready_via_iframe,
+		"iframe_id": IFRAME_ID
+	})
+	
 	var params: Dictionary = data.get("params", {})
-	var seed_from_message = data.get("seed", current_seed)
 	
 	MythosLogger.debug("WorldBuilderWebController", "Received params from WebView", {
 		"params_count": params.size(), 
 		"params": params,
-		"seed": seed_from_message
+		"optionsSeed": params.get("optionsSeed", "not_set")
 	})
 	
 	current_params.merge(params)
 	
-	# Use seed from message if provided, otherwise use current_seed
-	if seed_from_message != current_seed:
-		current_seed = int(seed_from_message)
-	
-	# Ensure seed is set in params
-	current_params["optionsSeed"] = current_seed
+	# Ensure optionsSeed is set in params (from Step 1)
+	if not current_params.has("optionsSeed"):
+		# Fallback: use default from step definitions or random
+		var default_seed: int = 12345
+		for step_dict in step_definitions.get("steps", []):
+			var parameters: Array = step_dict.get("parameters", [])
+			for param_dict in parameters:
+				if param_dict.get("azgaar_key") == "optionsSeed" and param_dict.has("default"):
+					default_seed = int(param_dict["default"])
+					break
+		current_params["optionsSeed"] = default_seed
+		MythosLogger.warn("WorldBuilderWebController", "optionsSeed not in params, using default", {"seed": default_seed})
 	
 	# Clamp all parameters before generation (only curated parameters)
 	var clamped_params: Dictionary = {}
@@ -546,85 +569,160 @@ func _handle_generate(data: Dictionary) -> void:
 	
 	MythosLogger.info("WorldBuilderWebController", "Generation requested", {
 		"params_count": current_params.size(), 
-		"seed": current_seed,
+		"optionsSeed": current_params.get("optionsSeed", "not_set"),
 		"sample_params": _get_sample_params(current_params, 5)
 	})
 	
-	# Use direct JS injection via WorldBuilderAzgaar controller
-	if azgaar_controller and azgaar_controller.has_method("trigger_generation_with_options"):
-		send_progress_update(10.0, "Syncing parameters to Azgaar...", true)
-		
-		# Prepare options dictionary for Azgaar
-		var azgaar_options: Dictionary = current_params.duplicate()
-		# Ensure seed is set correctly
-		azgaar_options["optionsSeed"] = current_seed
-		
-		# Trigger generation via direct JS injection
-		azgaar_controller.trigger_generation_with_options(azgaar_options, true)
-		
-		send_progress_update(40.0, "Generating map...", true)
-		
-		# Connect to generation signals if available
-		if azgaar_controller.has_signal("generation_complete"):
-			if not azgaar_controller.generation_complete.is_connected(_on_azgaar_generation_complete):
-				azgaar_controller.generation_complete.connect(_on_azgaar_generation_complete)
-		if azgaar_controller.has_signal("generation_failed"):
-			if not azgaar_controller.generation_failed.is_connected(_on_azgaar_generation_failed):
-				azgaar_controller.generation_failed.connect(_on_azgaar_generation_failed)
-		
-		MythosLogger.info("WorldBuilderWebController", "Generation triggered via direct JS injection")
-	else:
-		MythosLogger.error("WorldBuilderWebController", "Cannot generate - Azgaar controller not available")
-		send_progress_update(0.0, "Error: Azgaar controller not found", false)
-
-
-func _on_azgaar_ready() -> void:
-	"""Handle Azgaar ready signal - trigger initial default map generation."""
-	MythosLogger.info("WorldBuilderWebController", "Azgaar ready signal received, triggering initial generation")
+	# Use iframe-based JS injection to access Azgaar
+	if not azgaar_ready_via_iframe:
+		MythosLogger.warn("WorldBuilderWebController", "Azgaar not ready yet via iframe, attempting generation anyway")
 	
-	# Wait a moment for Azgaar to be fully ready
-	await get_tree().create_timer(0.5).timeout
+	send_progress_update(10.0, "Syncing parameters to Azgaar...", true)
 	
-	# Generate default map with default parameters
-	_generate_initial_default_map()
-
-
-func _check_and_trigger_initial_generation() -> void:
-	"""Fallback: Check if Azgaar is ready and trigger initial generation if signal didn't work."""
-	if not azgaar_controller:
-		MythosLogger.warn("WorldBuilderWebController", "Cannot check Azgaar readiness - controller not found")
-		return
+	# Inject parameters into Azgaar via iframe.contentWindow
+	_sync_params_to_azgaar_iframe(current_params)
 	
-	# Check if Azgaar WebView is ready by executing JS
-	if azgaar_controller.has_method("execute_azgaar_js"):
-		var check_code = """
+	send_progress_update(40.0, "Generating map...", true)
+	
+	# Trigger generation via iframe
+	var generate_script: String = """
 		(function() {
-			if (typeof azgaar !== 'undefined' && azgaar.options && typeof azgaar.generate === 'function') {
-				return 'ready';
+			try {
+				var iframe = document.getElementById('%s');
+				if (iframe && iframe.contentWindow && iframe.contentWindow.azgaar && 
+				    typeof iframe.contentWindow.azgaar.generate === 'function') {
+					iframe.contentWindow.azgaar.generate();
+					return 'generated';
+				}
+				return 'error: azgaar not available';
+			} catch (e) {
+				console.error('[WorldBuilder] Error triggering generation:', e);
+				return 'error: ' + e.message;
 			}
-			return 'not_ready';
 		})();
-		"""
-		var result = azgaar_controller.execute_azgaar_js(check_code)
-		
-		if result == "ready":
-			MythosLogger.info("WorldBuilderWebController", "Azgaar is ready (fallback check), triggering initial generation")
-			_generate_initial_default_map()
+	""" % IFRAME_ID
+	
+	if web_view.has_method("execute_js"):
+		var result = web_view.execute_js(generate_script)
+		if result == "generated":
+			MythosLogger.info("WorldBuilderWebController", "Generation triggered via iframe")
 		else:
-			MythosLogger.warn("WorldBuilderWebController", "Azgaar not ready yet (fallback check)", {"result": result})
-	elif azgaar_controller.has_method("trigger_generation_with_options"):
-		# If we can't check readiness, just try to trigger generation anyway
-		MythosLogger.info("WorldBuilderWebController", "Cannot check Azgaar readiness, attempting generation anyway (fallback)")
-		_generate_initial_default_map()
-	else:
-		MythosLogger.warn("WorldBuilderWebController", "Cannot check or trigger Azgaar - methods not available")
+			MythosLogger.error("WorldBuilderWebController", "Failed to trigger generation via iframe", {"result": result})
+			send_progress_update(0.0, "Error: Failed to trigger generation", false)
+	elif web_view.has_method("eval"):
+		web_view.eval(generate_script)
+		MythosLogger.info("WorldBuilderWebController", "Generation triggered via iframe (eval)")
+
+
+# Removed _on_azgaar_ready() - replaced by _handle_azgaar_ready_ipc() for iframe-based access
+# Removed _check_and_trigger_initial_generation() - replaced by polling in _handle_azgaar_loaded()
+
+
+func _sync_params_to_azgaar_iframe(params: Dictionary) -> void:
+	"""Sync parameters to Azgaar via iframe.contentWindow JavaScript injection."""
+	# Special handling: Collect wind array parameters (options.winds[0..5])
+	var winds_array: Array[int] = []
+	var wind_keys_processed: Array[String] = []
+	
+	for azgaar_key in params.keys():
+		# Check if this is a wind array parameter (e.g., "options.winds[0]")
+		if azgaar_key.begins_with("options.winds[") and azgaar_key.ends_with("]"):
+			var index_str: String = azgaar_key.substr(azgaar_key.find("[") + 1, azgaar_key.find("]") - azgaar_key.find("[") - 1)
+			var wind_index: int = int(index_str)
+			var wind_value: int = int(params[azgaar_key])
+			
+			# Ensure array is large enough
+			while winds_array.size() <= wind_index:
+				winds_array.append(0)
+			winds_array[wind_index] = wind_value
+			wind_keys_processed.append(azgaar_key)
+	
+	# If we collected wind values, set the winds array in Azgaar
+	if winds_array.size() > 0:
+		var winds_strs: Array[String] = []
+		for wind_val in winds_array:
+			winds_strs.append(str(wind_val))
+		var winds_js: String = "[%s]" % ",".join(winds_strs)
+		var js_code: String = """
+			(function() {
+				try {
+					var iframe = document.getElementById('%s');
+					if (iframe && iframe.contentWindow && iframe.contentWindow.azgaar && iframe.contentWindow.azgaar.options) {
+						iframe.contentWindow.azgaar.options.winds = %s;
+					}
+				} catch (e) {
+					console.error('[WorldBuilder] Error setting winds:', e);
+				}
+			})();
+		""" % [IFRAME_ID, winds_js]
+		
+		if web_view.has_method("execute_js"):
+			web_view.execute_js(js_code)
+		elif web_view.has_method("eval"):
+			web_view.eval(js_code)
+		MythosLogger.debug("WorldBuilderWebController", "Synced winds array to Azgaar via iframe", {"winds": winds_array})
+	
+	# Inject each parameter (skip wind array indices as they're handled above)
+	for azgaar_key in params:
+		if azgaar_key in wind_keys_processed:
+			continue  # Skip, already handled
+		
+		var value = params[azgaar_key]
+		
+		# Format value based on type
+		var js_value: String
+		if value is String:
+			js_value = '"%s"' % value.replace('"', '\\"')
+		elif value is bool:
+			js_value = "true" if value else "false"
+		elif value is int or value is float:
+			js_value = str(value)
+		else:
+			js_value = str(value)
+		
+		# Execute JS to set parameter via iframe
+		var js_code: String
+		if azgaar_key.begins_with("options"):
+			# Already has "options" prefix
+			js_code = """
+				(function() {
+					try {
+						var iframe = document.getElementById('%s');
+						if (iframe && iframe.contentWindow && iframe.contentWindow.azgaar && iframe.contentWindow.azgaar.options) {
+							iframe.contentWindow.azgaar.%s = %s;
+						}
+					} catch (e) {
+						console.error('[WorldBuilder] Error setting param:', e);
+					}
+				})();
+			""" % [IFRAME_ID, azgaar_key, js_value]
+		else:
+			# Standard option path
+			js_code = """
+				(function() {
+					try {
+						var iframe = document.getElementById('%s');
+						if (iframe && iframe.contentWindow && iframe.contentWindow.azgaar && iframe.contentWindow.azgaar.options) {
+							iframe.contentWindow.azgaar.options.%s = %s;
+						}
+					} catch (e) {
+						console.error('[WorldBuilder] Error setting param:', e);
+					}
+				})();
+			""" % [IFRAME_ID, azgaar_key, js_value]
+		
+		if web_view.has_method("execute_js"):
+			web_view.execute_js(js_code)
+		elif web_view.has_method("eval"):
+			web_view.eval(js_code)
+	
+	MythosLogger.debug("WorldBuilderWebController", "Synced parameters to Azgaar via iframe", {"param_count": params.size(), "winds_processed": winds_array.size()})
 
 
 func _generate_initial_default_map() -> void:
-	"""Generate initial default map when World Builder loads."""
-	if not azgaar_controller or not azgaar_controller.has_method("trigger_generation_with_options"):
-		MythosLogger.warn("WorldBuilderWebController", "Cannot generate initial map - Azgaar controller not available")
-		return
+	"""Generate initial default map when World Builder loads via iframe."""
+	if not azgaar_ready_via_iframe:
+		MythosLogger.warn("WorldBuilderWebController", "Azgaar not ready yet via iframe, attempting generation anyway")
 	
 	# Build default parameters from step definitions
 	var default_params: Dictionary = {}
@@ -651,10 +749,10 @@ func _generate_initial_default_map() -> void:
 			"mapHeightInput": 540
 		}
 	
-	# Use random seed for initial generation
-	var initial_seed: int = randi() % 999999999 + 1
-	default_params["optionsSeed"] = initial_seed
-	current_seed = initial_seed
+	# Use random seed for initial generation if optionsSeed not already set
+	if not default_params.has("optionsSeed"):
+		var initial_seed: int = randi() % 999999999 + 1
+		default_params["optionsSeed"] = initial_seed
 	
 	# Clamp parameters
 	var clamped_params: Dictionary = {}
@@ -664,27 +762,48 @@ func _generate_initial_default_map() -> void:
 	
 	MythosLogger.info("WorldBuilderWebController", "Triggering initial default map generation", {
 		"params_count": clamped_params.size(),
-		"seed": initial_seed,
+		"optionsSeed": clamped_params.get("optionsSeed", "not_set"),
 		"sample_params": _get_sample_params(clamped_params, 5)
 	})
 	
-	# Trigger generation
-	azgaar_controller.trigger_generation_with_options(clamped_params, true)
+	# Sync parameters to Azgaar via iframe
+	_sync_params_to_azgaar_iframe(clamped_params)
+	
+	# Trigger generation via iframe
+	var generate_script: String = """
+		(function() {
+			try {
+				var iframe = document.getElementById('%s');
+				if (iframe && iframe.contentWindow && iframe.contentWindow.azgaar && 
+				    typeof iframe.contentWindow.azgaar.generate === 'function') {
+					iframe.contentWindow.azgaar.generate();
+					return 'generated';
+				}
+				return 'error: azgaar not available';
+			} catch (e) {
+				console.error('[WorldBuilder] Error triggering initial generation:', e);
+				return 'error: ' + e.message;
+			}
+		})();
+	""" % IFRAME_ID
+	
+	if web_view.has_method("execute_js"):
+		var result = web_view.execute_js(generate_script)
+		if result == "generated":
+			MythosLogger.info("WorldBuilderWebController", "Initial generation triggered via iframe")
+		else:
+			MythosLogger.warn("WorldBuilderWebController", "Failed to trigger initial generation via iframe", {"result": result})
+	elif web_view.has_method("eval"):
+		web_view.eval(generate_script)
+		MythosLogger.info("WorldBuilderWebController", "Initial generation triggered via iframe (eval)")
 	
 	# Also update current_params so UI reflects the defaults
 	current_params = clamped_params.duplicate()
 
 
-func _on_azgaar_generation_complete() -> void:
-	"""Handle generation complete signal from Azgaar controller."""
-	send_progress_update(100.0, "Generation complete!", false)
-	MythosLogger.info("WorldBuilderWebController", "Azgaar generation completed")
-
-
-func _on_azgaar_generation_failed(reason: String) -> void:
-	"""Handle generation failed signal from Azgaar controller."""
-	send_progress_update(0.0, "Generation failed: %s" % reason, false)
-	MythosLogger.error("WorldBuilderWebController", "Azgaar generation failed", {"reason": reason})
+# Removed _on_azgaar_generation_complete() and _on_azgaar_generation_failed() - 
+# These were for node-based signals. For iframe, generation completion would need
+# to be detected via polling or iframe postMessage (future enhancement)
 
 
 func _handle_request_data(data: Dictionary) -> void:
@@ -830,6 +949,131 @@ func _on_console_message(level: int, message: String, source: String, line: int)
 				MythosLogger.error("WorldBuilderWebController", "WebView console", {"level": "error", "message": message, "source": source, "line": line})
 			_:
 				MythosLogger.debug("WorldBuilderWebController", "WebView console", {"level": level, "message": message, "source": source, "line": line})
+
+func _print_scene_tree_diagnostics() -> void:
+	"""Print detailed scene tree structure for diagnostics."""
+	MythosLogger.info("WorldBuilderWebController", "=== SCENE TREE DIAGNOSTICS ===")
+	MythosLogger.info("WorldBuilderWebController", "Current node", {
+		"name": name,
+		"path": get_path(),
+		"class": get_class(),
+		"parent": get_parent().name if get_parent() else "NONE"
+	})
+	
+	# Log all children
+	var children = get_children()
+	MythosLogger.info("WorldBuilderWebController", "Direct children", {"count": children.size()})
+	for i in range(children.size()):
+		var child = children[i]
+		MythosLogger.info("WorldBuilderWebController", "  Child[%d]" % i, {
+			"name": child.name,
+			"path": child.get_path(),
+			"class": child.get_class(),
+			"has_trigger_method": child.has_method("trigger_generation_with_options")
+		})
+	
+	# Log parent and siblings
+	var parent = get_parent()
+	if parent:
+		MythosLogger.info("WorldBuilderWebController", "Parent node", {
+			"name": parent.name,
+			"path": parent.get_path(),
+			"class": parent.get_class()
+		})
+		var siblings = parent.get_children()
+		MythosLogger.info("WorldBuilderWebController", "Siblings", {"count": siblings.size()})
+		for i in range(siblings.size()):
+			var sibling = siblings[i]
+			MythosLogger.info("WorldBuilderWebController", "  Sibling[%d]" % i, {
+				"name": sibling.name,
+				"path": sibling.get_path(),
+				"class": sibling.get_class(),
+				"has_trigger_method": sibling.has_method("trigger_generation_with_options")
+			})
+		
+		# Log grandparent if exists
+		var grandparent = parent.get_parent()
+		if grandparent:
+			MythosLogger.info("WorldBuilderWebController", "Grandparent node", {
+				"name": grandparent.name,
+				"path": grandparent.get_path(),
+				"class": grandparent.get_class()
+			})
+			var cousins = grandparent.get_children()
+			MythosLogger.info("WorldBuilderWebController", "Cousins (grandparent children)", {"count": cousins.size()})
+			for i in range(cousins.size()):
+				var cousin = cousins[i]
+				MythosLogger.info("WorldBuilderWebController", "  Cousin[%d]" % i, {
+					"name": cousin.name,
+					"path": cousin.get_path(),
+					"class": cousin.get_class(),
+					"has_trigger_method": cousin.has_method("trigger_generation_with_options")
+				})
+	
+	# Check for WebView nodes
+	var webview_nodes = _find_all_webview_nodes(self)
+	MythosLogger.info("WorldBuilderWebController", "WebView nodes found", {"count": webview_nodes.size()})
+	for i in range(webview_nodes.size()):
+		var wv = webview_nodes[i]
+		MythosLogger.info("WorldBuilderWebController", "  WebView[%d]" % i, {
+			"name": wv.name,
+			"path": wv.get_path(),
+			"parent": wv.get_parent().name if wv.get_parent() else "NONE"
+		})
+	
+	MythosLogger.info("WorldBuilderWebController", "=== END SCENE TREE DIAGNOSTICS ===")
+
+
+func _find_all_webview_nodes(node: Node) -> Array:
+	"""Recursively find all WebView nodes in the scene tree."""
+	var webviews: Array = []
+	if node.get_class() == "WebView":
+		webviews.append(node)
+	for child in node.get_children():
+		webviews.append_array(_find_all_webview_nodes(child))
+	return webviews
+
+
+func _print_azgaar_search_diagnostics() -> void:
+	"""Print detailed diagnostics about Azgaar iframe access (replaces node search)."""
+	MythosLogger.info("WorldBuilderWebController", "=== AZGAAR IFRAME DIAGNOSTICS ===")
+	MythosLogger.info("WorldBuilderWebController", "Iframe ID", {"iframe_id": IFRAME_ID})
+	MythosLogger.info("WorldBuilderWebController", "Azgaar ready via iframe", {"ready": azgaar_ready_via_iframe})
+	
+	# Check iframe existence via JS
+	var check_script: String = """
+		(function() {
+			var iframe = document.getElementById('%s');
+			if (iframe) {
+				return {
+					exists: true,
+					src: iframe.src,
+					loaded: iframe.contentDocument ? 'yes' : 'no'
+				};
+			}
+			return {exists: false};
+		})();
+	""" % IFRAME_ID
+	
+	if web_view.has_method("execute_js"):
+		var result = web_view.execute_js(check_script)
+		MythosLogger.info("WorldBuilderWebController", "Iframe check result", {"result": result})
+	elif web_view.has_method("eval"):
+		web_view.eval(check_script)
+		MythosLogger.info("WorldBuilderWebController", "Iframe check executed via eval")
+	
+	MythosLogger.info("WorldBuilderWebController", "=== END AZGAAR IFRAME DIAGNOSTICS ===")
+
+
+func _find_nodes_with_method(node: Node, method_name: String) -> Array:
+	"""Recursively find all nodes with a specific method."""
+	var results: Array = []
+	if node.has_method(method_name):
+		results.append(node)
+	for child in node.get_children():
+		results.append_array(_find_nodes_with_method(child, method_name))
+	return results
+
 
 func send_progress_update(progress: float, status: String, is_generating: bool) -> void:
 	"""Send progress update to WebView."""

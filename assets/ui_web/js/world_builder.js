@@ -64,7 +64,6 @@ document.addEventListener('alpine:init', () => {
         params: {},
         archetype: 'High Fantasy',
         archetypeNames: ['High Fantasy', 'Low Fantasy', 'Dark Fantasy', 'Realistic', 'Custom'],
-        seed: Math.floor(Math.random() * 1e9),
         isGenerating: false,
         progressValue: 0,
         statusText: '',
@@ -152,13 +151,9 @@ document.addEventListener('alpine:init', () => {
             console.log('[WorldBuilder] Azgaar will be controlled via direct JS injection from GDScript');
         },
     
-    /**
-     * Poll for Azgaar readiness (checks for azgaar, azgaar.options, and azgaar.generate)
-     * @param {HTMLIFrameElement} iframe - The Azgaar iframe element
-     * @param {number} maxWaitMs - Maximum time to wait in milliseconds (default: 60000)
-     * @param {number} pollIntervalMs - Polling interval in milliseconds (default: 100)
-     * @returns {Promise<boolean>} True if Azgaar is ready, false if timeout
-     */
+    // All iframe/postMessage code removed - using direct JS injection via GDScript now
+    // The following functions are no longer needed but kept for reference:
+    /*
     async _pollForAzgaarReady(iframe, maxWaitMs = 60000, pollIntervalMs = 100) {
         const startTime = Date.now();
         let attemptCount = 0;
@@ -820,16 +815,6 @@ document.addEventListener('alpine:init', () => {
         GodotBridge.postMessage('load_archetype', { archetype: archetypeName });
     },
     
-    setSeed(newSeed) {
-        this.seed = newSeed;
-        GodotBridge.postMessage('set_seed', { seed: this.seed });
-    },
-    
-    randomizeSeed() {
-        this.seed = Math.floor(Math.random() * 1e9);
-        this.setSeed(this.seed);
-    },
-    
     updateParam(key, value) {
         // Find the parameter definition to get clamping info
         let paramDef = null;
@@ -876,7 +861,7 @@ document.addEventListener('alpine:init', () => {
             timestamp: new Date().toISOString(),
             params: this.params,
             paramsCount: Object.keys(this.params).length,
-            seed: this.seed
+            optionsSeed: this.params.optionsSeed
         });
         
         // Clear previous errors
@@ -888,15 +873,15 @@ document.addEventListener('alpine:init', () => {
         this.statusText = 'Preparing generation...';
         
         // Send to Godot - it will handle direct JS injection via WorldBuilderAzgaar
+        // Only send params (which includes optionsSeed from Step 1)
         try {
             GodotBridge.postMessage('generate', { 
-                params: this.params,
-                seed: this.seed
+                params: this.params
             });
             console.log('[Genesis World Builder] Sent generate IPC message to Godot', {
                 timestamp: new Date().toISOString(),
                 paramsCount: Object.keys(this.params).length,
-                seed: this.seed
+                optionsSeed: this.params.optionsSeed
             });
             
             // Status will be updated via progress_update IPC messages from Godot
