@@ -188,7 +188,24 @@ document.addEventListener('alpine:init', () => {
                     }
                     
                     const iframeWindow = iframe.contentWindow;
-                    const hasAzgaar = typeof iframeWindow.azgaar !== 'undefined';
+                    
+                    // Check for CORS errors by trying to access iframe properties
+                    let corsError = false;
+                    let corsErrorMsg = null;
+                    try {
+                        // Try to access iframe document (will throw if CORS blocked)
+                        const testDoc = iframe.contentDocument || iframe.contentWindow.document;
+                    } catch (corsException) {
+                        corsError = true;
+                        corsErrorMsg = corsException.message;
+                        console.warn(`[Genesis World Builder] CORS error detected (attempt ${attemptCount}):`, {
+                            error: corsException.message,
+                            errorName: corsException.name,
+                            elapsedMs: elapsed
+                        });
+                    }
+                    
+                    const hasAzgaar = !corsError && typeof iframeWindow.azgaar !== 'undefined';
                     const hasOptions = hasAzgaar && iframeWindow.azgaar && typeof iframeWindow.azgaar.options !== 'undefined';
                     const hasGenerate = hasAzgaar && iframeWindow.azgaar && typeof iframeWindow.azgaar.generate === 'function';
                     
@@ -196,7 +213,9 @@ document.addEventListener('alpine:init', () => {
                         hasAzgaar,
                         hasOptions,
                         hasGenerate,
-                        allReady: hasAzgaar && hasOptions && hasGenerate
+                        allReady: hasAzgaar && hasOptions && hasGenerate,
+                        corsError: corsError,
+                        corsErrorMsg: corsErrorMsg
                     });
                     
                     if (hasAzgaar && hasOptions && hasGenerate) {
@@ -552,6 +571,76 @@ document.addEventListener('alpine:init', () => {
         });
     },
     
+    /**
+     * Test network connectivity to Azgaar server
+     * @param {string} url - The Azgaar server URL to test
+     */
+    async _testAzgaarServerConnectivity(url) {
+        console.log('[Genesis World Builder] Testing Azgaar server connectivity', {
+            timestamp: new Date().toISOString(),
+            url: url
+        });
+        
+        try {
+            const testStartTime = Date.now();
+            const response = await fetch(url, {
+                method: 'HEAD',
+                mode: 'no-cors', // Use no-cors to avoid CORS errors in test
+                cache: 'no-cache'
+            });
+            const testElapsed = Date.now() - testStartTime;
+            
+            console.log('[Genesis World Builder] Server connectivity test result', {
+                timestamp: new Date().toISOString(),
+                url: url,
+                elapsedMs: testElapsed,
+                status: response.status,
+                statusText: response.statusText,
+                ok: response.ok
+            });
+        } catch (fetchError) {
+            console.error('[Genesis World Builder] Server connectivity test failed', {
+                timestamp: new Date().toISOString(),
+                url: url,
+                error: fetchError.message,
+                errorName: fetchError.name,
+                errorStack: fetchError.stack
+            });
+            
+            // Try alternative test with XMLHttpRequest
+            try {
+                const xhr = new XMLHttpRequest();
+                xhr.open('HEAD', url, true);
+                xhr.timeout = 5000;
+                xhr.onload = () => {
+                    console.log('[Genesis World Builder] XHR connectivity test succeeded', {
+                        timestamp: new Date().toISOString(),
+                        status: xhr.status,
+                        statusText: xhr.statusText
+                    });
+                };
+                xhr.onerror = () => {
+                    console.error('[Genesis World Builder] XHR connectivity test failed', {
+                        timestamp: new Date().toISOString(),
+                        status: xhr.status,
+                        statusText: xhr.statusText
+                    });
+                };
+                xhr.ontimeout = () => {
+                    console.error('[Genesis World Builder] XHR connectivity test timeout', {
+                        timestamp: new Date().toISOString()
+                    });
+                };
+                xhr.send();
+            } catch (xhrError) {
+                console.error('[Genesis World Builder] XHR test also failed', {
+                    timestamp: new Date().toISOString(),
+                    error: xhrError.message
+                });
+            }
+        }
+    },
+    
     _setupAzgaarListener() {
         console.log('[Genesis World Builder] _setupAzgaarListener() called', {
             timestamp: new Date().toISOString()
@@ -565,6 +654,9 @@ document.addEventListener('alpine:init', () => {
             this.errorDetails = 'The Azgaar map iframe element is missing from the page.';
             return;
         }
+        
+        // Test network connectivity to Azgaar server
+        this._testAzgaarServerConnectivity(iframe.src || 'http://127.0.0.1:8080/index.html');
         
         // Helper to check if iframe is loaded
         const isIframeLoaded = () => {
@@ -684,11 +776,39 @@ document.addEventListener('alpine:init', () => {
             iframe.addEventListener('error', (e) => {
                 console.error('[Genesis World Builder] Iframe error event fired', {
                     timestamp: new Date().toISOString(),
-                    error: e
+                    error: e,
+                    errorType: e.type,
+                    errorMessage: e.message,
+                    iframeSrc: iframe.src
                 });
                 this.errorMessage = 'Azgaar iframe failed to load';
                 this.errorDetails = 'The Azgaar map iframe encountered an error while loading. Please check:\n- Azgaar server is running (http://127.0.0.1:8080)\n- Network connectivity\n- Browser console for details';
             }, { once: true });
+            
+            // Track iframe load start
+            const loadStartTime = Date.now();
+            console.log('[Genesis World Builder] Iframe load tracking started', {
+                timestamp: new Date().toISOString(),
+                iframeSrc: iframe.src,
+                iframeSandbox: iframe.sandbox?.toString()
+            });
+            
+            // Enhanced load event handler with timing
+            const originalLoadHandler = loadHandler;
+            const enhancedLoadHandler = () => {
+                const loadElapsed = Date.now() - loadStartTime;
+                console.log('[Genesis World Builder] Iframe load event fired (enhanced)', {
+                    timestamp: new Date().toISOString(),
+                    loadElapsedMs: loadElapsed,
+                    iframeSrc: iframe.src,
+                    hasContentWindow: !!iframe.contentWindow,
+                    readyState: iframe.contentDocument?.readyState
+                });
+                originalLoadHandler();
+            };
+            
+            iframe.removeEventListener('load', loadHandler);
+            iframe.addEventListener('load', enhancedLoadHandler, { once: true });
         }
     },
     

@@ -61,6 +61,17 @@ func _ready() -> void:
 	else:
 		MythosLogger.warn("WorldBuilderWebController", "WebView does not have ipc_message signal")
 	
+	# Connect to WebView error signals if available
+	if web_view.has_signal("console_message"):
+		web_view.console_message.connect(_on_console_message)
+		MythosLogger.info("WorldBuilderWebController", "Connected to WebView console_message signal")
+	
+	# Log WebView initialization
+	MythosLogger.info("WorldBuilderWebController", "WebView initialized", {
+		"has_ipc": web_view.has_signal("ipc_message"),
+		"has_console": web_view.has_signal("console_message")
+	})
+	
 	# Azgaar is now embedded via iframe - no separate controller needed
 	
 	# Wait for page to load, then inject theme/constants
@@ -607,6 +618,22 @@ func _get_sample_params(params: Dictionary, count: int) -> Dictionary:
 		sample[key] = params[key]
 	return sample
 
+
+func _on_console_message(level: int, message: String, source: String, line: int) -> void:
+	"""Handle console messages from WebView (for debugging)."""
+	# Filter for relevant messages
+	if message.contains("[Genesis World Builder]") or message.contains("[Genesis Azgaar]") or message.contains("CORS") or message.contains("timeout"):
+		match level:
+			0:  # LOG_LEVEL_DEBUG
+				MythosLogger.debug("WorldBuilderWebController", "WebView console", {"level": "debug", "message": message, "source": source, "line": line})
+			1:  # LOG_LEVEL_INFO
+				MythosLogger.info("WorldBuilderWebController", "WebView console", {"level": "info", "message": message, "source": source, "line": line})
+			2:  # LOG_LEVEL_WARN
+				MythosLogger.warn("WorldBuilderWebController", "WebView console", {"level": "warn", "message": message, "source": source, "line": line})
+			3:  # LOG_LEVEL_ERROR
+				MythosLogger.error("WorldBuilderWebController", "WebView console", {"level": "error", "message": message, "source": source, "line": line})
+			_:
+				MythosLogger.debug("WorldBuilderWebController", "WebView console", {"level": level, "message": message, "source": source, "line": line})
 
 func send_progress_update(progress: float, status: String, is_generating: bool) -> void:
 	"""Send progress update to WebView."""

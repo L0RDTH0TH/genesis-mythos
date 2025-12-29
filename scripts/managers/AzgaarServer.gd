@@ -73,6 +73,7 @@ func _on_polling_timer_timeout() -> void:
 		var peer: StreamPeerTCP = tcp_server.take_connection()
 		if peer:
 			active_connections.append(peer)
+			MythosLogger.debug("AzgaarServer", "New connection accepted", {"total_connections": active_connections.size()})
 	
 	# Early exit if no connections (performance optimization)
 	if active_connections.size() == 0:
@@ -187,6 +188,20 @@ func _handle_connection(peer: StreamPeerTCP) -> bool:
 	var method: String = parts[0]
 	var path: String = parts[1]
 	
+	# Handle OPTIONS requests for CORS preflight
+	if method == "OPTIONS":
+		var options_response: String = "HTTP/1.1 200 OK\r\n"
+		options_response += "Access-Control-Allow-Origin: *\r\n"
+		options_response += "Access-Control-Allow-Methods: GET, OPTIONS\r\n"
+		options_response += "Access-Control-Allow-Headers: Content-Type\r\n"
+		options_response += "Connection: close\r\n"
+		options_response += "\r\n"
+		var options_bytes: PackedByteArray = options_response.to_utf8_buffer()
+		peer.put_data(options_bytes)
+		peer.disconnect_from_host()
+		MythosLogger.debug("AzgaarServer", "Handled OPTIONS preflight request", {"path": path})
+		return true  # Remove after handling
+	
 	if method != "GET":
 		_send_error_response(peer, 405, "Method Not Allowed")
 		peer.disconnect_from_host()
@@ -244,7 +259,7 @@ func _handle_connection(peer: StreamPeerTCP) -> bool:
 	# Close connection (HTTP/1.0 style)
 	peer.disconnect_from_host()
 	
-	MythosLogger.debug("AzgaarServer", "Served file", {"path": path, "size": content.size(), "mime": mime_type})
+	MythosLogger.debug("AzgaarServer", "Served file", {"path": path, "size": content.size(), "mime": mime_type, "method": method})
 	return true  # Remove after handling request
 
 func _send_file_response(peer: StreamPeerTCP, content: PackedByteArray, mime_type: String) -> void:
@@ -253,6 +268,10 @@ func _send_file_response(peer: StreamPeerTCP, content: PackedByteArray, mime_typ
 	response += "Content-Type: %s\r\n" % mime_type
 	response += "Content-Length: %d\r\n" % content.size()
 	response += "Connection: close\r\n"
+	# CORS headers to allow iframe embedding from any origin (needed for WebView/iframe contexts)
+	response += "Access-Control-Allow-Origin: *\r\n"
+	response += "Access-Control-Allow-Methods: GET, OPTIONS\r\n"
+	response += "Access-Control-Allow-Headers: Content-Type\r\n"
 	response += "\r\n"
 	
 	var response_bytes: PackedByteArray = response.to_utf8_buffer()
@@ -271,6 +290,10 @@ func _send_error_response(peer: StreamPeerTCP, status_code: int, status_text: St
 	response += "Content-Type: text/html\r\n"
 	response += "Content-Length: %d\r\n" % body_bytes.size()
 	response += "Connection: close\r\n"
+	# CORS headers for error responses too
+	response += "Access-Control-Allow-Origin: *\r\n"
+	response += "Access-Control-Allow-Methods: GET, OPTIONS\r\n"
+	response += "Access-Control-Allow-Headers: Content-Type\r\n"
 	response += "\r\n"
 	
 	var response_bytes: PackedByteArray = response.to_utf8_buffer()
