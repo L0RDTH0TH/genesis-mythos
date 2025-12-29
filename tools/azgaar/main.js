@@ -1266,3 +1266,156 @@ function undraw() {
   notes = [];
   unfog();
 }
+
+// ╔═══════════════════════════════════════════════════════════
+// ║ Genesis Mythos Integration: Native postMessage Listener
+// ║ Desc: Handles cross-origin communication with parent window
+// ║ Author: Lordthoth
+// ╚═══════════════════════════════════════════════════════════
+
+// Add postMessage listener for Genesis Mythos World Builder integration
+// This allows communication without violating same-origin policy
+(function() {
+  let azgaarReadySent = false;
+  
+  // Listen for messages from parent window (World Builder)
+  window.addEventListener('message', function(event) {
+    // Accept messages from any origin (parent is res:// or file://, we're http://127.0.0.1:8080)
+    // In production, you might want to check event.origin for security
+    
+    console.log('[Genesis Azgaar] Message received', {
+      timestamp: new Date().toISOString(),
+      type: event.data?.type,
+      origin: event.origin,
+      hasParams: !!event.data?.params,
+      hasSeed: event.data?.seed !== undefined
+    });
+    
+    // Handle azgaar_params message - apply parameters to options
+    if (event.data && event.data.type === 'azgaar_params') {
+      console.log('[Genesis Azgaar] Processing azgaar_params message', {
+        timestamp: new Date().toISOString(),
+        paramsCount: event.data.params ? Object.keys(event.data.params).length : 0,
+        hasSeed: event.data.seed !== undefined
+      });
+      
+      try {
+        // Apply parameters to options object
+        if (event.data.params) {
+          console.log('[Genesis Azgaar] Applying params to options:', Object.keys(event.data.params));
+          Object.assign(options, event.data.params);
+          
+          // Update UI elements if they exist (for parameters that have corresponding inputs)
+          // This ensures the UI reflects the applied parameters
+          for (const key in event.data.params) {
+            const input = byId(key);
+            if (input && input.value !== undefined) {
+              input.value = event.data.params[key];
+              // Trigger change event if needed
+              if (input.dispatchEvent) {
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+              }
+            }
+          }
+        }
+        
+        // Set seed if provided
+        if (event.data.seed !== undefined) {
+          console.log('[Genesis Azgaar] Setting seed:', event.data.seed);
+          setSeed(event.data.seed);
+        }
+        
+        console.log('[Genesis Azgaar] Parameters applied successfully', {
+          timestamp: new Date().toISOString(),
+          currentSeed: seed,
+          optionsKeys: Object.keys(options)
+        });
+      } catch (e) {
+        console.error('[Genesis Azgaar] Error applying parameters:', e, {
+          stack: e.stack,
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+    
+    // Handle azgaar_generate message - trigger map generation
+    if (event.data && event.data.type === 'azgaar_generate') {
+      console.log('[Genesis Azgaar] Processing azgaar_generate message', {
+        timestamp: new Date().toISOString()
+      });
+      
+      try {
+        console.log('[Genesis Azgaar] Calling generate()', {
+          timestamp: new Date().toISOString(),
+          currentSeed: seed
+        });
+        
+        // Call the generate function (async)
+        generate().then(() => {
+          console.log('[Genesis Azgaar] Generation completed successfully', {
+            timestamp: new Date().toISOString()
+          });
+        }).catch((error) => {
+          console.error('[Genesis Azgaar] Generation error:', error, {
+            stack: error.stack,
+            timestamp: new Date().toISOString()
+          });
+        });
+      } catch (e) {
+        console.error('[Genesis Azgaar] Error triggering generation:', e, {
+          stack: e.stack,
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+  });
+  
+  // Send ready message after initialization
+  // Wait for DOM to be ready and Azgaar to be initialized
+  function sendReadyMessage() {
+    if (azgaarReadySent) {
+      return; // Already sent
+    }
+    
+    // Check if generate function is available (Azgaar is initialized)
+    if (typeof generate === 'function' && typeof setSeed === 'function') {
+      azgaarReadySent = true;
+      console.log('[Genesis Azgaar] Sending azgaar_ready message to parent', {
+        timestamp: new Date().toISOString()
+      });
+      
+      // Send ready message to parent window
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({
+          type: 'azgaar_ready',
+          timestamp: new Date().toISOString()
+        }, '*');
+      }
+    }
+  }
+  
+  // Try to send ready message after DOMContentLoaded
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      // Wait a bit for Azgaar to initialize
+      setTimeout(sendReadyMessage, 1000);
+    });
+  } else {
+    // DOM already loaded, try immediately and with delay
+    setTimeout(sendReadyMessage, 1000);
+  }
+  
+  // Also send ready after generateMapOnLoad completes (if it runs)
+  // We'll hook into generateMapOnLoad to send ready after first generation
+  const originalGenerateMapOnLoad = generateMapOnLoad;
+  generateMapOnLoad = async function() {
+    const result = await originalGenerateMapOnLoad.apply(this, arguments);
+    // Send ready after first generation completes
+    setTimeout(sendReadyMessage, 500);
+    return result;
+  };
+  
+  console.log('[Genesis Azgaar] Native postMessage listener initialized', {
+    timestamp: new Date().toISOString()
+  });
+})();

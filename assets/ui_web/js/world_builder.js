@@ -71,6 +71,8 @@ document.addEventListener('alpine:init', () => {
         updateDebounceTimer: null,
         azgaarListenerInjected: false,
         azgaarListenerVerified: false,
+        azgaarReady: false,
+        azgaarReadyReceived: false,
         errorMessage: null,
         errorDetails: null,
         
@@ -149,8 +151,8 @@ document.addEventListener('alpine:init', () => {
             this.setStep(0);
             console.log('[WorldBuilder] Initialized, current step:', this.currentStep, 'total steps:', this.steps.length);
             
-            // Setup Azgaar iframe message listener injection
-            this._setupAzgaarListener();
+            // Setup Azgaar message-based communication (no injection needed)
+            this._setupAzgaarMessageListener();
         },
     
     /**
@@ -641,175 +643,76 @@ document.addEventListener('alpine:init', () => {
         }
     },
     
-    _setupAzgaarListener() {
-        console.log('[Genesis World Builder] _setupAzgaarListener() called', {
+    /**
+     * Setup message-based communication with Azgaar iframe (no injection needed)
+     * Listens for 'azgaar_ready' message from the iframe
+     */
+    _setupAzgaarMessageListener() {
+        console.log('[Genesis World Builder] _setupAzgaarMessageListener() called', {
             timestamp: new Date().toISOString()
         });
         
-        // Inject message listener into Azgaar iframe when it loads
         const iframe = document.getElementById('azgaar-iframe');
         if (!iframe) {
-            console.warn('[Genesis World Builder] Azgaar iframe not found, cannot setup listener');
+            console.warn('[Genesis World Builder] Azgaar iframe not found');
             this.errorMessage = 'Azgaar iframe not found';
             this.errorDetails = 'The Azgaar map iframe element is missing from the page.';
             return;
         }
         
-        // Test network connectivity to Azgaar server
+        // Test network connectivity
         this._testAzgaarServerConnectivity(iframe.src || 'http://127.0.0.1:8080/index.html');
         
-        // Helper to check if iframe is loaded
-        const isIframeLoaded = () => {
-            try {
-                return iframe.contentDocument && iframe.contentDocument.readyState === 'complete';
-            } catch (e) {
-                // CORS - can't access contentDocument, but iframe might still be loading
-                return false;
-            }
-        };
-        
-        const setupListener = async () => {
-            const setupStartTime = Date.now();
-            console.log('[Genesis World Builder] Starting listener setup process', {
-                timestamp: new Date().toISOString(),
-                iframeLoaded: isIframeLoaded(),
-                hasContentWindow: !!iframe.contentWindow
-            });
+        // Listen for 'azgaar_ready' message from the iframe
+        const messageHandler = (event) => {
+            // Accept messages from Azgaar iframe (http://127.0.0.1:8080)
+            const allowedOrigins = ['http://127.0.0.1:8080', 'http://localhost:8080', '*'];
+            const isAllowedOrigin = allowedOrigins.some(origin => 
+                origin === '*' || event.origin === origin || event.origin.startsWith(origin)
+            );
             
-            // Wait for iframe to be accessible (with timeout)
-            if (!iframe.contentWindow) {
-                console.log('[Genesis World Builder] Waiting for iframe.contentWindow to become available...');
-                const iframeWaitStart = Date.now();
-                const iframeWaitMax = 10000; // 10 seconds max wait for iframe window
-                
-                while (!iframe.contentWindow && (Date.now() - iframeWaitStart) < iframeWaitMax) {
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                }
-                
-                if (!iframe.contentWindow) {
-                    console.error('[Genesis World Builder] iframe.contentWindow never became available');
-                    this.errorMessage = 'Azgaar iframe not accessible';
-                    this.errorDetails = 'The Azgaar iframe content window is not accessible. The iframe may not be loading properly.';
-                    return;
-                }
-            }
-            
-            console.log('[Genesis World Builder] Iframe window is accessible, starting Azgaar readiness polling...');
-            
-            // First, wait for Azgaar to be ready
-            const isReady = await this._pollForAzgaarReady(iframe);
-            if (!isReady) {
-                const elapsed = Date.now() - setupStartTime;
-                console.error('[Genesis World Builder] Azgaar never became ready, cannot inject listener', {
-                    elapsedMs: elapsed,
-                    timestamp: new Date().toISOString()
-                });
-                this.errorMessage = 'Azgaar initialization timeout';
-                this.errorDetails = `The Azgaar map generator did not initialize within 60 seconds (waited ${Math.round(elapsed/1000)}s). This may indicate:\n- Slow network connection\n- Azgaar server not responding\n- Browser security restrictions\n\nPlease refresh the page and try again.`;
+            if (!isAllowedOrigin) {
+                console.warn('[Genesis World Builder] Rejected message from origin:', event.origin);
                 return;
             }
             
-            const readyElapsed = Date.now() - setupStartTime;
-            console.log('[Genesis World Builder] Azgaar is ready, injecting listener...', {
-                elapsedMs: readyElapsed,
-                timestamp: new Date().toISOString()
-            });
-            
-            // Then inject the listener
-            const injectionSuccess = await this._injectAzgaarListener(iframe);
-            if (!injectionSuccess) {
-                const totalElapsed = Date.now() - setupStartTime;
-                console.error('[Genesis World Builder] Failed to inject listener after all retries', {
-                    totalElapsedMs: totalElapsed,
-                    timestamp: new Date().toISOString()
-                });
-                this.errorMessage = 'Failed to setup Azgaar communication';
-                this.errorDetails = 'Could not inject the message listener into the Azgaar iframe. This may be due to CORS restrictions or iframe loading issues.';
-            } else {
-                const totalElapsed = Date.now() - setupStartTime;
-                console.log('[Genesis World Builder] Listener setup completed successfully', {
+            if (event.data && event.data.type === 'azgaar_ready') {
+                console.log('[Genesis World Builder] Received azgaar_ready message', {
                     timestamp: new Date().toISOString(),
-                    totalElapsedMs: totalElapsed
+                    eventOrigin: event.origin,
+                    eventData: event.data
                 });
+                
+                this.azgaarReady = true;
+                this.azgaarReadyReceived = true;
+                
                 // Clear any previous errors
                 this.errorMessage = null;
                 this.errorDetails = null;
+                
+                console.log('[Genesis World Builder] Azgaar is ready for communication', {
+                    timestamp: new Date().toISOString()
+                });
             }
         };
         
-        // Try to setup immediately if iframe is already loaded
-        if (isIframeLoaded()) {
-            console.log('[Genesis World Builder] Iframe already loaded, starting setup immediately', {
-                timestamp: new Date().toISOString()
-            });
-            setupListener();
-        } else {
-            // Wait for iframe to load
-            console.log('[Genesis World Builder] Waiting for iframe to load...', {
+        window.addEventListener('message', messageHandler);
+        console.log('[Genesis World Builder] Message listener registered, waiting for azgaar_ready', {
+            timestamp: new Date().toISOString()
+        });
+        
+        // Handle iframe error events
+        iframe.addEventListener('error', (e) => {
+            console.error('[Genesis World Builder] Iframe error event fired', {
                 timestamp: new Date().toISOString(),
+                error: e,
+                errorType: e.type,
+                errorMessage: e.message,
                 iframeSrc: iframe.src
             });
-            
-            const loadHandler = () => {
-                console.log('[Genesis World Builder] Iframe load event fired, starting setup', {
-                    timestamp: new Date().toISOString(),
-                    readyState: isIframeLoaded() ? 'complete' : 'loading'
-                });
-                setupListener();
-            };
-            
-            iframe.addEventListener('load', loadHandler, { once: true });
-            
-            // Fallback: if load event doesn't fire within 5 seconds, try anyway
-            setTimeout(() => {
-                if (!this.azgaarListenerInjected && !this.azgaarListenerVerified) {
-                    console.warn('[Genesis World Builder] Iframe load event timeout, attempting setup anyway', {
-                        timestamp: new Date().toISOString(),
-                        hasContentWindow: !!iframe.contentWindow
-                    });
-                    iframe.removeEventListener('load', loadHandler);
-                    setupListener();
-                }
-            }, 5000);
-            
-            // Also handle iframe error events
-            iframe.addEventListener('error', (e) => {
-                console.error('[Genesis World Builder] Iframe error event fired', {
-                    timestamp: new Date().toISOString(),
-                    error: e,
-                    errorType: e.type,
-                    errorMessage: e.message,
-                    iframeSrc: iframe.src
-                });
-                this.errorMessage = 'Azgaar iframe failed to load';
-                this.errorDetails = 'The Azgaar map iframe encountered an error while loading. Please check:\n- Azgaar server is running (http://127.0.0.1:8080)\n- Network connectivity\n- Browser console for details';
-            }, { once: true });
-            
-            // Track iframe load start
-            const loadStartTime = Date.now();
-            console.log('[Genesis World Builder] Iframe load tracking started', {
-                timestamp: new Date().toISOString(),
-                iframeSrc: iframe.src,
-                iframeSandbox: iframe.sandbox?.toString()
-            });
-            
-            // Enhanced load event handler with timing
-            const originalLoadHandler = loadHandler;
-            const enhancedLoadHandler = () => {
-                const loadElapsed = Date.now() - loadStartTime;
-                console.log('[Genesis World Builder] Iframe load event fired (enhanced)', {
-                    timestamp: new Date().toISOString(),
-                    loadElapsedMs: loadElapsed,
-                    iframeSrc: iframe.src,
-                    hasContentWindow: !!iframe.contentWindow,
-                    readyState: iframe.contentDocument?.readyState
-                });
-                originalLoadHandler();
-            };
-            
-            iframe.removeEventListener('load', loadHandler);
-            iframe.addEventListener('load', enhancedLoadHandler, { once: true });
-        }
+            this.errorMessage = 'Azgaar iframe failed to load';
+            this.errorDetails = 'The Azgaar map iframe encountered an error while loading. Please check:\n- Azgaar server is running (http://127.0.0.1:8080)\n- Network connectivity\n- Browser console for details';
+        }, { once: true });
     },
     
     _initializeParams() {
@@ -1022,45 +925,37 @@ document.addEventListener('alpine:init', () => {
         }
         
         try {
-            // Step 1: Wait for Azgaar to be ready (polling)
+            // Step 1: Wait for Azgaar to be ready (message-based, no polling needed)
             this.statusText = 'Waiting for Azgaar to initialize...';
-            console.log('[Genesis World Builder] Step 1: Polling for Azgaar readiness...');
-            const isReady = await this._pollForAzgaarReady(iframe);
+            console.log('[Genesis World Builder] Step 1: Waiting for azgaar_ready message...');
             
-            if (!isReady) {
-                console.error('[Genesis World Builder] Azgaar not ready after polling timeout');
-                this.isGenerating = false;
-                this.statusText = 'Error: Azgaar initialization timeout';
-                this.errorMessage = 'Azgaar initialization timeout';
-                this.errorDetails = 'The Azgaar map generator did not initialize within 60 seconds. This may indicate:\n- Slow network connection\n- Azgaar server not responding\n- Browser security restrictions\n\nPlease refresh the page and try again.';
-                return;
-            }
-            
-            console.log('[Genesis World Builder] Step 1 complete: Azgaar is ready');
-            
-            // Step 2: Ensure listener is injected and verified
-            this.statusText = 'Setting up communication...';
-            console.log('[Genesis World Builder] Step 2: Ensuring listener is injected and verified...');
-            
-            if (!this.azgaarListenerInjected || !this.azgaarListenerVerified) {
-                console.log('[Genesis World Builder] Listener not ready, injecting now...');
-                const injectionSuccess = await this._injectAzgaarListener(iframe);
+            if (!this.azgaarReady) {
+                // Wait for azgaar_ready message with timeout
+                const waitStartTime = Date.now();
+                const maxWaitMs = 60000; // 60 seconds
+                const pollIntervalMs = 100;
                 
-                if (!injectionSuccess) {
-                    console.error('[Genesis World Builder] Failed to inject/verify listener');
+                while (!this.azgaarReady && (Date.now() - waitStartTime) < maxWaitMs) {
+                    await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+                }
+                
+                if (!this.azgaarReady) {
+                    const elapsed = Date.now() - waitStartTime;
+                    console.error('[Genesis World Builder] Azgaar not ready after waiting for message', {
+                        elapsedMs: elapsed,
+                        timestamp: new Date().toISOString()
+                    });
                     this.isGenerating = false;
-                    this.statusText = 'Error: Failed to setup communication';
-                    this.errorMessage = 'Failed to setup Azgaar communication';
-                    this.errorDetails = 'Could not inject or verify the message listener. This may be due to CORS restrictions or iframe security policies.';
+                    this.statusText = 'Error: Azgaar initialization timeout';
+                    this.errorMessage = 'Azgaar initialization timeout';
+                    this.errorDetails = `The Azgaar map generator did not send ready signal within 60 seconds (waited ${Math.round(elapsed/1000)}s). This may indicate:\n- Azgaar server not responding\n- Cross-origin communication blocked\n- Browser security restrictions\n\nPlease refresh the page and try again.`;
                     return;
                 }
-            } else {
-                console.log('[Genesis World Builder] Listener already injected and verified');
             }
             
-            console.log('[Genesis World Builder] Step 2 complete: Listener is ready');
+            console.log('[Genesis World Builder] Step 1 complete: Azgaar is ready (message received)');
             
-            // Step 3: Send parameters message
+            // Step 2: Send parameters message
             this.statusText = 'Sending parameters...';
             console.log('[Genesis World Builder] Step 3: Sending parameters to Azgaar...');
             
@@ -1100,9 +995,9 @@ document.addEventListener('alpine:init', () => {
             
             // Small delay to ensure params are applied before triggering generation
             await new Promise(resolve => setTimeout(resolve, 100));
-            console.log('[Genesis World Builder] Step 3 complete: Parameters sent');
+            console.log('[Genesis World Builder] Step 2 complete: Parameters sent');
             
-            // Step 4: Send generate message
+            // Step 3: Send generate message
             this.statusText = 'Triggering generation...';
             console.log('[Genesis World Builder] Step 4: Sending generate message to Azgaar...');
             
@@ -1134,7 +1029,7 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
             
-            console.log('[Genesis World Builder] Step 4 complete: Generate message sent');
+            console.log('[Genesis World Builder] Step 3 complete: Generate message sent');
             console.log('[Genesis World Builder] Generation flow completed successfully', {
                 timestamp: new Date().toISOString(),
                 totalElapsedMs: Date.now() - generateStartTime
