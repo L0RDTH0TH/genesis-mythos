@@ -205,33 +205,6 @@ let urbanDensity = +byId("urbanDensityInput").value;
 
 applyStoredOptions();
 
-// Custom Godot integration: Load options.json to override map parameters
-async function loadGodotCustomOptions() {
-  try {
-    const response = await fetch('./options.json');
-    if (!response.ok) {
-      console.warn('No custom options.json found or failed to load – using defaults');
-      return;
-    }
-    const customOptions = await response.json();
-    
-    // Deep merge if needed (Azgaar options are mostly flat, but safe)
-    Object.assign(options, customOptions);
-    
-    console.log('Godot custom options applied:', customOptions);
-    
-    // Optional: Force regeneration if flag is set (recommended for our flow)
-    if (customOptions.regenerateOnLoad || customOptions.regenerateOnLoad === undefined) {
-      generate(); // or generate() depending on exact function name; most versions use regenerate()
-    }
-  } catch (err) {
-    console.error('Failed to load custom options.json:', err);
-  }
-}
-
-// Call it after stored options are applied
-loadGodotCustomOptions();
-
 // voronoi graph extension, cannot be changed after generation
 let graphWidth = +mapWidthInput.value;
 let graphHeight = +mapHeightInput.value;
