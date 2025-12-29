@@ -7,10 +7,11 @@
 class_name WorldBuilderWebController
 extends Control
 
-## Reference to the WebView node
+## Reference to the WebView node (for UI)
 @onready var web_view: WebView = $WebView
 
-## Azgaar is now embedded via iframe - no separate controller needed
+## Reference to WorldBuilderAzgaar controller (for direct JS injection)
+var azgaar_controller: Node = null
 
 ## Current step index (synced with WebView)
 var current_step: int = 0
@@ -72,7 +73,8 @@ func _ready() -> void:
 		"has_console": web_view.has_signal("console_message")
 	})
 	
-	# Azgaar is now embedded via iframe - no separate controller needed
+	# Find WorldBuilderAzgaar controller for direct JS injection
+	_find_azgaar_controller()
 	
 	# Wait for page to load, then inject theme/constants
 	# Alpine.js readiness will be signaled via IPC message 'alpine_ready'
@@ -82,7 +84,42 @@ func _ready() -> void:
 	# WebView automatically sizes via anchors/size flags - no manual resize needed
 
 
-# Azgaar controller finding removed - using iframe embedding instead
+func _find_azgaar_controller() -> void:
+	"""Find the WorldBuilderAzgaar controller in the scene tree."""
+	# Try to find it as a sibling or in parent
+	var parent_node = get_parent()
+	if parent_node:
+		# Look for WorldBuilderAzgaar as sibling
+		for child in parent_node.get_children():
+			if child.has_method("trigger_generation_with_options"):
+				azgaar_controller = child
+				MythosLogger.info("WorldBuilderWebController", "Found WorldBuilderAzgaar controller", {"path": child.get_path()})
+				return
+		
+		# Look in parent's parent
+		var grandparent = parent_node.get_parent()
+		if grandparent:
+			for child in grandparent.get_children():
+				if child.has_method("trigger_generation_with_options"):
+					azgaar_controller = child
+					MythosLogger.info("WorldBuilderWebController", "Found WorldBuilderAzgaar controller in grandparent", {"path": child.get_path()})
+					return
+	
+	# Try to find by node path (common structure)
+	var azgaar_node = get_node_or_null("../WorldBuilderAzgaar")
+	if azgaar_node and azgaar_node.has_method("trigger_generation_with_options"):
+		azgaar_controller = azgaar_node
+		MythosLogger.info("WorldBuilderWebController", "Found WorldBuilderAzgaar controller via path")
+		return
+	
+	# Try to find by autoload/singleton if it exists
+	azgaar_node = get_node_or_null("/root/WorldBuilderAzgaar")
+	if azgaar_node and azgaar_node.has_method("trigger_generation_with_options"):
+		azgaar_controller = azgaar_node
+		MythosLogger.info("WorldBuilderWebController", "Found WorldBuilderAzgaar controller via autoload")
+		return
+	
+	MythosLogger.warn("WorldBuilderWebController", "WorldBuilderAzgaar controller not found - direct injection will not work")
 
 
 func _notification(what: int) -> void:
@@ -448,11 +485,21 @@ func _handle_generate(data: Dictionary) -> void:
 	MythosLogger.debug("WorldBuilderWebController", "_handle_generate() called", {"data_keys": data.keys()})
 	
 	var params: Dictionary = data.get("params", {})
-	MythosLogger.debug("WorldBuilderWebController", "Received params from WebView", {"params_count": params.size(), "params": params})
+	var seed_from_message = data.get("seed", current_seed)
+	
+	MythosLogger.debug("WorldBuilderWebController", "Received params from WebView", {
+		"params_count": params.size(), 
+		"params": params,
+		"seed": seed_from_message
+	})
 	
 	current_params.merge(params)
 	
-	# Ensure seed is set
+	# Use seed from message if provided, otherwise use current_seed
+	if seed_from_message != current_seed:
+		current_seed = int(seed_from_message)
+	
+	# Ensure seed is set in params
 	current_params["optionsSeed"] = current_seed
 	
 	# Clamp all parameters before generation (only curated parameters)
@@ -469,14 +516,32 @@ func _handle_generate(data: Dictionary) -> void:
 		"sample_params": _get_sample_params(current_params, 5)
 	})
 	
-	# Generation is handled via iframe postMessage in JavaScript
-	# The JS generate() function sends postMessage to the Azgaar iframe
-	# We just track progress here
-	send_progress_update(10.0, "Syncing parameters...", true)
-	send_progress_update(40.0, "Generating map...", true)
-	
-	# Note: Actual generation happens in iframe via postMessage from JS
-	# We'll update progress when iframe sends completion message (if needed)
+	# Use direct JS injection via WorldBuilderAzgaar controller
+	if azgaar_controller and azgaar_controller.has_method("trigger_generation_with_options"):
+		send_progress_update(10.0, "Syncing parameters to Azgaar...", true)
+		
+		# Prepare options dictionary for Azgaar
+		var azgaar_options: Dictionary = current_params.duplicate()
+		# Ensure seed is set correctly
+		azgaar_options["optionsSeed"] = current_seed
+		
+		# Trigger generation via direct JS injection
+		azgaar_controller.trigger_generation_with_options(azgaar_options, true)
+		
+		send_progress_update(40.0, "Generating map...", true)
+		
+		# Connect to generation signals if available
+		if azgaar_controller.has_signal("generation_complete"):
+			if not azgaar_controller.generation_complete.is_connected(_on_azgaar_generation_complete):
+				azgaar_controller.generation_complete.connect(_on_azgaar_generation_complete)
+		if azgaar_controller.has_signal("generation_failed"):
+			if not azgaar_controller.generation_failed.is_connected(_on_azgaar_generation_failed):
+				azgaar_controller.generation_failed.connect(_on_azgaar_generation_failed)
+		
+		MythosLogger.info("WorldBuilderWebController", "Generation triggered via direct JS injection")
+	else:
+		MythosLogger.error("WorldBuilderWebController", "Cannot generate - Azgaar controller not available")
+		send_progress_update(0.0, "Error: Azgaar controller not found", false)
 
 
 func _on_generation_complete() -> void:

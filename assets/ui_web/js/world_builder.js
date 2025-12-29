@@ -69,10 +69,6 @@ document.addEventListener('alpine:init', () => {
         progressValue: 0,
         statusText: '',
         updateDebounceTimer: null,
-        azgaarListenerInjected: false,
-        azgaarListenerVerified: false,
-        azgaarReady: false,
-        azgaarReadyReceived: false,
         errorMessage: null,
         errorDetails: null,
         
@@ -151,8 +147,9 @@ document.addEventListener('alpine:init', () => {
             this.setStep(0);
             console.log('[WorldBuilder] Initialized, current step:', this.currentStep, 'total steps:', this.steps.length);
             
-            // Setup Azgaar message-based communication (no injection needed)
-            this._setupAzgaarMessageListener();
+            // Azgaar is now handled via direct JS injection from GDScript (WorldBuilderAzgaar)
+            // No iframe or message listener setup needed
+            console.log('[WorldBuilder] Azgaar will be controlled via direct JS injection from GDScript');
         },
     
     /**
@@ -874,15 +871,12 @@ document.addEventListener('alpine:init', () => {
         }, 100);
     },
     
-    async generate() {
-        const generateStartTime = Date.now();
+    generate() {
         console.log('[Genesis World Builder] generate() called', {
             timestamp: new Date().toISOString(),
             params: this.params,
             paramsCount: Object.keys(this.params).length,
-            seed: this.seed,
-            listenerInjected: this.azgaarListenerInjected,
-            listenerVerified: this.azgaarListenerVerified
+            seed: this.seed
         });
         
         // Clear previous errors
@@ -893,160 +887,26 @@ document.addEventListener('alpine:init', () => {
         this.progressValue = 0;
         this.statusText = 'Preparing generation...';
         
-        // Send to Godot for progress tracking
+        // Send to Godot - it will handle direct JS injection via WorldBuilderAzgaar
         try {
-            GodotBridge.postMessage('generate', { params: this.params });
-            console.log('[Genesis World Builder] Sent generate IPC message to Godot', {
-                timestamp: new Date().toISOString(),
-                paramsCount: Object.keys(this.params).length
-            });
-        } catch (e) {
-            console.error('[Genesis World Builder] Error sending generate IPC to Godot:', e);
-        }
-        
-        // Get iframe reference
-        const iframe = document.getElementById('azgaar-iframe');
-        if (!iframe) {
-            console.error('[Genesis World Builder] Azgaar iframe not found');
-            this.isGenerating = false;
-            this.statusText = 'Error: Azgaar iframe not found';
-            this.errorMessage = 'Azgaar iframe not found';
-            this.errorDetails = 'The Azgaar map iframe element is missing from the page.';
-            return;
-        }
-        
-        if (!iframe.contentWindow) {
-            console.error('[Genesis World Builder] iframe.contentWindow not available');
-            this.isGenerating = false;
-            this.statusText = 'Error: Cannot access Azgaar iframe';
-            this.errorMessage = 'Cannot access Azgaar iframe';
-            this.errorDetails = 'The iframe content window is not accessible. The iframe may not be fully loaded.';
-            return;
-        }
-        
-        try {
-            // Step 1: Wait for Azgaar to be ready (message-based, no polling needed)
-            this.statusText = 'Waiting for Azgaar to initialize...';
-            console.log('[Genesis World Builder] Step 1: Waiting for azgaar_ready message...');
-            
-            if (!this.azgaarReady) {
-                // Wait for azgaar_ready message with timeout
-                const waitStartTime = Date.now();
-                const maxWaitMs = 60000; // 60 seconds
-                const pollIntervalMs = 100;
-                
-                while (!this.azgaarReady && (Date.now() - waitStartTime) < maxWaitMs) {
-                    await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
-                }
-                
-                if (!this.azgaarReady) {
-                    const elapsed = Date.now() - waitStartTime;
-                    console.error('[Genesis World Builder] Azgaar not ready after waiting for message', {
-                        elapsedMs: elapsed,
-                        timestamp: new Date().toISOString()
-                    });
-                    this.isGenerating = false;
-                    this.statusText = 'Error: Azgaar initialization timeout';
-                    this.errorMessage = 'Azgaar initialization timeout';
-                    this.errorDetails = `The Azgaar map generator did not send ready signal within 60 seconds (waited ${Math.round(elapsed/1000)}s). This may indicate:\n- Azgaar server not responding\n- Cross-origin communication blocked\n- Browser security restrictions\n\nPlease refresh the page and try again.`;
-                    return;
-                }
-            }
-            
-            console.log('[Genesis World Builder] Step 1 complete: Azgaar is ready (message received)');
-            
-            // Step 2: Send parameters message
-            this.statusText = 'Sending parameters...';
-            console.log('[Genesis World Builder] Step 3: Sending parameters to Azgaar...');
-            
-            const paramsMessage = {
-                type: 'azgaar_params',
+            GodotBridge.postMessage('generate', { 
                 params: this.params,
                 seed: this.seed
-            };
-            
-            console.log('[Genesis World Builder] Preparing params message', {
+            });
+            console.log('[Genesis World Builder] Sent generate IPC message to Godot', {
                 timestamp: new Date().toISOString(),
-                messageType: paramsMessage.type,
-                paramsCount: Object.keys(paramsMessage.params).length,
-                seed: paramsMessage.seed,
-                fullMessage: paramsMessage
+                paramsCount: Object.keys(this.params).length,
+                seed: this.seed
             });
             
-            try {
-                iframe.contentWindow.postMessage(paramsMessage, '*');
-                console.log('[Genesis World Builder] Sent azgaar_params message', {
-                    timestamp: new Date().toISOString(),
-                    targetOrigin: '*',
-                    paramsCount: Object.keys(paramsMessage.params).length,
-                    seed: paramsMessage.seed
-                });
-            } catch (postError) {
-                console.error('[Genesis World Builder] Error sending params message:', postError, {
-                    message: postError.message,
-                    stack: postError.stack
-                });
-                this.isGenerating = false;
-                this.statusText = 'Error: Failed to send parameters';
-                this.errorMessage = 'Failed to send parameters';
-                this.errorDetails = `Error: ${postError.message}`;
-                return;
-            }
-            
-            // Small delay to ensure params are applied before triggering generation
-            await new Promise(resolve => setTimeout(resolve, 100));
-            console.log('[Genesis World Builder] Step 2 complete: Parameters sent');
-            
-            // Step 3: Send generate message
-            this.statusText = 'Triggering generation...';
-            console.log('[Genesis World Builder] Step 4: Sending generate message to Azgaar...');
-            
-            const generateMessage = {
-                type: 'azgaar_generate'
-            };
-            
-            console.log('[Genesis World Builder] Preparing generate message', {
-                timestamp: new Date().toISOString(),
-                messageType: generateMessage.type,
-                fullMessage: generateMessage
-            });
-            
-            try {
-                iframe.contentWindow.postMessage(generateMessage, '*');
-                console.log('[Genesis World Builder] Sent azgaar_generate message', {
-                    timestamp: new Date().toISOString(),
-                    targetOrigin: '*'
-                });
-            } catch (postError) {
-                console.error('[Genesis World Builder] Error sending generate message:', postError, {
-                    message: postError.message,
-                    stack: postError.stack
-                });
-                this.isGenerating = false;
-                this.statusText = 'Error: Failed to trigger generation';
-                this.errorMessage = 'Failed to trigger generation';
-                this.errorDetails = `Error: ${postError.message}`;
-                return;
-            }
-            
-            console.log('[Genesis World Builder] Step 3 complete: Generate message sent');
-            console.log('[Genesis World Builder] Generation flow completed successfully', {
-                timestamp: new Date().toISOString(),
-                totalElapsedMs: Date.now() - generateStartTime
-            });
-            
-            this.statusText = 'Generation triggered - waiting for Azgaar...';
-            
+            // Status will be updated via progress_update IPC messages from Godot
+            this.statusText = 'Generation in progress...';
         } catch (e) {
-            console.error('[Genesis World Builder] Error in generate() flow:', e, {
-                message: e.message,
-                stack: e.stack,
-                timestamp: new Date().toISOString()
-            });
+            console.error('[Genesis World Builder] Error sending generate IPC to Godot:', e);
             this.isGenerating = false;
-            this.statusText = 'Error: Generation failed';
-            this.errorMessage = 'Generation failed';
-            this.errorDetails = `Unexpected error: ${e.message}. Check console for details.`;
+            this.statusText = 'Error: Failed to send generation request';
+            this.errorMessage = 'Failed to send generation request';
+            this.errorDetails = `Error: ${e.message}`;
         }
     }
     }));
