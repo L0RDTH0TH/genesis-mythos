@@ -1622,7 +1622,14 @@ func _send_preview_to_webview(data_url: String) -> void:
 	MythosLogger.info("WorldBuilderWebController", "Sending preview to WebView", {"data_url_length": data_url.length()})
 	
 	# Escape single quotes and backslashes in data URL for JavaScript
-	var escaped_url: String = data_url.replace("'", "\'").replace("\", "\\")
+	# First escape backslashes, then single quotes (order matters)
+	# Note: In GDScript, \' is not a valid escape sequence, so we build it using concatenation
+	var escaped_url: String = data_url.replace("\\", "\\\\")
+	# For single quotes, we need to escape them for JavaScript: replace ' with \'
+	# Build the escape sequence using backslash + quote
+	var backslash: String = "\\"
+	var single_quote_escaped: String = backslash + "'"
+	escaped_url = escaped_url.replace("'", single_quote_escaped)
 	
 	var preview_script: String = """
 		(function() {
@@ -1672,10 +1679,3 @@ func _send_preview_to_webview(data_url: String) -> void:
 		MythosLogger.debug("WorldBuilderWebController", "Preview update executed via eval")
 	else:
 		MythosLogger.error("WorldBuilderWebController", "Cannot execute JS - WebView method not available")
-		MythosLogger.debug("WorldBuilderWebController", "Preview update executed via eval")
-	else:
-		MythosLogger.error("WorldBuilderWebController", "Cannot execute JS - WebView method not available")
-		MythosLogger.debug("WorldBuilderWebController", "Preview update executed via eval")
-	else:
-		MythosLogger.error("WorldBuilderWebController", "Cannot execute JS - WebView method not available")
-
