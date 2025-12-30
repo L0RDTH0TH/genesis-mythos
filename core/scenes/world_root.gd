@@ -179,6 +179,9 @@ func _setup_world_builder_ui_async() -> void:
 		"is_inside_tree": world_builder_ui.is_inside_tree()
 	})
 	
+	# Note: Azgaar is now embedded as iframe in world_builder.html center panel
+	# No separate WebView scene needed
+	
 	# Update progress: Finalizing
 	LoadingOverlay.update_progress("Finalizing...", 70.0)
 	await get_tree().process_frame

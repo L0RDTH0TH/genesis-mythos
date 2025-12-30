@@ -43,12 +43,16 @@
                 </div>
             </div>
 
-            <!-- Center Panel: Status/Preview (No iframe - headless mode) -->
-            <div class="center-panel" style="background: #1a1a1a; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-                <canvas id="azgaar-canvas" style="width: 100%; height: 100%; display: none; border: 1px solid #444;"></canvas>
+            <!-- Center Panel: Status/Preview (Fork mode with canvas preview) -->
+            <div class="center-panel" style="background: #1a1a1a; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden;">
+                <!-- Canvas for Azgaar preview rendering (shown when rendered) -->
+                <canvas id="azgaar-canvas" style="width: 100%; height: 100%; object-fit: contain; background: #0a0a0a; display: none;"></canvas>
+                <!-- Preview image (fallback if canvas not available, from Godot conversion) -->
+                <img id="map-preview-img" x-show="previewImageUrl" :src="previewImageUrl" style="width: 100%; height: 100%; object-fit: contain; display: none;" alt="Map Preview">
+                <!-- Status message (shown when no preview) -->
                 <div id="azgaar-status" style="padding: 2rem; text-align: center; color: #aaa; font-size: 1.2em;">
                     <p>Azgaar Genesis Fork - Ready</p>
-                    <p style="font-size: 0.8em; margin-top: 1rem; color: #666;">Using modular API (headless mode)</p>
+                    <p style="font-size: 0.8em; margin-top: 1rem; color: #666;">Using modular API - Generate a map to see preview</p>
                 </div>
             </div>
 
@@ -169,11 +173,33 @@
             renderPreview 
         } from '../js/azgaar/azgaar-genesis.esm.js';
 
-        // Initialize generator (headless mode - no canvas for now)
+        // Initialize generator with canvas for preview rendering
         const canvas = document.getElementById('azgaar-canvas');
+        function resizeCanvas() {
+            if (canvas) {
+                const container = canvas.parentElement;
+                if (container) {
+                    canvas.width = container.clientWidth;
+                    canvas.height = container.clientHeight;
+                    console.log('[Azgaar Genesis] Canvas resized', { width: canvas.width, height: canvas.height });
+                }
+            }
+        }
+        
         try {
-            initGenerator({ canvas: null }); // null = headless mode
-            console.log('[Azgaar Genesis] Generator initialized (headless mode)');
+            if (canvas) {
+                // Set initial canvas size
+                resizeCanvas();
+                
+                // Resize on window resize
+                window.addEventListener('resize', resizeCanvas);
+                
+                initGenerator({ canvas: canvas });
+                console.log('[Azgaar Genesis] Generator initialized with canvas');
+            } else {
+                initGenerator({ canvas: null }); // Fallback to headless
+                console.log('[Azgaar Genesis] Generator initialized (headless mode - no canvas)');
+            }
         } catch (error) {
             console.error('[Azgaar Genesis] Initialization error:', error);
         }
@@ -207,7 +233,8 @@
          */
         async function handleGenerateMap(options) {
             const statusDiv = document.getElementById('azgaar-status');
-            const { Delaunator, loadOptions, generateMap, getMapData } = window.AzgaarGenesis;
+            const canvas = document.getElementById('azgaar-canvas');
+            const { Delaunator, loadOptions, generateMap, getMapData, renderPreview } = window.AzgaarGenesis;
             
             if (!window.AzgaarGenesis.initialized) {
                 console.error('[Azgaar Genesis] Generator not initialized');
@@ -242,25 +269,43 @@
                     hasPack: !!json.pack
                 });
                 
-                // Send to Godot via IPC
+                // Render preview to canvas
+                let previewDataUrl = '';
+                if (canvas && window.AzgaarGenesis.renderPreview) {
+                    try {
+                        statusDiv.innerHTML = '<p>Rendering preview...</p>';
+                        console.log('[Azgaar Genesis] Rendering preview to canvas...');
+                        window.AzgaarGenesis.renderPreview(canvas);
+                        previewDataUrl = canvas.toDataURL('image/png');
+                        // Show canvas after rendering
+                        canvas.style.display = 'block';
+                        if (statusDiv) {
+                            statusDiv.style.display = 'none';
+                        }
+                        console.log('[Azgaar Genesis] Preview rendered, data URL length:', previewDataUrl.length);
+                    } catch (renderError) {
+                        console.warn('[Azgaar Genesis] Preview render failed:', renderError);
+                    }
+                }
+                
+                // Send to Godot via IPC (with preview if available)
                 if (window.GodotBridge && window.GodotBridge.postMessage) {
                     window.GodotBridge.postMessage('map_generated', {
                         data: json,
                         seed: data.seed,
-                        generationTime: generateTime
+                        generationTime: generateTime,
+                        previewDataUrl: previewDataUrl
                     });
-                    console.log('[Azgaar Genesis] Sent map_generated message to Godot');
+                    console.log('[Azgaar Genesis] Sent map_generated message to Godot', {
+                        hasPreview: previewDataUrl.length > 0
+                    });
                 } else {
                     console.warn('[Azgaar Genesis] GodotBridge.postMessage not available');
                 }
                 
-                statusDiv.innerHTML = `
-                    <p style="color: #4f4;">Map generated successfully!</p>
-                    <p style="font-size: 0.9em; color: #aaa; margin-top: 0.5rem;">
-                        Seed: ${data.seed}<br>
-                        Time: ${generateTime.toFixed(0)}ms
-                    </p>
-                `;
+                // Preview is now visible via canvas rendering
+                // Alpine.js will handle showing/hiding based on previewImageUrl
+                console.log('[Azgaar Genesis] Generation and preview complete');
             } catch (error) {
                 console.error('[Azgaar Genesis] Generation error:', error);
                 statusDiv.innerHTML = `

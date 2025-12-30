@@ -163,6 +163,46 @@
                     }
                 });
             }
+            
+            // Listen for completion messages from Azgaar iframe
+            window.addEventListener('message', function(event) {
+                // Accept messages from Azgaar iframe (localhost:8080)
+                if (event.origin !== 'http://127.0.0.1:8080' && event.origin !== 'http://localhost:8080') {
+                    return;
+                }
+                
+                if (event.data && event.data.type === 'generation_complete') {
+                    console.log('[WorldBuilder] Received generation_complete message from Azgaar', {
+                        timestamp: event.data.timestamp
+                    });
+                    
+                    // Forward to Godot via IPC
+                    if (window.GodotBridge && window.GodotBridge.postMessage) {
+                        window.GodotBridge.postMessage({
+                            type: 'generation_complete',
+                            data: {
+                                timestamp: event.data.timestamp
+                            }
+                        });
+                    }
+                } else if (event.data && event.data.type === 'generation_failed') {
+                    console.error('[WorldBuilder] Received generation_failed message from Azgaar', {
+                        error: event.data.error,
+                        timestamp: event.data.timestamp
+                    });
+                    
+                    // Forward to Godot via IPC
+                    if (window.GodotBridge && window.GodotBridge.postMessage) {
+                        window.GodotBridge.postMessage({
+                            type: 'generation_failed',
+                            data: {
+                                error: event.data.error,
+                                timestamp: event.data.timestamp
+                            }
+                        });
+                    }
+                }
+            });
         });
     </script>
 </body>

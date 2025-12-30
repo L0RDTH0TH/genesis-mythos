@@ -45,6 +45,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 Object.assign(window.worldBuilderInstance.params, data.params || {});
                 console.log('[Genesis World Builder] Archetype params loaded', Object.keys(data.params || {}));
             }
+        } else if (data.update_type === 'preview_ready') {
+            // Preview image ready
+            if (window.worldBuilderInstance) {
+                window.worldBuilderInstance.previewImageUrl = data.preview_url || data.previewDataUrl || null;
+                console.log('[Genesis World Builder] Preview image ready', {
+                    hasUrl: !!window.worldBuilderInstance.previewImageUrl
+                });
+            }
         }
         
         // Call original handler if needed
@@ -70,6 +78,7 @@ document.addEventListener('alpine:init', () => {
         updateDebounceTimer: null,
         errorMessage: null,
         errorDetails: null,
+        previewImageUrl: null,  // Preview image data URL or URL
         
         init() {
             // Store instance for global access
@@ -864,9 +873,20 @@ document.addEventListener('alpine:init', () => {
             optionsSeed: this.params.optionsSeed
         });
         
-        // Clear previous errors
+        // Clear previous errors and preview
         this.errorMessage = null;
         this.errorDetails = null;
+        this.previewImageUrl = null;  // Clear preview when starting new generation
+        
+        // Hide canvas and show status
+        const canvas = document.getElementById('azgaar-canvas');
+        const statusDiv = document.getElementById('azgaar-status');
+        if (canvas) {
+            canvas.style.display = 'none';
+        }
+        if (statusDiv) {
+            statusDiv.style.display = 'block';
+        }
         
         this.isGenerating = true;
         this.progressValue = 0;

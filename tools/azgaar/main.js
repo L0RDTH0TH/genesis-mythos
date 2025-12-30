@@ -1415,6 +1415,44 @@ function undraw() {
     return result;
   };
   
+  // Hook into generate() function to send completion message to parent
+  // This allows World Builder to detect when generation completes
+  const originalGenerate = generate;
+  generate = async function(options) {
+    try {
+      console.log('[Genesis Azgaar] Generation started', {
+        timestamp: new Date().toISOString()
+      });
+      const result = await originalGenerate.apply(this, arguments);
+      
+      // Send completion message to parent window
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({
+          type: 'generation_complete',
+          timestamp: new Date().toISOString()
+        }, '*');
+        console.log('[Genesis Azgaar] Sent generation_complete message to parent', {
+          timestamp: new Date().toISOString()
+        });
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('[Genesis Azgaar] Generation error:', error);
+      
+      // Send error message to parent window
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({
+          type: 'generation_failed',
+          error: error.message || 'Unknown error',
+          timestamp: new Date().toISOString()
+        }, '*');
+      }
+      
+      throw error;
+    }
+  };
+  
   console.log('[Genesis Azgaar] Native postMessage listener initialized', {
     timestamp: new Date().toISOString()
   });
