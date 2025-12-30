@@ -16,6 +16,9 @@ const IFRAME_ID: String = "azgaar-iframe"
 ## Flag to track if Azgaar is ready via iframe
 var azgaar_ready_via_iframe: bool = false
 
+## Flag to track if fork is ready
+var fork_ready: bool = false
+
 ## Timer for polling Azgaar readiness
 var azgaar_readiness_timer: Timer = null
 var azgaar_readiness_poll_count: int = 0
@@ -382,8 +385,12 @@ func _handle_alpine_ready(data: Dictionary) -> void:
 	_send_step_definitions()
 	_send_archetypes()
 	
-	# Wait for fork initialization, then trigger auto-generation with default archetype
-	await get_tree().create_timer(0.5).timeout  # Wait for fork init
+	# Wait for fork initialization (fork_ready IPC), then trigger auto-generation
+	# Fork will send fork_ready IPC after module script loads
+	# If fork_ready not received within 3 seconds, proceed anyway (fork might be ready but signal missed)
+	await get_tree().create_timer(3.0).timeout
+	if not fork_ready:
+		MythosLogger.warn("WorldBuilderWebController", "fork_ready IPC not received, proceeding with auto-generation anyway")
 	_trigger_auto_generation_on_load()
 
 
@@ -593,32 +600,43 @@ func _handle_generate(data: Dictionary) -> void:
 	send_progress_update(10.0, "Checking fork availability...", true)
 	
 	# Try fork mode first (preferred)
-	var fork_check_script: String = """
-		(function() {
-			try {
-				if (window.AzgaarGenesis && window.AzgaarGenesis.initialized && 
-				    typeof window.AzgaarGenesis.generateMap === 'function') {
-					return 'available';
-				}
-				return 'not_available';
-			} catch (e) {
-				return 'error: ' + e.message;
-			}
-		})();
-	"""
-	
+	# Check with retries since module script loads asynchronously
 	var fork_available: bool = false
-	if web_view.has_method("execute_js"):
-		var fork_result = web_view.execute_js(fork_check_script)
-		fork_available = (fork_result == "available")
-		MythosLogger.info("WorldBuilderWebController", "Fork availability check", {"result": fork_result, "available": fork_available})
+	var max_retries: int = 5
+	var retry_delay: float = 0.2
+	
+	for attempt in range(max_retries):
+		var fork_check_script: String = """
+			(function() {
+				try {
+					if (window.AzgaarGenesis && window.AzgaarGenesis.initialized && 
+					    typeof window.AzgaarGenesis.generateMap === 'function') {
+						return 'available';
+					}
+					return 'not_available';
+				} catch (e) {
+					return 'error: ' + e.message;
+				}
+			})();
+		"""
+		
+		if web_view.has_method("execute_js"):
+			var fork_result = web_view.execute_js(fork_check_script)
+			fork_available = (fork_result == "available")
+			MythosLogger.info("WorldBuilderWebController", "Fork availability check (attempt %d/%d)" % [attempt + 1, max_retries], {"result": fork_result, "available": fork_available})
+			
+			if fork_available:
+				break
+		
+		if attempt < max_retries - 1:
+			await get_tree().create_timer(retry_delay).timeout
 	
 	if fork_available:
 		# Use fork mode (preferred)
 		_generate_via_fork(current_params)
 	else:
-		# Fallback to iframe mode
-		MythosLogger.warn("WorldBuilderWebController", "Fork not available, falling back to iframe mode")
+		# Fallback to iframe mode (but world_builder_v2.html has no iframe, so this will fail)
+		MythosLogger.warn("WorldBuilderWebController", "Fork not available after %d attempts, falling back to iframe mode (may fail - no iframe in fork template)" % max_retries)
 		_generate_via_iframe(current_params)
 
 
@@ -626,10 +644,17 @@ func _generate_via_fork(params: Dictionary) -> void:
 	"""Generate map using Azgaar fork API (headless mode)."""
 	MythosLogger.info("WorldBuilderWebController", "Generating via fork mode")
 	
+	# Verify fork is actually available before proceeding
+	if not web_view:
+		MythosLogger.error("WorldBuilderWebController", "Cannot generate via fork - WebView is null")
+		send_progress_update(0.0, "Error: WebView not available", false)
+		return
+	
 	send_progress_update(20.0, "Loading options into fork...", true)
 	
 	# Convert params to fork options format
 	var fork_options: Dictionary = _convert_params_to_fork_options(params)
+	MythosLogger.debug("WorldBuilderWebController", "Fork options prepared", {"options_keys": fork_options.keys(), "seed": fork_options.get("seed", "not_set")})
 	
 	# Trigger fork generation via JavaScript (use handleGenerateMap if available, else direct call)
 	var generate_script: String = """
@@ -704,7 +729,9 @@ func _generate_via_fork(params: Dictionary) -> void:
 	if web_view.has_method("execute_js"):
 		var result = web_view.execute_js(generate_script)
 		send_progress_update(50.0, "Generating map (fork mode)...", true)
-		MythosLogger.info("WorldBuilderWebController", "Fork generation triggered", {"result": result})
+		MythosLogger.info("WorldBuilderWebController", "Fork generation triggered", {"result": result, "result_type": typeof(result)})
+		if result != "triggered" and result != "success":
+			MythosLogger.warn("WorldBuilderWebController", "Fork generation script returned unexpected result", {"result": result})
 	elif web_view.has_method("eval"):
 		web_view.eval(generate_script)
 		send_progress_update(50.0, "Generating map (fork mode)...", true)
@@ -716,6 +743,7 @@ func _generate_via_fork(params: Dictionary) -> void:
 
 func _generate_via_iframe(params: Dictionary) -> void:
 	"""Generate map using iframe method (fallback)."""
+	MythosLogger.warn("WorldBuilderWebController", "Iframe mode requested, but world_builder_v2.html has no iframe - this will fail")
 	MythosLogger.info("WorldBuilderWebController", "Generating via iframe mode (fallback)")
 	
 	if not azgaar_ready_via_iframe:
@@ -738,7 +766,7 @@ func _generate_via_iframe(params: Dictionary) -> void:
 					iframe.contentWindow.azgaar.generate();
 					return 'generated';
 				}
-				return 'error: azgaar not available';
+				return 'error: azgaar not available (iframe not found or azgaar not loaded)';
 			} catch (e) {
 				console.error('[WorldBuilder] Error triggering generation:', e);
 				return 'error: ' + e.message;
@@ -748,12 +776,13 @@ func _generate_via_iframe(params: Dictionary) -> void:
 	
 	if web_view.has_method("execute_js"):
 		var result = web_view.execute_js(generate_script)
+		MythosLogger.info("WorldBuilderWebController", "Iframe generation check result", {"result": result})
 		if result == "generated":
 			MythosLogger.info("WorldBuilderWebController", "Generation triggered via iframe")
 			_start_generation_timeout()
 		else:
 			MythosLogger.error("WorldBuilderWebController", "Failed to trigger generation via iframe", {"result": result})
-			send_progress_update(0.0, "Error: Failed to trigger generation", false)
+			send_progress_update(0.0, "Error: Failed to trigger generation - iframe not available in fork template", false)
 	elif web_view.has_method("eval"):
 		web_view.eval(generate_script)
 		MythosLogger.info("WorldBuilderWebController", "Generation triggered via iframe (eval)")
@@ -1488,7 +1517,8 @@ func _handle_map_generation_failed(data: Dictionary) -> void:
 
 func _handle_fork_ready(data: Dictionary) -> void:
 	"""Handle fork ready IPC message."""
-	MythosLogger.info("WorldBuilderWebController", "Fork is ready for generation")
+	fork_ready = true
+	MythosLogger.info("WorldBuilderWebController", "Fork is ready for generation - fork_ready IPC received")
 
 
 func _trigger_auto_generation_on_load() -> void:

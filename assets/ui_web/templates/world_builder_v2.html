@@ -202,6 +202,13 @@
             }
         } catch (error) {
             console.error('[Azgaar Genesis] Initialization error:', error);
+            // Send error to Godot
+            if (window.GodotBridge && window.GodotBridge.postMessage) {
+                window.GodotBridge.postMessage('map_generation_failed', {
+                    error: 'Fork initialization failed: ' + error.message,
+                    stack: error.stack
+                });
+            }
         }
         
         // Store generator functions globally for Alpine.js access
@@ -215,6 +222,14 @@
         };
         
         console.log('[Azgaar Genesis] Library loaded and ready');
+        
+        // Notify Godot that fork is ready via IPC
+        if (window.GodotBridge && window.GodotBridge.postMessage) {
+            window.GodotBridge.postMessage('fork_ready', {});
+            console.log('[Azgaar Genesis] Sent fork_ready IPC message to Godot');
+        } else {
+            console.warn('[Azgaar Genesis] GodotBridge.postMessage not available - cannot notify Godot');
+        }
         
         // Listen for IPC messages from Godot
         if (window.GodotBridge && window.GodotBridge.onMessage) {
