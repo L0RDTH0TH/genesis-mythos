@@ -15,18 +15,19 @@ const FORMAT_HEIGHTMAP: int = Image.FORMAT_RF
 """
 Converts Azgaar JSON height data to a rasterized Godot Image.
 Uses spatial hashing for efficient nearest-neighbor lookup during rasterization.
-:param json_data: Dictionary from getMapData() with 'settings', 'grid' keys
+:param json_data: Dictionary from getMapData() with 'options', 'grid' keys (fork JSON structure)
 :return: Image with normalized heights (0.0-1.0 float in red channel)
 """
 func convert_to_heightmap(json_data: Dictionary) -> Image:
-	var settings: Dictionary = json_data.get("settings", {})
-	var width: int = settings.get("width", 1024)
-	var height: int = settings.get("height", 1024)
+	# Fork JSON uses 'options' for settings, not 'settings'
+	var options: Dictionary = json_data.get("options", {})
+	var width: int = options.get("mapWidth", 1024)
+	var height: int = options.get("mapHeight", 1024)
 	
 	var grid: Dictionary = json_data.get("grid", {})
 	var cells: Dictionary = grid.get("cells", {})
-	var points: Array = grid.get("points", [])  # Array of [x: float, y: float]
-	var heights: Array = cells.get("h", [])  # Array of int (0-100)
+	var points: Array = grid.get("points", [])  # Array of arrays [[x,y], ...]
+	var heights: Array = cells.get("h", [])  # Array of ints (0-100)
 	
 	var num_cells: int = heights.size()
 	if num_cells == 0 or points.size() != num_cells:
@@ -38,9 +39,11 @@ func convert_to_heightmap(json_data: Dictionary) -> Image:
 	var bucket_size_y: float = float(height) / BUCKET_COUNT
 	var buckets: Dictionary = {}
 	for cell_id in num_cells:
-		var pt: Array = points[cell_id]
-		var bx: int = floor(pt[0] / bucket_size_x)
-		var by: int = floor(pt[1] / bucket_size_y)
+		var pt: Array = points[cell_id]  # pt is [x, y]
+		var x: float = pt[0]
+		var y: float = pt[1]
+		var bx: int = floor(x / bucket_size_x)
+		var by: int = floor(y / bucket_size_y)
 		var key: Vector2i = Vector2i(bx, by)
 		if not buckets.has(key):
 			buckets[key] = []
@@ -69,7 +72,9 @@ func convert_to_heightmap(json_data: Dictionary) -> Image:
 			var closest_h: int = 0
 			for cid in candidates:
 				var pt: Array = points[cid]
-				var dist: float = (pt[0] - px) * (pt[0] - px) + (pt[1] - py) * (pt[1] - py)
+				var x: float = pt[0]
+				var y: float = pt[1]
+				var dist: float = (x - px) * (x - px) + (y - py) * (y - py)
 				if dist < min_dist:
 					min_dist = dist
 					closest_h = heights[cid]
@@ -86,12 +91,24 @@ func convert_to_heightmap(json_data: Dictionary) -> Image:
 """
 Extracts biome data per cell.
 :return: Dictionary {cell_id: biome_name} using pack.biomes for names
+Handles missing biome arrays gracefully.
 """
 func extract_biomes(json_data: Dictionary) -> Dictionary:
 	var pack: Dictionary = json_data.get("pack", {})
-	var cells: Dictionary = pack.get("cells", {})
+	if pack.is_empty():
+		return {}
+	
 	var biomes_data: Array = pack.get("biomes", [])  # Array of biome names
-	var cell_biomes: Array = cells.get("biome", [])  # Array of biome indices per cell
+	if biomes_data.is_empty():
+		return {}
+	
+	var cells: Dictionary = pack.get("cells", {})
+	if cells.is_empty():
+		return {}
+	
+	var cell_biomes: Array = cells.get("biome", [])  # Array of biome indices per cell (may be missing)
+	if cell_biomes.is_empty():
+		return {}
 	
 	var result: Dictionary = {}
 	for cell_id in cell_biomes.size():
@@ -110,3 +127,92 @@ func extract_rivers(json_data: Dictionary) -> Array:
 	var rivers: Array = pack.get("rivers", [])  # Array of river dicts from Azgaar
 	
 	return rivers  # Direct return; can process further if needed (e.g., paths)
+
+"""
+Converts Azgaar JSON biome data to a rasterized Godot Image (biome indices).
+Similar rasterization to heightmap, but uses biome indices instead of heights.
+:param json_data: Dictionary from getMapData() with 'options', 'grid', 'pack' keys
+:return: Image with biome indices (0-max_biomes) in red channel, or empty Image if biomes unavailable
+"""
+func convert_to_biome_map(json_data: Dictionary) -> Image:
+	var options: Dictionary = json_data.get("options", {})
+	var width: int = options.get("mapWidth", 1024)
+	var height: int = options.get("mapHeight", 1024)
+	
+	var pack: Dictionary = json_data.get("pack", {})
+	if pack.is_empty():
+		return Image.new()
+	
+	var biomes_data: Array = pack.get("biomes", [])
+	if biomes_data.is_empty():
+		return Image.new()
+	
+	var pack_cells: Dictionary = pack.get("cells", {})
+	if pack_cells.is_empty():
+		return Image.new()
+	
+	var cell_biomes: Array = pack_cells.get("biome", [])
+	if cell_biomes.is_empty():
+		return Image.new()
+	
+	var grid: Dictionary = json_data.get("grid", {})
+	var points: Array = grid.get("points", [])
+	
+	var num_cells: int = cell_biomes.size()
+	if num_cells == 0 or points.size() != num_cells:
+		push_error("Invalid Azgaar biome data: mismatched points and biome indices")
+		return Image.new()
+	
+	var max_biomes: int = biomes_data.size()
+	
+	# Build spatial hash: buckets[Vector2i] = Array[cell_id]
+	var bucket_size_x: float = float(width) / BUCKET_COUNT
+	var bucket_size_y: float = float(height) / BUCKET_COUNT
+	var buckets: Dictionary = {}
+	for cell_id in num_cells:
+		var pt: Array = points[cell_id]
+		var x: float = pt[0]
+		var y: float = pt[1]
+		var bx: int = floor(x / bucket_size_x)
+		var by: int = floor(y / bucket_size_y)
+		var key: Vector2i = Vector2i(bx, by)
+		if not buckets.has(key):
+			buckets[key] = []
+		buckets[key].append(cell_id)
+	
+	# Create image (use FORMAT_R8 for single-channel biome index)
+	var img: Image = Image.create(width, height, false, Image.FORMAT_R8)
+	for px in width:
+		for py in height:
+			var bx: int = floor(px / bucket_size_x)
+			var by: int = floor(py / bucket_size_y)
+			
+			# Collect candidates from 3x3 buckets
+			var candidates: Array = []
+			for dx in range(-1, 2):
+				for dy in range(-1, 2):
+					var nkey: Vector2i = Vector2i(bx + dx, by + dy)
+					if buckets.has(nkey):
+						candidates += buckets[nkey]
+			
+			if candidates.is_empty():
+				continue  # Fallback to 0 if no cells (rare)
+			
+			# Find nearest cell
+			var min_dist: float = INF
+			var closest_biome_idx: int = 0
+			for cid in candidates:
+				var pt: Array = points[cid]
+				var x: float = pt[0]
+				var y: float = pt[1]
+				var dist: float = (x - px) * (x - px) + (y - py) * (y - py)
+				if dist < min_dist:
+					min_dist = dist
+					closest_biome_idx = cell_biomes[cid]
+			
+			# Pack biome index as normalized float in red channel
+			# biome_idx / max_biomes gives 0-1 range
+			var norm: float = float(closest_biome_idx) / float(max_biomes) if max_biomes > 0 else 0.0
+			img.set_pixel(px, py, Color(norm, 0.0, 0.0, 1.0))
+	
+	return img
