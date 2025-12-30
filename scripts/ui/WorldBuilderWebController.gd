@@ -1322,6 +1322,9 @@ func _handle_map_generated(data: Dictionary) -> void:
 	# Save to file
 	_save_test_json_to_file(map_data, seed_value)
 	
+	# Phase 3: Convert to heightmap and generate 2D preview
+	_convert_and_preview_heightmap(map_data)
+	
 	MythosLogger.info("WorldBuilderWebController", "=== END MAP GENERATED ===", {
 		"seed": seed_value,
 		"generation_time_ms": gen_time,
@@ -1380,3 +1383,65 @@ func _save_test_json_to_file(json_data: Dictionary, seed: String) -> void:
 	print("File: " + file_path)
 	print("Size: " + str(json_string.length()) + " bytes")
 	print("Seed: " + seed)
+
+
+func _convert_and_preview_heightmap(json_data: Dictionary) -> void:
+	"""Convert Azgaar JSON to heightmap Image and save preview PNG (Phase 3)."""
+	MythosLogger.info("WorldBuilderWebController", "Converting JSON to heightmap for 2D preview")
+	
+	var converter: AzgaarDataConverter = AzgaarDataConverter.new()
+	var heightmap_img: Image = converter.convert_to_heightmap(json_data)
+	
+	if heightmap_img.is_empty():
+		MythosLogger.error("WorldBuilderWebController", "Failed to convert JSON to heightmap")
+		return
+	
+	var img_size: Vector2i = heightmap_img.get_size()
+	MythosLogger.info("WorldBuilderWebController", "Heightmap converted", {
+		"width": img_size.x,
+		"height": img_size.y,
+		"format": heightmap_img.get_format()
+	})
+	
+	# Create debug directory if needed
+	var debug_dir := DirAccess.open("user://")
+	if not debug_dir:
+		MythosLogger.error("WorldBuilderWebController", "Cannot open user:// directory")
+		return
+	
+	if not debug_dir.dir_exists("debug"):
+		var err := debug_dir.make_dir("debug")
+		if err != OK:
+			MythosLogger.error("WorldBuilderWebController", "Failed to create debug directory", {"error": err})
+			return
+	
+	# Convert heightmap to RGB8 format for PNG export (heightmap is FORMAT_RF)
+	var preview_img: Image = Image.create(img_size.x, img_size.y, false, Image.FORMAT_RGB8)
+	for y in range(img_size.y):
+		for x in range(img_size.x):
+			var height_color: Color = heightmap_img.get_pixel(x, y)
+			var height_value: float = height_color.r  # FORMAT_RF stores height in red channel
+			# Convert normalized height (0-1) to grayscale RGB
+			preview_img.set_pixel(x, y, Color(height_value, height_value, height_value, 1.0))
+	
+	# Save PNG preview
+	var png_path: String = "user://debug/heightmap_preview.png"
+	var save_err: Error = preview_img.save_png(png_path)
+	if save_err != OK:
+		MythosLogger.error("WorldBuilderWebController", "Failed to save heightmap PNG", {
+			"path": png_path,
+			"error": save_err
+		})
+		return
+	
+	MythosLogger.info("WorldBuilderWebController", "Heightmap PNG preview saved", {
+		"path": png_path,
+		"size": img_size
+	})
+	print("=== HEIGHTMAP PREVIEW SAVED ===")
+	print("File: " + png_path)
+	print("Size: " + str(img_size.x) + "x" + str(img_size.y))
+	
+	# Optional: Integrate with MapMakerModule for live 2D preview
+	# Note: MapRenderer is currently deprecated, so we'll skip this for now
+	# Future: Create WorldMapData and pass to MapMakerModule if needed
