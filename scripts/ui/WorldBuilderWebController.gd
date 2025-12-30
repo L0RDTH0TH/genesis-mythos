@@ -1449,7 +1449,10 @@ func _handle_map_generated(data: Dictionary) -> void:
 	var seed_value: String = data.get("seed", "")
 	var gen_time: float = data.get("generationTime", 0.0)
 	var preview_data_url: String = data.get("previewDataUrl", "")
-	var preview_svg: String = data.get("previewSvg", "")
+	var preview_svg_value = data.get("previewSvg", "")
+	var preview_svg: String = ""
+	if preview_svg_value is String:
+		preview_svg = preview_svg_value
 	
 	# Store for analysis
 	test_json_data = map_data
