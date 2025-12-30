@@ -1,0 +1,22 @@
+{
+	"fork_version": "20251230",
+	"fork_commit": "88dbf22",
+	"fork_repository": "https://github.com/L0RDTH0TH/Genesis-Azgaar",
+	"bundle_file": "azgaar-genesis.esm-20251230.js",
+	"features": {
+		"svg_rendering": true,
+		"canvas_rendering": true,
+		"headless_generation": true,
+		"modular_api": true
+	},
+	"api_functions": [
+		"initGenerator",
+		"loadOptions",
+		"generateMap",
+		"getMapData",
+		"renderPreview",
+		"renderPreviewSVG"
+	],
+	"last_updated": "2025-12-30",
+	"notes": "Updated bundle includes SVG rendering support (renderPreviewSVG function)"
+}

@@ -372,6 +372,8 @@ func _on_ipc_message(message: String) -> void:
 			_handle_map_generation_failed(message_data)
 		"fork_ready":
 			_handle_fork_ready(message_data)
+		"svg_preview_ready":
+			_handle_svg_preview(message_data)
 		_:
 			MythosLogger.warn("WorldBuilderWebController", "Unknown IPC message type", {"type": message_type, "data": data})
 
@@ -1447,9 +1449,18 @@ func _handle_map_generated(data: Dictionary) -> void:
 	var seed_value: String = data.get("seed", "")
 	var gen_time: float = data.get("generationTime", 0.0)
 	var preview_data_url: String = data.get("previewDataUrl", "")
+	var preview_svg: String = data.get("previewSvg", "")
 	
 	# Store for analysis
 	test_json_data = map_data
+	
+	# Handle SVG preview if available
+	if not preview_svg.is_empty():
+		_handle_svg_preview({
+			"svgData": preview_svg,
+			"width": data.get("width", 1024),
+			"height": data.get("height", 768)
+		})
 	
 	# Print top-level keys
 	var top_keys: Array = map_data.keys()
@@ -1498,6 +1509,30 @@ func _handle_fork_ready(data: Dictionary) -> void:
 	"""Handle fork ready IPC message."""
 	fork_ready = true
 	MythosLogger.info("WorldBuilderWebController", "Fork is ready for generation - fork_ready IPC received, flag set to true")
+
+
+func _handle_svg_preview(data: Dictionary) -> void:
+	"""Handle SVG preview ready IPC message."""
+	var svg_data: String = data.get("svgData", "")
+	var width: int = data.get("width", 1024)
+	var height: int = data.get("height", 768)
+	
+	if svg_data.is_empty():
+		MythosLogger.warn("WorldBuilderWebController", "SVG preview data is empty")
+		return
+	
+	MythosLogger.info("WorldBuilderWebController", "SVG preview received", {
+		"svg_length": svg_data.length(),
+		"width": width,
+		"height": height
+	})
+	
+	# Store SVG data for potential future use (e.g., export, conversion, etc.)
+	# Note: SVG rendering is handled in the WebView HTML template via Alpine.js
+	# This handler is primarily for logging and potential future processing
+	
+	# Optional: Could convert SVG to Image if needed for Godot display
+	# For now, SVG is displayed directly in the WebView via x-html binding
 
 
 func _trigger_auto_generation_on_load() -> void:

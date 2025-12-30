@@ -78,7 +78,9 @@ document.addEventListener('alpine:init', () => {
         updateDebounceTimer: null,
         errorMessage: null,
         errorDetails: null,
-        previewImageUrl: null,  // Preview image data URL or URL
+        previewImageUrl: null,  // Preview image data URL or URL (canvas preview)
+        previewSvg: null,       // SVG preview string (SVG rendering)
+        previewMode: 'svg',     // 'svg' or 'canvas' - preferred preview mode
         
         init() {
             // Store instance for global access
@@ -813,6 +815,18 @@ document.addEventListener('alpine:init', () => {
         }
     },
     
+    togglePreviewMode() {
+        // Toggle between SVG and canvas preview modes
+        if (this.previewSvg && this.previewImageUrl) {
+            this.previewMode = this.previewMode === 'svg' ? 'canvas' : 'svg';
+            console.log('[Genesis World Builder] Preview mode toggled:', this.previewMode);
+        } else if (this.previewSvg) {
+            this.previewMode = 'svg';
+        } else if (this.previewImageUrl) {
+            this.previewMode = 'canvas';
+        }
+    },
+    
     nextStep() {
         if (this.currentStep < this.totalSteps - 1) {
             this.setStep(this.currentStep + 1);
@@ -876,7 +890,8 @@ document.addEventListener('alpine:init', () => {
         // Clear previous errors and preview
         this.errorMessage = null;
         this.errorDetails = null;
-        this.previewImageUrl = null;  // Clear preview when starting new generation
+        this.previewImageUrl = null;  // Clear canvas preview when starting new generation
+        this.previewSvg = null;       // Clear SVG preview when starting new generation
         
         // Hide canvas and show status
         const canvas = document.getElementById('azgaar-canvas');
