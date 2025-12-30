@@ -48,11 +48,11 @@
                 <!-- Canvas for Azgaar preview rendering (shown when rendered) -->
                 <canvas id="azgaar-canvas" style="width: 100%; height: 100%; object-fit: contain; background: #0a0a0a; display: none;"></canvas>
                 <!-- Preview image (fallback if canvas not available, from Godot conversion) -->
-                <img id="map-preview-img" x-show="previewImageUrl" :src="previewImageUrl" style="width: 100%; height: 100%; object-fit: contain; display: none;" alt="Map Preview">
+                <img id="map-preview-img" x-show="previewImageUrl" :src="previewImageUrl" style="width: 100%; height: 100%; object-fit: contain;" alt="Map Preview">
                 <!-- Status message (shown when no preview) -->
-                <div id="azgaar-status" style="padding: 2rem; text-align: center; color: #aaa; font-size: 1.2em;">
-                    <p>Azgaar Genesis Fork - Ready</p>
-                    <p style="font-size: 0.8em; margin-top: 1rem; color: #666;">Using modular API - Generate a map to see preview</p>
+                <div id="azgaar-status" x-show="!previewImageUrl" style="padding: 2rem; text-align: center; color: #aaa; font-size: 1.2em;">
+                    <p x-text="statusText || 'Azgaar Genesis Fork - Ready'"></p>
+                    <p style="font-size: 0.8em; margin-top: 1rem; color: #666;" x-show="!isGenerating">Using modular API - Generate a map to see preview</p>
                 </div>
             </div>
 

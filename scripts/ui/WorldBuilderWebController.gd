@@ -599,44 +599,15 @@ func _handle_generate(data: Dictionary) -> void:
 	
 	send_progress_update(10.0, "Checking fork availability...", true)
 	
-	# Try fork mode first (preferred)
-	# Check with retries since module script loads asynchronously
-	var fork_available: bool = false
-	var max_retries: int = 5
-	var retry_delay: float = 0.2
-	
-	for attempt in range(max_retries):
-		var fork_check_script: String = """
-			(function() {
-				try {
-					if (window.AzgaarGenesis && window.AzgaarGenesis.initialized && 
-					    typeof window.AzgaarGenesis.generateMap === 'function') {
-						return 'available';
-					}
-					return 'not_available';
-				} catch (e) {
-					return 'error: ' + e.message;
-				}
-			})();
-		"""
-		
-		if web_view.has_method("execute_js"):
-			var fork_result = web_view.execute_js(fork_check_script)
-			fork_available = (fork_result == "available")
-			MythosLogger.info("WorldBuilderWebController", "Fork availability check (attempt %d/%d)" % [attempt + 1, max_retries], {"result": fork_result, "available": fork_available})
-			
-			if fork_available:
-				break
-		
-		if attempt < max_retries - 1:
-			await get_tree().create_timer(retry_delay).timeout
-	
-	if fork_available:
+	# Use fork_ready flag instead of execute_js to avoid WebView binding panics
+	# fork_ready is set to true when fork_ready IPC message is received
+	if fork_ready:
 		# Use fork mode (preferred)
+		MythosLogger.info("WorldBuilderWebController", "Fork ready - generating via fork mode")
 		_generate_via_fork(current_params)
 	else:
 		# Fallback to iframe mode (but world_builder_v2.html has no iframe, so this will fail)
-		MythosLogger.warn("WorldBuilderWebController", "Fork not available after %d attempts, falling back to iframe mode (may fail - no iframe in fork template)" % max_retries)
+		MythosLogger.warn("WorldBuilderWebController", "Fork not ready (fork_ready flag is false) - falling back to iframe mode (may fail - no iframe in fork template)")
 		_generate_via_iframe(current_params)
 
 
@@ -822,14 +793,22 @@ func _convert_params_to_fork_options(params: Dictionary) -> Dictionary:
 	if params.has("manorsInput"):
 		options["burgs"] = int(params["manorsInput"])
 	
-	# Wind array
+	# Wind array - collect from params or use defaults
 	var winds: Array[int] = []
+	var has_winds: bool = false
 	for i in range(6):
 		var wind_key: String = "options.winds[%d]" % i
 		if params.has(wind_key):
 			winds.append(int(params[wind_key]))
-	if winds.size() > 0:
-		options["winds"] = winds
+			has_winds = true
+		else:
+			# Default wind values if not provided (Azgaar defaults)
+			winds.append(0)
+	
+	# Always include winds array (Azgaar expects it)
+	options["winds"] = winds
+	if not has_winds:
+		MythosLogger.debug("WorldBuilderWebController", "No wind parameters in params, using default winds (all zeros)")
 	
 	return options
 
@@ -1518,7 +1497,7 @@ func _handle_map_generation_failed(data: Dictionary) -> void:
 func _handle_fork_ready(data: Dictionary) -> void:
 	"""Handle fork ready IPC message."""
 	fork_ready = true
-	MythosLogger.info("WorldBuilderWebController", "Fork is ready for generation - fork_ready IPC received")
+	MythosLogger.info("WorldBuilderWebController", "Fork is ready for generation - fork_ready IPC received, flag set to true")
 
 
 func _trigger_auto_generation_on_load() -> void:
@@ -1637,22 +1616,66 @@ func _convert_and_preview_heightmap(json_data: Dictionary) -> void:
 func _send_preview_to_webview(data_url: String) -> void:
 	"""Send preview image (data URL) to WebView for display."""
 	if not web_view or data_url.is_empty():
+		MythosLogger.warn("WorldBuilderWebController", "Cannot send preview - web_view is null or data_url is empty")
 		return
 	
 	MythosLogger.info("WorldBuilderWebController", "Sending preview to WebView", {"data_url_length": data_url.length()})
 	
+	# Escape single quotes and backslashes in data URL for JavaScript
+	var escaped_url: String = data_url.replace("'", "\'").replace("\", "\\")
+	
 	var preview_script: String = """
 		(function() {
-			if (window.worldBuilderInstance) {
-				window.worldBuilderInstance.previewImageUrl = '%s';
-				console.log('[WorldBuilder] Preview image URL set');
-			} else {
-				console.warn('[WorldBuilder] worldBuilderInstance not found');
+			try {
+				console.log('[WorldBuilder] Setting preview image URL, length:', %d);
+				if (window.worldBuilderInstance) {
+					// Set preview URL - Alpine.js will reactively update the UI
+					window.worldBuilderInstance.previewImageUrl = '%s';
+					
+					// Hide status div explicitly (backup in case Alpine.js doesn't react)
+					var statusDiv = document.getElementById('azgaar-status');
+					if (statusDiv) {
+						statusDiv.style.display = 'none';
+					}
+					
+					// Show preview image explicitly (backup)
+					var previewImg = document.getElementById('map-preview-img');
+					if (previewImg) {
+						previewImg.style.display = 'block';
+					}
+					
+					console.log('[WorldBuilder] Preview image URL set successfully', {
+						hasUrl: !!window.worldBuilderInstance.previewImageUrl,
+						urlLength: window.worldBuilderInstance.previewImageUrl ? window.worldBuilderInstance.previewImageUrl.length : 0
+					});
+					return 'success';
+				} else {
+					console.error('[WorldBuilder] worldBuilderInstance not found - Alpine.js may not be initialized');
+					return 'error: worldBuilderInstance not found';
+				}
+			} catch (e) {
+				console.error('[WorldBuilder] Error setting preview image:', e);
+				return 'error: ' + e.message;
 			}
 		})();
-	""" % data_url.replace("'", "\\'")
+	""" % [data_url.length(), escaped_url]
 	
-	if web_view.has_method("execute_js"):
-		web_view.execute_js(preview_script)
+	# Use call_deferred to avoid WebView binding panics
+	if web_view.has_method("call_deferred"):
+		web_view.call_deferred("execute_js", preview_script)
+		MythosLogger.debug("WorldBuilderWebController", "Scheduled preview update via call_deferred")
+	elif web_view.has_method("execute_js"):
+		var result = web_view.execute_js(preview_script)
+		MythosLogger.debug("WorldBuilderWebController", "Preview update executed", {"result": result})
 	elif web_view.has_method("eval"):
 		web_view.eval(preview_script)
+		MythosLogger.debug("WorldBuilderWebController", "Preview update executed via eval")
+	else:
+		MythosLogger.error("WorldBuilderWebController", "Cannot execute JS - WebView method not available")
+		MythosLogger.debug("WorldBuilderWebController", "Preview update executed via eval")
+	else:
+		MythosLogger.error("WorldBuilderWebController", "Cannot execute JS - WebView method not available")
+		MythosLogger.debug("WorldBuilderWebController", "Preview update executed via eval")
+	else:
+		MythosLogger.error("WorldBuilderWebController", "Cannot execute JS - WebView method not available")
+
