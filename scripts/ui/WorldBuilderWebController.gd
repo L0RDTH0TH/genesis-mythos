@@ -41,7 +41,6 @@ const STEP_PARAMETERS_PATH: String = "res://data/config/azgaar_step_parameters.j
 ## Debug: Test Azgaar fork headless generation
 const DEBUG_TEST_FORK: bool = true  # Set to true to run test on _ready()
 var test_json_data: Dictionary = {}  # Store test JSON output
-var test_json_data: Dictionary = {}  # Store test JSON output
 
 ## Archetype presets (same as WorldBuilderUI)
 const ARCHETYPES: Dictionary = {
