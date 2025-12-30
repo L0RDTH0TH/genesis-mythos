@@ -41,14 +41,8 @@ const STEP_PARAMETERS_PATH: String = "res://data/config/azgaar_step_parameters.j
 ## Fork mode is now the default - no debug flag needed
 var test_json_data: Dictionary = {}  # Store test JSON output
 
-## Archetype presets (same as WorldBuilderUI)
-const ARCHETYPES: Dictionary = {
-	"High Fantasy": {"points": 800000, "heightExponent": 1.2, "allowErosion": true, "plateCount": 8, "burgs": 500, "precip": 0.6},
-	"Low Fantasy": {"points": 600000, "heightExponent": 0.8, "allowErosion": true, "plateCount": 5, "burgs": 200, "precip": 0.5},
-	"Dark Fantasy": {"points": 400000, "heightExponent": 1.5, "allowErosion": false, "plateCount": 12, "burgs": 100, "precip": 0.8},
-	"Realistic": {"points": 1000000, "heightExponent": 1.0, "allowErosion": true, "plateCount": 7, "burgs": 800},
-	"Custom": {}
-}
+## Archetype presets loaded from JSON (data-driven)
+var archetype_presets: Dictionary = {}
 
 
 func _ready() -> void:
@@ -64,6 +58,9 @@ func _ready() -> void:
 	
 	# Load step definitions from JSON
 	_load_step_definitions()
+	
+	# Load archetype presets from JSON
+	_load_archetype_presets()
 	
 	# Load the World Builder HTML file (always use fork template - default mode)
 	var html_url: String = "res://assets/ui_web/templates/world_builder_v2.html"
@@ -138,6 +135,24 @@ func _load_step_definitions() -> void:
 		"step_0_params": data.steps[0].get("parameters", []).size() if data.steps.size() > 0 else 0,
 		"step_1_params": data.steps[1].get("parameters", []).size() if data.steps.size() > 1 else 0
 	})
+
+
+func _load_archetype_presets() -> void:
+	"""Loads archetype presets from JSON file."""
+	var file: FileAccess = FileAccess.open("res://data/config/archetype_azgaar_presets.json", FileAccess.READ)
+	if file:
+		var json_text: String = file.get_as_text()
+		file.close()
+		var json: JSON = JSON.new()
+		var parse_result: Variant = json.parse(json_text)
+		if parse_result == OK:
+			archetype_presets = json.data
+			var keys_array: Array = archetype_presets.keys()
+			MythosLogger.info("WorldBuilderWebController", "Archetype presets loaded from JSON", {"archetypes": keys_array})
+		else:
+			MythosLogger.error("WorldBuilderWebController", "Failed to parse archetype presets JSON: %s" % json.get_error_message())
+	else:
+		MythosLogger.error("WorldBuilderWebController", "Failed to open archetype presets JSON file.")
 
 
 
@@ -220,7 +235,7 @@ func _send_archetypes() -> void:
 		return
 	
 	var archetype_names: Array[String] = []
-	for archetype_name in ARCHETYPES.keys():
+	for archetype_name in archetype_presets.keys():
 		archetype_names.append(archetype_name)
 	
 	var script: String = """
@@ -366,6 +381,10 @@ func _handle_alpine_ready(data: Dictionary) -> void:
 	# Now that Alpine.js is ready, send step definitions and archetypes
 	_send_step_definitions()
 	_send_archetypes()
+	
+	# Wait for fork initialization, then trigger auto-generation with default archetype
+	await get_tree().create_timer(0.5).timeout  # Wait for fork init
+	_trigger_auto_generation_on_load()
 
 
 func _handle_azgaar_loaded(data: Dictionary) -> void:
@@ -459,38 +478,24 @@ func _handle_load_archetype(data: Dictionary) -> void:
 	var archetype_name: String = data.get("archetype", "High Fantasy")
 	current_archetype = archetype_name
 	
-	var preset: Dictionary = ARCHETYPES.get(archetype_name, {}).duplicate()
+	var preset: Dictionary = archetype_presets.get(archetype_name, {}).duplicate()
 	if not preset.is_empty():
-		# Map preset keys to azgaar_keys (handle different naming conventions)
-		# Note: ARCHETYPES uses different keys than azgaar - this mapping is approximate
-		var preset_mapped: Dictionary = {}
-		# Convert points (actual count) to pointsInput slider value (1-13) - approximate conversion
-		if preset.has("points"):
-			# Approximate: pointsInput 1-13 maps to ~1K-100K cells
-			# We'll use a simple mapping - this may need adjustment
-			var points_count: int = preset["points"]
-			var clamped_points: int = UIConstants.get_clamped_points(points_count)
-			# Convert to slider value (1-13 scale, approximate)
-			# Use natural log divided by log(10) to get log base 10
-			preset_mapped["pointsInput"] = int(log(clamped_points / 1000.0) / log(10.0))
-			preset_mapped["pointsInput"] = clamp(preset_mapped["pointsInput"], 1, 10)  # Use clamped max
-		if preset.has("heightExponent"):
-			preset_mapped["heightExponentInput"] = preset["heightExponent"]
-		if preset.has("allowErosion"):
-			preset_mapped["allowErosion"] = preset["allowErosion"]
-		if preset.has("burgs"):
-			preset_mapped["manorsInput"] = preset["burgs"]
-		if preset.has("precip"):
-			preset_mapped["precInput"] = int(preset["precip"] * 100)  # Convert to percentage
-		
-		# Clamp and apply preset params
-		for key in preset_mapped.keys():
-			var clamped_value = _clamp_parameter_value(key, preset_mapped[key])
+		# Apply all keys from JSON preset directly (JSON already uses Azgaar keys)
+		# Clamp and apply each parameter
+		for key in preset.keys():
+			var value = preset[key]
+			var clamped_value = _clamp_parameter_value(key, value)
 			current_params[key] = clamped_value
 		
 		# Send params update to WebView
 		_send_params_update()
-		MythosLogger.info("WorldBuilderWebController", "Loaded archetype preset", {"archetype": archetype_name, "params": preset_mapped})
+		MythosLogger.info("WorldBuilderWebController", "Loaded archetype preset", {"archetype": archetype_name, "params": preset})
+		
+		# Auto-trigger generation after archetype change
+		await get_tree().create_timer(0.1).timeout  # Small delay for UI update
+		_handle_generate({"params": current_params})
+	else:
+		MythosLogger.warn("WorldBuilderWebController", "Archetype preset not found", {"archetype": archetype_name})
 
 
 func _clamp_parameter_value(azgaar_key: String, value: Variant) -> Variant:
@@ -545,6 +550,7 @@ func _handle_update_param(data: Dictionary) -> void:
 
 func _handle_generate(data: Dictionary) -> void:
 	"""Handle generate message from WebView - use fork mode first, fallback to iframe."""
+	MythosLogger.info("WorldBuilderWebController", "Starting map generation...")
 	MythosLogger.debug("WorldBuilderWebController", "_handle_generate() called", {"data_keys": data.keys()})
 	
 	var params: Dictionary = data.get("params", {})
@@ -1081,12 +1087,12 @@ func _send_archetypes_response(request_id: String) -> void:
 		return
 	
 	var archetype_names: Array[String] = []
-	for archetype_name in ARCHETYPES.keys():
+	for archetype_name in archetype_presets.keys():
 		archetype_names.append(archetype_name)
 	
 	var response_data: Dictionary = {
 		"archetype_names": archetype_names,
-		"archetypes": ARCHETYPES
+		"archetypes": archetype_presets
 	}
 	
 	var response_script: String = """
@@ -1483,6 +1489,13 @@ func _handle_map_generation_failed(data: Dictionary) -> void:
 func _handle_fork_ready(data: Dictionary) -> void:
 	"""Handle fork ready IPC message."""
 	MythosLogger.info("WorldBuilderWebController", "Fork is ready for generation")
+
+
+func _trigger_auto_generation_on_load() -> void:
+	"""Triggers automatic map generation on initial load with default archetype."""
+	current_archetype = "High Fantasy"
+	var data: Dictionary = {"archetype": current_archetype}
+	_handle_load_archetype(data)  # This will load preset, update params, and trigger generation
 
 
 func _save_test_json_to_file(json_data: Dictionary, seed: String) -> void:
