@@ -41,6 +41,9 @@ var current_archetype: String = "High Fantasy"
 var step_definitions: Dictionary = {}
 const STEP_PARAMETERS_PATH: String = "res://data/config/azgaar_step_parameters.json"
 
+## Force SVG rendering by default (deprecate PNG heightmap fallback)
+const USE_SVG_DEFAULT: bool = true
+
 ## Fork mode is now the default - no debug flag needed
 var test_json_data: Dictionary = {}  # Store test JSON output
 
@@ -374,6 +377,8 @@ func _on_ipc_message(message: String) -> void:
 			_handle_fork_ready(message_data)
 		"svg_preview_ready":
 			_handle_svg_preview(message_data)
+		"svg_failed":
+			_handle_svg_failed(message_data)
 		_:
 			MythosLogger.warn("WorldBuilderWebController", "Unknown IPC message type", {"type": message_type, "data": data})
 
@@ -593,9 +598,14 @@ func _handle_generate(data: Dictionary) -> void:
 	
 	current_params = clamped_params
 	
+	# Force SVG rendering mode (default enabled)
+	current_params["use_svg"] = USE_SVG_DEFAULT
+	MythosLogger.info("WorldBuilderWebController", "SVG rendering mode enabled", {"use_svg": USE_SVG_DEFAULT})
+	
 	MythosLogger.info("WorldBuilderWebController", "Generation requested", {
 		"params_count": current_params.size(), 
 		"optionsSeed": current_params.get("optionsSeed", "not_set"),
+		"use_svg": current_params.get("use_svg", false),
 		"sample_params": _get_sample_params(current_params, 5)
 	})
 	
@@ -1457,14 +1467,6 @@ func _handle_map_generated(data: Dictionary) -> void:
 	# Store for analysis
 	test_json_data = map_data
 	
-	# Handle SVG preview if available
-	if not preview_svg.is_empty():
-		_handle_svg_preview({
-			"svgData": preview_svg,
-			"width": data.get("width", 1024),
-			"height": data.get("height", 768)
-		})
-	
 	# Print top-level keys
 	var top_keys: Array = map_data.keys()
 	MythosLogger.info("WorldBuilderWebController", "JSON Top-Level Keys", {"keys": top_keys, "count": top_keys.size()})
@@ -1472,13 +1474,31 @@ func _handle_map_generated(data: Dictionary) -> void:
 	# Save to file
 	_save_test_json_to_file(map_data, seed_value)
 	
-	# Send preview to WebView if available (from fork renderPreview)
-	if not preview_data_url.is_empty():
-		_send_preview_to_webview(preview_data_url)
-		send_progress_update(90.0, "Preview ready!", true)
+	# Handle SVG preview (primary, preferred method)
+	if not preview_svg.is_empty():
+		_handle_svg_preview({
+			"svgData": preview_svg,
+			"width": data.get("width", 1024),
+			"height": data.get("height", 768)
+		})
+		send_progress_update(90.0, "SVG preview ready!", true)
 	else:
-		# Fallback: Convert to heightmap and generate 2D preview
-		_convert_and_preview_heightmap(map_data)
+		# SVG missing - log warning and use legacy fallback
+		var use_svg_requested: bool = current_params.get("use_svg", USE_SVG_DEFAULT)
+		if use_svg_requested:
+			MythosLogger.warn("WorldBuilderWebController", "SVG missing, using legacy heightmap PNG fallback (SVG rendering may have failed)")
+		else:
+			MythosLogger.info("WorldBuilderWebController", "SVG disabled, using legacy heightmap PNG")
+		
+		# Legacy fallback: Send canvas preview if available
+		if not preview_data_url.is_empty():
+			_send_preview_to_webview(preview_data_url)
+			send_progress_update(90.0, "Preview ready (canvas fallback)!", true)
+		else:
+			# Last resort: Convert to heightmap and generate 2D preview
+			# DEPRECATED: This should only happen if both SVG and canvas fail
+			MythosLogger.warn("WorldBuilderWebController", "No SVG or canvas preview available, using deprecated heightmap conversion")
+			_convert_and_preview_heightmap(map_data)
 	
 	send_progress_update(100.0, "Generation complete!", false)
 	
@@ -1536,6 +1556,29 @@ func _handle_svg_preview(data: Dictionary) -> void:
 	
 	# Optional: Could convert SVG to Image if needed for Godot display
 	# For now, SVG is displayed directly in the WebView via x-html binding
+	
+	# Log success message for debugging
+	MythosLogger.info("WorldBuilderWebController", "SVG preview processed successfully", {
+		"length": svg_data.length(),
+		"characters": svg_data.length(),
+		"width": width,
+		"height": height
+	})
+
+
+func _handle_svg_failed(data: Dictionary) -> void:
+	"""Handle SVG rendering failure IPC message."""
+	var error_msg: String = data.get("error", "Unknown SVG rendering error")
+	var stack: String = data.get("stack", "")
+	
+	MythosLogger.warn("WorldBuilderWebController", "SVG rendering failed in WebView", {
+		"error": error_msg,
+		"stack": stack
+	})
+	
+	# SVG failed - will fall back to canvas/PNG in _handle_map_generated
+	# This handler logs the failure for debugging
+	send_progress_update(0.0, "Warning: SVG rendering failed, using fallback preview", true)
 
 
 func _trigger_auto_generation_on_load() -> void:
@@ -1586,8 +1629,14 @@ func _save_test_json_to_file(json_data: Dictionary, seed: String) -> void:
 
 
 func _convert_and_preview_heightmap(json_data: Dictionary) -> void:
-	"""Convert Azgaar JSON to heightmap Image and save preview PNG (Phase 3)."""
-	MythosLogger.info("WorldBuilderWebController", "Converting JSON to heightmap for 2D preview")
+	"""
+	Convert Azgaar JSON to heightmap Image and save preview PNG (Phase 3).
+	
+	DEPRECATED: This function is deprecated. SVG rendering is now the preferred method.
+	This fallback should only be used if both SVG and canvas rendering fail.
+	Consider removing this function in a future version once SVG rendering is fully stable.
+	"""
+	MythosLogger.warn("WorldBuilderWebController", "Using deprecated heightmap PNG conversion fallback")
 	
 	var converter: AzgaarDataConverter = AzgaarDataConverter.new()
 	var heightmap_img: Image = converter.convert_to_heightmap(json_data)
