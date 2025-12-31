@@ -3363,7 +3363,24 @@ function getMapData() {
         // Additional fields for SVG rendering
         p: pack.cells.p ? pack.cells.p.map((p) => [...p]) : [],
         c: pack.cells.c ? pack.cells.c.map((c) => Array.isArray(c) ? [...c] : c) : [],
-        v: pack.cells.v ? pack.cells.v.map((v) => Array.isArray(v) ? [...v] : v) : [],
+        v: (() => {
+          // Ensure cells.v is properly initialized - critical for SVG rendering
+          const cellCount = pack.cells.i ? pack.cells.i.length : 0;
+          if (pack.cells.v && Array.isArray(pack.cells.v) && pack.cells.v.length === cellCount) {
+            // Valid cells.v exists - map it properly
+            return pack.cells.v.map((v) => Array.isArray(v) ? [...v] : v);
+          } else {
+            // cells.v is missing, empty, or wrong length - create array of empty arrays
+            if (typeof console !== "undefined" && console.warn && cellCount > 0) {
+              console.warn(`getMapData: cells.v missing or empty (length ${pack.cells.v?.length || 0} vs expected ${cellCount}), creating placeholder array`);
+            }
+            const placeholder = [];
+            for (let i = 0; i < cellCount; i++) {
+              placeholder.push([]);
+            }
+            return placeholder;
+          }
+        })(),
         state: pack.cells.state ? Array.from(pack.cells.state) : [],
         province: pack.cells.province ? Array.from(pack.cells.province) : [],
         biome: pack.cells.biome ? Array.from(pack.cells.biome) : [],
@@ -3510,7 +3527,35 @@ function loadMapData(jsonData) {
         culture: jsonData.pack.cells.culture ? reconstructTypedArray(jsonData.pack.cells.culture, Uint16Array, 65535) : null,
         religion: jsonData.pack.cells.religion ? reconstructTypedArray(jsonData.pack.cells.religion, Uint16Array, 65535) : null,
         c: jsonData.pack.cells.c || [],
-        v: jsonData.pack.cells.v || []
+        v: (() => {
+          // Ensure cells.v is properly initialized - critical for SVG rendering
+          const cellCount = jsonData.pack.cells.i ? jsonData.pack.cells.i.length : 0;
+          if (jsonData.pack.cells.v && Array.isArray(jsonData.pack.cells.v) && jsonData.pack.cells.v.length === cellCount) {
+            // Valid cells.v exists - validate and fill undefined entries
+            let hasUndefined = false;
+            const validated = jsonData.pack.cells.v.map((v, idx) => {
+              if (v === undefined || v === null) {
+                hasUndefined = true;
+                return [];
+              }
+              return Array.isArray(v) ? v : [];
+            });
+            if (hasUndefined && typeof console !== "undefined" && console.warn) {
+              console.warn(`loadMapData: cells.v contained undefined/null entries, filled with empty arrays`);
+            }
+            return validated;
+          } else {
+            // cells.v is missing, empty, or wrong length - create array of empty arrays
+            if (typeof console !== "undefined" && console.warn && cellCount > 0) {
+              console.warn(`loadMapData: cells.v missing or empty (length ${jsonData.pack.cells.v?.length || 0} vs expected ${cellCount}), creating placeholder array`);
+            }
+            const placeholder = [];
+            for (let i = 0; i < cellCount; i++) {
+              placeholder.push([]);
+            }
+            return placeholder;
+          }
+        })()
       },
       vertices: jsonData.pack.vertices || {},
       features: jsonData.pack.features || [],

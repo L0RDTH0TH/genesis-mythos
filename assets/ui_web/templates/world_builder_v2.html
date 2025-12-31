@@ -705,9 +705,17 @@
                 return {repaired: false, repairs: ['Cannot repair: cells.i empty']};
             }
             
-            // Repair cells.v if length is wrong
+            // Repair cells.v if length is wrong, missing, or empty
             if (cells.v && Array.isArray(cells.v)) {
-                if (cells.v.length < expectedLength) {
+                if (cells.v.length === 0) {
+                    // cells.v exists but is empty - create placeholder array
+                    console.warn('[Genesis Azgaar] cells.v is empty, creating placeholder array with length', expectedLength);
+                    cells.v = [];
+                    while (cells.v.length < expectedLength) {
+                        cells.v.push([]); // Push empty array as default
+                    }
+                    repairs.push(`Created cells.v array from empty (length ${expectedLength})`);
+                } else if (cells.v.length < expectedLength) {
                     const originalLength = cells.v.length;
                     console.warn('[Genesis Azgaar] Patching short cells.v array:', originalLength, '->', expectedLength);
                     while (cells.v.length < expectedLength) {
