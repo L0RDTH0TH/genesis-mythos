@@ -3181,6 +3181,21 @@ function createBasicPack(grid, options) {
     g: createTypedArray({ maxValue: gridCells.i.length, length: gridCells.i.length }).map((_, i) => i),
     h: new Uint8Array(gridCells.h.length),
     c: gridCells.c ? gridCells.c.slice() : [],
+    v: (() => {
+      // Ensure cells.v is properly initialized - critical for SVG rendering
+      const cellCount = gridCells.i ? gridCells.i.length : 0;
+      if (gridCells.v && Array.isArray(gridCells.v) && gridCells.v.length === cellCount) {
+        // Valid cells.v exists - map it properly
+        return gridCells.v.map((v) => Array.isArray(v) ? [...v] : v);
+      } else {
+        // cells.v is missing, empty, or wrong length - create array of empty arrays
+        const placeholder = [];
+        for (let i = 0; i < cellCount; i++) {
+          placeholder.push([]);
+        }
+        return placeholder;
+      }
+    })(),
     b: gridCells.b ? new Uint8Array(gridCells.b.length) : new Uint8Array(gridCells.i.length),
     t: gridCells.t ? new Int8Array(gridCells.t.length) : new Int8Array(gridCells.i.length),
     f: gridCells.f ? new Uint16Array(gridCells.f.length) : new Uint16Array(gridCells.i.length),
@@ -3229,6 +3244,12 @@ function generateMapInternal(options, DelaunatorClass) {
   pack.cells.h = grid.cells.h;
   for (let i = 0; i < pack.cells.i.length; i++) {
     pack.cells.g[i] = i;
+  }
+  // Debug: Log cells.v state after pack creation
+  if (typeof console !== "undefined" && console.log) {
+    const cellsVLength = pack.cells.v ? pack.cells.v.length : 0;
+    const cellsVSample = pack.cells.v && pack.cells.v.length > 0 ? pack.cells.v[0] : null;
+    console.log(`[Genesis Azgaar] After createBasicPack: pack.cells.v length=${cellsVLength}, sample[0]=${cellsVSample ? JSON.stringify(cellsVSample) : 'null'}`);
   }
   generateRivers({
     grid,
@@ -3426,6 +3447,13 @@ function renderPreviewSVG(options = {}) {
     throw new NoDataError();
   }
   try {
+    // Debug: Log cells.v state before SVG rendering
+    if (typeof console !== "undefined" && console.log) {
+      const cellsV = state.data.pack && state.data.pack.cells ? state.data.pack.cells.v : null;
+      const cellsVLength = cellsV ? cellsV.length : 0;
+      const cellsVSample = cellsV && cellsV.length > 0 ? cellsV[0] : null;
+      console.log(`[Genesis Azgaar] Before renderMapSVG: pack.cells.v length=${cellsVLength}, sample[0]=${cellsVSample ? JSON.stringify(cellsVSample) : 'null'}`);
+    }
     let width = options.width;
     let height = options.height;
     const container = options.container || state.container;
@@ -3440,6 +3468,9 @@ function renderPreviewSVG(options = {}) {
       height = height || state.data.options.mapHeight || 600;
     }
     const svgString = renderMapSVG(state.data, { width, height });
+    if (typeof console !== "undefined" && console.log) {
+      console.log(`[Genesis Azgaar] SVG rendering succeeded, length=${svgString ? svgString.length : 0}`);
+    }
     if (container) {
       container.innerHTML = svgString;
       return null;
@@ -3448,7 +3479,8 @@ function renderPreviewSVG(options = {}) {
     }
   } catch (error) {
     if (typeof console !== "undefined" && console.error) {
-      console.error("SVG rendering failed:", error);
+      console.error("[Genesis Azgaar] SVG rendering failed:", error);
+      console.error("[Genesis Azgaar] Error stack:", error.stack);
     }
     throw new GenerationError(`SVG rendering failed: ${error.message}`);
   }
