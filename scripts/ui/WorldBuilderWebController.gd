@@ -1391,29 +1391,54 @@ func _find_nodes_with_method(node: Node, method_name: String) -> Array:
 
 
 func send_progress_update(progress: float, status: String, is_generating: bool) -> void:
-	"""Send progress update to WebView."""
+	"""Send progress update to WebView via post_message to avoid Rust binding conflicts."""
 	if not web_view:
 		return
 	
 	var update_data: Dictionary = {
-		"update_type": "progress_update",
-		"progress": progress,
-		"status": status,
-		"is_generating": is_generating
+		"type": "update",
+		"data": {
+			"update_type": "progress_update",
+			"progress": progress,
+			"status": status,
+			"is_generating": is_generating
+		}
 	}
 	
-	MythosLogger.debug("WorldBuilderWebController", "Sending progress update", update_data)
+	MythosLogger.debug("WorldBuilderWebController", "Sending progress update", update_data["data"])
 	
-	var update_script: String = """
-		if (window.GodotBridge && window.GodotBridge._handleUpdate) {
-			window.GodotBridge._handleUpdate(%s);
-		}
-	""" % JSON.stringify(update_data)
-	
+	# Use post_message instead of execute_js/eval to avoid Rust binding conflicts
+	# This is safer when multiple calls happen in quick succession
+	if web_view.has_method("post_message"):
+		var json_string: String = JSON.stringify(update_data)
+		# Use call_deferred to serialize WebView access and prevent concurrent binding
+		call_deferred("_post_message_safe", json_string)
+	else:
+		# Fallback to execute_js with deferred call if post_message not available
+		var update_script: String = """
+			if (window.GodotBridge && window.GodotBridge._handleUpdate) {
+				window.GodotBridge._handleUpdate(%s);
+			}
+		""" % JSON.stringify(update_data["data"])
+		call_deferred("_execute_js_safe", update_script)
+
+
+func _post_message_safe(message: String) -> void:
+	"""Safely post message to WebView (called deferred to avoid binding conflicts)."""
+	if not web_view:
+		return
+	if web_view.has_method("post_message"):
+		web_view.post_message(message)
+
+
+func _execute_js_safe(script: String) -> void:
+	"""Safely execute JS in WebView (called deferred to avoid binding conflicts)."""
+	if not web_view:
+		return
 	if web_view.has_method("execute_js"):
-		web_view.execute_js(update_script)
+		web_view.execute_js(script)
 	elif web_view.has_method("eval"):
-		web_view.eval(update_script)
+		web_view.eval(script)
 
 
 func _test_fork_headless_generation() -> void:
