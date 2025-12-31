@@ -1650,6 +1650,7 @@ func _handle_svg_failed(data: Dictionary) -> void:
 func _handle_render_failed(data: Dictionary) -> void:
 	"""Handle render_failed IPC message with detailed error information."""
 	const DEBUG_RENDERING: bool = false  # Set to true for verbose rendering logs
+	const ENABLE_CANVAS_FALLBACK: bool = false  # Disabled due to WebView canvas limitations
 	
 	var render_type: String = data.get("type", "unknown")
 	var error_msg: String = data.get("error", "Unknown rendering error")
@@ -1664,40 +1665,54 @@ func _handle_render_failed(data: Dictionary) -> void:
 			"validation_errors": validation_errors
 		})
 	
-	# Log based on render type
+	# Log based on render type with enhanced distinction
 	match render_type:
-		"svg":
-			MythosLogger.warn("WorldBuilderWebController", "SVG rendering failed", {
-				"error": error_msg,
-				"validation_errors": validation_errors,
-				"stack": stack if DEBUG_RENDERING else ""
-			})
-		"canvas":
-			MythosLogger.warn("WorldBuilderWebController", "Canvas rendering failed", {
-				"error": error_msg,
-				"validation_errors": validation_errors,
-				"stack": stack if DEBUG_RENDERING else ""
-			})
 		"validation":
-			MythosLogger.error("WorldBuilderWebController", "Data validation failed before rendering", {
+			# Validation errors are the most critical - log prominently
+			MythosLogger.error("WorldBuilderWebController", "DATA VALIDATION FAILED - Cannot render preview", {
 				"errors": validation_errors,
-				"error": error_msg
+				"error": error_msg,
+				"count": validation_errors.size()
 			})
+			# Print each validation error prominently
+			push_error("=== DATA VALIDATION FAILED ===")
+			for i in range(validation_errors.size()):
+				var err: String = str(validation_errors[i])
+				push_error("  Validation Error %d: %s" % [i + 1, err])
+				MythosLogger.error("WorldBuilderWebController", "Validation error detail", {"index": i + 1, "error": err})
+			push_error("=== END VALIDATION ERRORS ===")
+			# Don't push generic error message - already printed details above
+		"svg":
+			# SVG runtime errors - log with context
+			MythosLogger.warn("WorldBuilderWebController", "SVG rendering failed (runtime error)", {
+				"error": error_msg,
+				"has_validation_errors": not validation_errors.is_empty(),
+				"validation_errors": validation_errors if DEBUG_RENDERING else [],
+				"stack": stack if DEBUG_RENDERING else ""
+			})
+			if not validation_errors.is_empty():
+				push_error("SVG render failed: %s (Validation errors: %s)" % [error_msg, str(validation_errors)])
+			else:
+				push_error("SVG render failed: %s" % error_msg)
+		"canvas":
+			# Canvas errors - log but note that canvas is deprecated/unreliable
+			MythosLogger.warn("WorldBuilderWebController", "Canvas rendering failed (fallback, deprecated)", {
+				"error": error_msg,
+				"canvas_fallback_enabled": ENABLE_CANVAS_FALLBACK,
+				"validation_errors": validation_errors if DEBUG_RENDERING else [],
+				"stack": stack if DEBUG_RENDERING else ""
+			})
+			if not validation_errors.is_empty():
+				push_error("Canvas render failed (fallback): %s (Validation errors: %s)" % [error_msg, str(validation_errors)])
+			else:
+				push_error("Canvas render failed (fallback): %s" % error_msg)
 		_:
-			MythosLogger.warn("WorldBuilderWebController", "Rendering failed", {
+			MythosLogger.warn("WorldBuilderWebController", "Rendering failed (unknown type)", {
 				"type": render_type,
 				"error": error_msg,
 				"validation_errors": validation_errors
 			})
-	
-	# Print error details for debugging
-	if not validation_errors.is_empty():
-		printerr("Render failed (%s): Validation errors:" % render_type)
-		for i in range(validation_errors.size()):
-			printerr("  - %s" % str(validation_errors[i]))
-		push_error("Render failed (%s): Validation errors: %s" % [render_type, str(validation_errors)])
-	else:
-		push_error("Render failed (%s): %s" % [render_type, error_msg])
+			push_error("Render failed (%s): %s" % [render_type, error_msg])
 
 
 func _trigger_auto_generation_on_load() -> void:
