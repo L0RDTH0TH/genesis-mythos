@@ -195,8 +195,11 @@
                 if (Array.isArray(arg) && arg.length > 100) {
                     return `[Large Array: ${arg.length} items, sample: ${JSON.stringify(arg.slice(0, 5))}...]`;
                 }
-                if (arg && typeof arg === 'object' && arg.constructor && arg.constructor.name === 'Uint16Array' && arg.length > 100) {
-                    return `[TypedArray (${arg.constructor.name}): ${arg.length} items, sample: ${Array.from(arg.slice(0, 5)).join(',')}...]`;
+                if (arg && typeof arg === 'object' && arg.constructor && arg.length > 100) {
+                    const typedArrayNames = ['Uint16Array', 'Uint8Array', 'Int8Array', 'Float32Array', 'Uint32Array', 'Int32Array', 'Int16Array'];
+                    if (typedArrayNames.includes(arg.constructor.name)) {
+                        return `[TypedArray (${arg.constructor.name}): ${arg.length} items, sample: ${Array.from(arg.slice(0, 5)).join(',')}...]`;
+                    }
                 }
                 return arg;
             });
@@ -208,8 +211,11 @@
                 if (Array.isArray(arg) && arg.length > 100) {
                     return `[Large Array: ${arg.length} items, sample: ${JSON.stringify(arg.slice(0, 5))}...]`;
                 }
-                if (arg && typeof arg === 'object' && arg.constructor && arg.constructor.name === 'Uint16Array' && arg.length > 100) {
-                    return `[TypedArray (${arg.constructor.name}): ${arg.length} items, sample: ${Array.from(arg.slice(0, 5)).join(',')}...]`;
+                if (arg && typeof arg === 'object' && arg.constructor && arg.length > 100) {
+                    const typedArrayNames = ['Uint16Array', 'Uint8Array', 'Int8Array', 'Float32Array', 'Uint32Array', 'Int32Array', 'Int16Array'];
+                    if (typedArrayNames.includes(arg.constructor.name)) {
+                        return `[TypedArray (${arg.constructor.name}): ${arg.length} items, sample: ${Array.from(arg.slice(0, 5)).join(',')}...]`;
+                    }
                 }
                 return arg;
             });
@@ -255,12 +261,28 @@
                     console.warn('[Azgaar Genesis] Canvas element found but getContext not available');
                 }
                 
+                // Check canvas support in environment
+                const testCanvas = document.createElement('canvas');
+                const testCtx = testCanvas.getContext('2d');
+                console.log('[Genesis Azgaar] Canvas support:', !!testCtx, '- Environment check passed');
+                
                 initGenerator({ canvas: canvas });
                 console.log('[Azgaar Genesis] Generator initialized with canvas');
                 
-                // Verify canvas was set in state
+                // Verify canvas was set in state (with retry if needed)
                 if (window.AzgaarGenesis && window.AzgaarGenesis.state && !window.AzgaarGenesis.state.canvas) {
-                    console.warn('[Azgaar Genesis] Canvas provided but not set in state - canvas rendering may fail');
+                    console.warn('[Azgaar Genesis] Canvas provided but not set in state - attempting retry...');
+                    // Retry initialization after a short delay (Godot timing issue)
+                    setTimeout(() => {
+                        if (canvas && window.AzgaarGenesis && window.AzgaarGenesis.initGenerator) {
+                            window.AzgaarGenesis.initGenerator({ canvas: canvas });
+                            if (window.AzgaarGenesis.state && window.AzgaarGenesis.state.canvas) {
+                                console.log('[Azgaar Genesis] Canvas initialization succeeded on retry');
+                            } else {
+                                console.warn('[Azgaar Genesis] Canvas initialization retry failed - canvas rendering may not work');
+                            }
+                        }
+                    }, 100);
                 }
             } else {
                 console.warn('[Azgaar Genesis] Canvas element not found - canvas rendering will not be available');
@@ -352,23 +374,45 @@
                     hasPack: !!json.pack
                 });
                 
+                // Fix data integrity issues (repair missing/incomplete arrays)
+                statusDiv.innerHTML = '<p>Validating and fixing data integrity...</p>';
+                const fixResult = fixMapData(json);
+                if (fixResult.fixed && fixResult.fixes.length > 0) {
+                    console.warn('[Genesis Azgaar] Applied', fixResult.fixes.length, 'data fixes');
+                    // Update state.data with fixed data if available
+                    if (window.AzgaarGenesis && window.AzgaarGenesis.state && window.AzgaarGenesis.state.data) {
+                        window.AzgaarGenesis.state.data = json; // Sync fixes to state
+                    }
+                }
+                
                 // Render preview (SVG forced by default, canvas fallback only on error)
                 let previewDataUrl = '';
                 let previewSvgString = '';
                 const useSvg = options.use_svg !== false && options.use_svg !== undefined ? options.use_svg : true; // Default to true (forced SVG mode)
                 const DEBUG_RENDERING = false; // Set to true for verbose rendering logs
                 
-                // Validate map data before rendering
+                // Deep validate map data before rendering (after fixes)
                 // Use json data (from getMapData) for validation - it has the same structure as state.data
                 const validation = validateMapData(json);
                 if (!validation.valid) {
-                    console.error('[Azgaar Genesis] Data validation failed:', validation.errors);
-                    if (window.GodotBridge && window.GodotBridge.postMessage) {
-                        window.GodotBridge.postMessage('render_failed', {
-                            type: 'validation',
-                            error: 'Data validation failed',
-                            validationErrors: validation.errors
-                        });
+                    console.error('[Azgaar Genesis] Data validation failed after fixes:', validation.errors);
+                    // Attempt to fix again if validation still fails
+                    const retryFix = fixMapData(json);
+                    // Re-validate after retry
+                    const retryValidation = validateMapData(json);
+                    if (!retryValidation.valid) {
+                        // Still invalid - skip rendering and report
+                        if (window.GodotBridge && window.GodotBridge.postMessage) {
+                            window.GodotBridge.postMessage('render_failed', {
+                                type: 'validation',
+                                error: 'Data validation failed after fix attempts',
+                                validationErrors: retryValidation.errors
+                            });
+                        }
+                        statusDiv.innerHTML = '<p style="color: #f44;">Error: Data validation failed - cannot render</p>';
+                        throw new Error('Data validation failed: ' + retryValidation.errors.join(', '));
+                    } else {
+                        console.log('[Azgaar Genesis] Data validation passed after retry fixes');
                     }
                 } else if (DEBUG_RENDERING) {
                     console.log('[Azgaar Genesis] Data validation passed');
@@ -483,9 +527,20 @@
                             throw new Error('Data validation failed: ' + validation.errors.join(', '));
                         }
                         
-                        // Check if canvas is properly initialized
+                        // Check if canvas is properly initialized, retry if needed
                         if (!window.AzgaarGenesis.state || !window.AzgaarGenesis.state.canvas) {
-                            throw new Error('Canvas not initialized in AzgaarGenesis state');
+                            console.warn('[Azgaar Genesis] Canvas not initialized, attempting re-initialization...');
+                            const canvasEl = document.getElementById('azgaar-canvas');
+                            if (canvasEl && window.AzgaarGenesis.initGenerator) {
+                                // Force re-initialize with canvas
+                                window.AzgaarGenesis.initGenerator({ canvas: canvasEl });
+                            }
+                            // Check again
+                            if (!window.AzgaarGenesis.state || !window.AzgaarGenesis.state.canvas) {
+                                throw new Error('Canvas not initialized in AzgaarGenesis state (retry failed)');
+                            } else {
+                                console.log('[Azgaar Genesis] Canvas initialization succeeded on retry');
+                            }
                         }
                         
                         window.AzgaarGenesis.renderPreview();
@@ -564,7 +619,115 @@
         }
         
         /**
-         * Validate map data structure before rendering
+         * Fix missing or incomplete data structures after generation
+         * Repairs holes in arrays (undefined values) that cause rendering failures
+         * Returns {fixed: boolean, fixes: string[]}
+         */
+        function fixMapData(data) {
+            if (!data || !data.pack) {
+                return {fixed: false, fixes: ['Cannot fix: missing pack object']};
+            }
+            const pack = data.pack;
+            const fixes = [];
+            
+            if (!pack.cells) {
+                return {fixed: false, fixes: ['Cannot fix: missing pack.cells']};
+            }
+            
+            const cells = pack.cells;
+            const cellsCount = cells.i ? cells.i.length : 0;
+            
+            if (cellsCount === 0) {
+                return {fixed: false, fixes: ['Cannot fix: no cells in cells.i']};
+            }
+            
+            // Fix cells.v array - ensure all entries exist and are arrays
+            if (!cells.v || !Array.isArray(cells.v)) {
+                cells.v = new Array(cellsCount).fill(null).map(() => []);
+                fixes.push('Created missing cells.v array');
+            } else {
+                // Ensure cells.v has entries for all cell IDs
+                for (let cellId = 0; cellId < cellsCount; cellId++) {
+                    if (cells.v[cellId] === undefined || cells.v[cellId] === null || !Array.isArray(cells.v[cellId])) {
+                        cells.v[cellId] = []; // Default to empty array if missing
+                        if (fixes.length < 10) { // Limit logging to first 10 fixes
+                            fixes.push(`Fixed missing cells.v[${cellId}]`);
+                        }
+                    }
+                }
+                // Update length if needed
+                if (cells.v.length < cellsCount) {
+                    const oldLength = cells.v.length;
+                    cells.v.length = cellsCount;
+                    for (let i = oldLength; i < cellsCount; i++) {
+                        cells.v[i] = [];
+                    }
+                    fixes.push(`Extended cells.v from ${oldLength} to ${cellsCount}`);
+                }
+            }
+            
+            // Fix cells.biome array
+            if (!cells.biome || !Array.isArray(cells.biome)) {
+                cells.biome = new Array(cellsCount).fill(0);
+                fixes.push('Created missing cells.biome array');
+            } else {
+                // Fill undefined/null values
+                for (let i = 0; i < cellsCount; i++) {
+                    if (cells.biome[i] === undefined || cells.biome[i] === null) {
+                        cells.biome[i] = 0; // Default biome
+                        if (fixes.length < 10) {
+                            fixes.push(`Fixed missing cells.biome[${i}]`);
+                        }
+                    }
+                }
+                // Extend if needed
+                if (cells.biome.length < cellsCount) {
+                    const oldLength = cells.biome.length;
+                    cells.biome.length = cellsCount;
+                    cells.biome.fill(0, oldLength);
+                    fixes.push(`Extended cells.biome from ${oldLength} to ${cellsCount}`);
+                }
+            }
+            
+            // Fix cells.state array
+            if (!cells.state || !Array.isArray(cells.state)) {
+                cells.state = new Array(cellsCount).fill(-1);
+                fixes.push('Created missing cells.state array');
+            } else {
+                // Fill undefined/null values
+                for (let i = 0; i < cellsCount; i++) {
+                    if (cells.state[i] === undefined || cells.state[i] === null) {
+                        cells.state[i] = -1; // Default: no state
+                        if (fixes.length < 10) {
+                            fixes.push(`Fixed missing cells.state[${i}]`);
+                        }
+                    }
+                }
+                // Extend if needed
+                if (cells.state.length < cellsCount) {
+                    const oldLength = cells.state.length;
+                    cells.state.length = cellsCount;
+                    cells.state.fill(-1, oldLength);
+                    fixes.push(`Extended cells.state from ${oldLength} to ${cellsCount}`);
+                }
+            }
+            
+            // Fix vertices.c if needed (object/Map-like structure)
+            if (pack.vertices && (!pack.vertices.c || typeof pack.vertices.c !== 'object')) {
+                pack.vertices.c = {};
+                fixes.push('Created missing pack.vertices.c object');
+            }
+            
+            if (fixes.length > 0) {
+                const fixesMsg = fixes.length > 10 ? fixes.slice(0, 10).join(', ') + `... and ${fixes.length - 10} more` : fixes.join(', ');
+                console.warn('[Genesis Azgaar] Applied data fixes:', fixesMsg);
+            }
+            
+            return {fixed: fixes.length > 0, fixes: fixes};
+        }
+        
+        /**
+         * Validate map data structure before rendering with deep integrity checks
          * Returns {valid: boolean, errors: string[]}
          */
         function validateMapData(data) {
@@ -577,21 +740,76 @@
             // Check cells structure
             if (!pack.cells) {
                 errors.push('Missing pack.cells');
+                return {valid: false, errors: errors};
+            }
+            
+            const cells = pack.cells;
+            const cellsCount = cells.i ? cells.i.length : 0;
+            const MAX_SAMPLE = 100; // Limit iteration to avoid overflow on huge arrays
+            
+            if (!cells.i || !Array.isArray(cells.i)) {
+                errors.push('Missing or invalid pack.cells.i');
+            }
+            if (!cells.c || !Array.isArray(cells.c)) {
+                errors.push('Missing or invalid pack.cells.c');
+            }
+            
+            // Deep check cells.v for undefined/null values and length mismatch
+            if (!cells.v || !Array.isArray(cells.v)) {
+                errors.push('Missing or invalid pack.cells.v');
             } else {
-                if (!pack.cells.i || !Array.isArray(pack.cells.i)) {
-                    errors.push('Missing or invalid pack.cells.i');
+                // Check length matches
+                if (cells.v.length !== cellsCount) {
+                    errors.push(`cells.v.length (${cells.v.length}) != cells.i.length (${cellsCount})`);
                 }
-                if (!pack.cells.c || !Array.isArray(pack.cells.c)) {
-                    errors.push('Missing or invalid pack.cells.c');
+                // Sample check for undefined/null values (first and last N elements)
+                const sampleSize = Math.min(MAX_SAMPLE, Math.floor(cellsCount / 2));
+                for (let i = 0; i < sampleSize && i < cells.v.length; i++) {
+                    if (cells.v[i] === undefined || cells.v[i] === null || !Array.isArray(cells.v[i])) {
+                        errors.push(`Invalid cells.v[${i}] (undefined, null, or not an array)`);
+                        break; // Report first found, don't spam
+                    }
                 }
-                if (!pack.cells.v || !Array.isArray(pack.cells.v)) {
-                    errors.push('Missing or invalid pack.cells.v');
+                // Check last elements
+                if (cells.v.length > sampleSize) {
+                    for (let i = Math.max(sampleSize, cells.v.length - sampleSize); i < cells.v.length; i++) {
+                        if (cells.v[i] === undefined || cells.v[i] === null || !Array.isArray(cells.v[i])) {
+                            errors.push(`Invalid cells.v[${i}] (undefined, null, or not an array)`);
+                            break;
+                        }
+                    }
                 }
-                if (!pack.cells.biome) {
-                    errors.push('Missing pack.cells.biome (required for SVG rendering)');
+            }
+            
+            // Check cells.biome with length validation
+            if (!cells.biome || !Array.isArray(cells.biome)) {
+                errors.push('Missing or invalid pack.cells.biome (required for SVG rendering)');
+            } else if (cells.biome.length !== cellsCount) {
+                errors.push(`cells.biome.length (${cells.biome.length}) != cells.i.length (${cellsCount})`);
+            } else {
+                // Sample check for undefined/null in biome array
+                const sampleSize = Math.min(MAX_SAMPLE, cellsCount);
+                for (let i = 0; i < sampleSize; i++) {
+                    if (cells.biome[i] === undefined || cells.biome[i] === null) {
+                        errors.push(`Undefined cells.biome[${i}]`);
+                        break;
+                    }
                 }
-                if (!pack.cells.state) {
-                    errors.push('Missing pack.cells.state (required for SVG rendering)');
+            }
+            
+            // Check cells.state with length validation
+            if (!cells.state || !Array.isArray(cells.state)) {
+                errors.push('Missing or invalid pack.cells.state (required for SVG rendering)');
+            } else if (cells.state.length !== cellsCount) {
+                errors.push(`cells.state.length (${cells.state.length}) != cells.i.length (${cellsCount})`);
+            } else {
+                // Sample check for undefined/null in state array
+                const sampleSize = Math.min(MAX_SAMPLE, cellsCount);
+                for (let i = 0; i < sampleSize; i++) {
+                    if (cells.state[i] === undefined || cells.state[i] === null) {
+                        errors.push(`Undefined cells.state[${i}]`);
+                        break;
+                    }
                 }
             }
             

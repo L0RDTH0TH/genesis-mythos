@@ -1692,6 +1692,9 @@ func _handle_render_failed(data: Dictionary) -> void:
 	
 	# Print error details for debugging
 	if not validation_errors.is_empty():
+		printerr("Render failed (%s): Validation errors:" % render_type)
+		for i in range(validation_errors.size()):
+			printerr("  - %s" % str(validation_errors[i]))
 		push_error("Render failed (%s): Validation errors: %s" % [render_type, str(validation_errors)])
 	else:
 		push_error("Render failed (%s): %s" % [render_type, error_msg])
