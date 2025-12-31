@@ -250,9 +250,20 @@
                 // Resize on window resize
                 window.addEventListener('resize', resizeCanvas);
                 
+                // Validate canvas before initialization
+                if (!canvas.getContext) {
+                    console.warn('[Azgaar Genesis] Canvas element found but getContext not available');
+                }
+                
                 initGenerator({ canvas: canvas });
                 console.log('[Azgaar Genesis] Generator initialized with canvas');
+                
+                // Verify canvas was set in state
+                if (window.AzgaarGenesis && window.AzgaarGenesis.state && !window.AzgaarGenesis.state.canvas) {
+                    console.warn('[Azgaar Genesis] Canvas provided but not set in state - canvas rendering may fail');
+                }
             } else {
+                console.warn('[Azgaar Genesis] Canvas element not found - canvas rendering will not be available');
                 initGenerator({ canvas: null }); // Fallback to headless
                 console.log('[Azgaar Genesis] Generator initialized (headless mode - no canvas)');
             }
@@ -345,12 +356,36 @@
                 let previewDataUrl = '';
                 let previewSvgString = '';
                 const useSvg = options.use_svg !== false && options.use_svg !== undefined ? options.use_svg : true; // Default to true (forced SVG mode)
+                const DEBUG_RENDERING = false; // Set to true for verbose rendering logs
+                
+                // Validate map data before rendering
+                // Use json data (from getMapData) for validation - it has the same structure as state.data
+                const validation = validateMapData(json);
+                if (!validation.valid) {
+                    console.error('[Azgaar Genesis] Data validation failed:', validation.errors);
+                    if (window.GodotBridge && window.GodotBridge.postMessage) {
+                        window.GodotBridge.postMessage('render_failed', {
+                            type: 'validation',
+                            error: 'Data validation failed',
+                            validationErrors: validation.errors
+                        });
+                    }
+                } else if (DEBUG_RENDERING) {
+                    console.log('[Azgaar Genesis] Data validation passed');
+                }
                 
                 // Force SVG rendering (default enabled)
                 if (useSvg && window.AzgaarGenesis.renderPreviewSVG) {
                     try {
                         statusDiv.innerHTML = '<p>Rendering SVG preview...</p>';
-                        console.log('[Azgaar Genesis] Rendering SVG preview (forced mode)...', { useSvg, hasFunction: !!window.AzgaarGenesis.renderPreviewSVG });
+                        if (DEBUG_RENDERING) {
+                            console.log('[Azgaar Genesis] Rendering SVG preview (forced mode)...', { useSvg, hasFunction: !!window.AzgaarGenesis.renderPreviewSVG });
+                        }
+                        
+                        // Validate data before rendering
+                        if (!validation.valid) {
+                            throw new Error('Data validation failed: ' + validation.errors.join(', '));
+                        }
                         
                         const svgContainer = document.getElementById('map-preview');
                         if (!svgContainer) {
@@ -365,7 +400,9 @@
                         const width = containerRect.width > 0 ? containerRect.width : (options.mapWidth || 1024);
                         const height = containerRect.height > 0 ? containerRect.height : (options.mapHeight || 768);
                         
-                        console.log('[Azgaar Genesis] SVG container dimensions:', { width, height, containerWidth: containerRect.width, containerHeight: containerRect.height });
+                        if (DEBUG_RENDERING) {
+                            console.log('[Azgaar Genesis] SVG container dimensions:', { width, height, containerWidth: containerRect.width, containerHeight: containerRect.height });
+                        }
                         
                         // Render SVG to container
                         const svgOptions = {
@@ -402,15 +439,24 @@
                                     width: svgOptions.width,
                                     height: svgOptions.height
                                 });
-                                console.log('[Azgaar Genesis] Sent svg_preview_ready IPC message');
+                                if (DEBUG_RENDERING) {
+                                    console.log('[Azgaar Genesis] Sent svg_preview_ready IPC message');
+                                }
                             }
                         } else {
                             throw new Error('SVG rendering returned empty result');
                         }
                     } catch (svgError) {
-                        console.error('[Azgaar Genesis] SVG preview render failed:', svgError, svgError.stack);
-                        // Notify Godot of SVG failure
+                        console.error('[Azgaar Genesis] SVG preview render failed:', svgError.message, svgError.stack);
+                        // Notify Godot of SVG failure with detailed error info
                         if (window.GodotBridge && window.GodotBridge.postMessage) {
+                            window.GodotBridge.postMessage('render_failed', {
+                                type: 'svg',
+                                error: svgError.message,
+                                stack: svgError.stack,
+                                validationErrors: validation.valid ? [] : validation.errors
+                            });
+                            // Also send legacy svg_failed for compatibility
                             window.GodotBridge.postMessage('svg_failed', {
                                 error: svgError.message,
                                 stack: svgError.stack
@@ -431,8 +477,24 @@
                     try {
                         statusDiv.innerHTML = '<p>Rendering canvas preview (legacy fallback)...</p>';
                         console.warn('[Azgaar Genesis] Using deprecated canvas rendering fallback (SVG preferred)');
+                        
+                        // Validate data before canvas rendering
+                        if (!validation.valid) {
+                            throw new Error('Data validation failed: ' + validation.errors.join(', '));
+                        }
+                        
+                        // Check if canvas is properly initialized
+                        if (!window.AzgaarGenesis.state || !window.AzgaarGenesis.state.canvas) {
+                            throw new Error('Canvas not initialized in AzgaarGenesis state');
+                        }
+                        
                         window.AzgaarGenesis.renderPreview();
                         previewDataUrl = canvas.toDataURL('image/png');
+                        
+                        if (!previewDataUrl || previewDataUrl.length === 0) {
+                            throw new Error('Canvas toDataURL returned empty result');
+                        }
+                        
                         // Show canvas after rendering
                         canvas.style.display = 'block';
                         if (statusDiv) {
@@ -446,7 +508,16 @@
                             window.worldBuilderInstance.previewImageUrl = previewDataUrl;
                         }
                     } catch (renderError) {
-                        console.error('[Azgaar Genesis] Canvas preview render failed:', renderError);
+                        console.error('[Azgaar Genesis] Canvas preview render failed:', renderError.message, renderError.stack);
+                        // Notify Godot of canvas failure with detailed error info
+                        if (window.GodotBridge && window.GodotBridge.postMessage) {
+                            window.GodotBridge.postMessage('render_failed', {
+                                type: 'canvas',
+                                error: renderError.message,
+                                stack: renderError.stack,
+                                validationErrors: validation.valid ? [] : validation.errors
+                            });
+                        }
                         statusDiv.innerHTML = '<p style="color: #f44;">Error: Both SVG and canvas rendering failed</p>';
                     }
                 } else if (!previewSvgString && useSvg) {
@@ -490,6 +561,64 @@
                     });
                 }
             }
+        }
+        
+        /**
+         * Validate map data structure before rendering
+         * Returns {valid: boolean, errors: string[]}
+         */
+        function validateMapData(data) {
+            if (!data || !data.pack) {
+                return {valid: false, errors: ['Missing pack object']};
+            }
+            const pack = data.pack;
+            const errors = [];
+            
+            // Check cells structure
+            if (!pack.cells) {
+                errors.push('Missing pack.cells');
+            } else {
+                if (!pack.cells.i || !Array.isArray(pack.cells.i)) {
+                    errors.push('Missing or invalid pack.cells.i');
+                }
+                if (!pack.cells.c || !Array.isArray(pack.cells.c)) {
+                    errors.push('Missing or invalid pack.cells.c');
+                }
+                if (!pack.cells.v || !Array.isArray(pack.cells.v)) {
+                    errors.push('Missing or invalid pack.cells.v');
+                }
+                if (!pack.cells.biome) {
+                    errors.push('Missing pack.cells.biome (required for SVG rendering)');
+                }
+                if (!pack.cells.state) {
+                    errors.push('Missing pack.cells.state (required for SVG rendering)');
+                }
+            }
+            
+            // Check vertices structure
+            if (!pack.vertices) {
+                errors.push('Missing pack.vertices');
+            } else {
+                if (!pack.vertices.c || typeof pack.vertices.c !== 'object') {
+                    errors.push('Missing or invalid pack.vertices.c (required for isolines)');
+                }
+                if (!pack.vertices.p || !Array.isArray(pack.vertices.p)) {
+                    errors.push('Missing or invalid pack.vertices.p (required for isolines)');
+                }
+            }
+            
+            // Check optional but recommended fields
+            if (!pack.states || !Array.isArray(pack.states)) {
+                errors.push('Missing or invalid pack.states (recommended)');
+            }
+            if (!pack.burgs || !Array.isArray(pack.burgs)) {
+                errors.push('Missing or invalid pack.burgs (recommended)');
+            }
+            if (!pack.rivers || !Array.isArray(pack.rivers)) {
+                errors.push('Missing or invalid pack.rivers (recommended)');
+            }
+            
+            return {valid: errors.length === 0, errors: errors};
         }
         
         // Make handleGenerateMap available globally for direct calls
