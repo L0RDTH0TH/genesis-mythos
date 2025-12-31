@@ -587,6 +587,20 @@ func _handle_generate(data: Dictionary) -> void:
 	
 	current_params.merge(params)
 	
+	# Ensure all default parameters from step definitions are included (if missing)
+	# This ensures mapWidthInput, mapHeightInput, pointsInput, etc. are always present
+	if not step_definitions.is_empty():
+		var steps: Array = step_definitions.get("steps", [])
+		for step_dict in steps:
+			var parameters: Array = step_dict.get("parameters", [])
+			for param_dict in parameters:
+				# Only include curated parameters with defaults
+				if param_dict.get("curated", true) == true and param_dict.has("default"):
+					var azgaar_key: String = param_dict.get("azgaar_key", "")
+					if not azgaar_key.is_empty() and not current_params.has(azgaar_key):
+						current_params[azgaar_key] = param_dict["default"]
+						MythosLogger.debug("WorldBuilderWebController", "Added missing default parameter", {"key": azgaar_key, "value": param_dict["default"]})
+	
 	# Ensure optionsSeed is set in params (from Step 1)
 	if not current_params.has("optionsSeed"):
 		# Fallback: use default from step definitions or random
