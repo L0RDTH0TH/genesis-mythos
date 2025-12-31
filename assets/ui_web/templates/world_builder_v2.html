@@ -169,6 +169,53 @@
          * Uses modular API instead of iframe
          */
         
+        // Safety override for accidental large array logging (prevents console overflow)
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        
+        console.log = function(...args) {
+            const safeArgs = args.map(arg => {
+                if (Array.isArray(arg) && arg.length > 100) {
+                    return `[Large Array: ${arg.length} items, sample: ${JSON.stringify(arg.slice(0, 5))}...]`;
+                }
+                if (arg && typeof arg === 'object' && arg.constructor && arg.constructor.name === 'Uint16Array' && arg.length > 100) {
+                    return `[TypedArray (${arg.constructor.name}): ${arg.length} items, sample: ${Array.from(arg.slice(0, 5)).join(',')}...]`;
+                }
+                if (arg && typeof arg === 'object' && arg.constructor && arg.constructor.name === 'Uint8Array' && arg.length > 100) {
+                    return `[TypedArray (${arg.constructor.name}): ${arg.length} items, sample: ${Array.from(arg.slice(0, 5)).join(',')}...]`;
+                }
+                return arg;
+            });
+            originalLog.apply(console, safeArgs);
+        };
+        
+        console.error = function(...args) {
+            const safeArgs = args.map(arg => {
+                if (Array.isArray(arg) && arg.length > 100) {
+                    return `[Large Array: ${arg.length} items, sample: ${JSON.stringify(arg.slice(0, 5))}...]`;
+                }
+                if (arg && typeof arg === 'object' && arg.constructor && arg.constructor.name === 'Uint16Array' && arg.length > 100) {
+                    return `[TypedArray (${arg.constructor.name}): ${arg.length} items, sample: ${Array.from(arg.slice(0, 5)).join(',')}...]`;
+                }
+                return arg;
+            });
+            originalError.apply(console, safeArgs);
+        };
+        
+        console.warn = function(...args) {
+            const safeArgs = args.map(arg => {
+                if (Array.isArray(arg) && arg.length > 100) {
+                    return `[Large Array: ${arg.length} items, sample: ${JSON.stringify(arg.slice(0, 5))}...]`;
+                }
+                if (arg && typeof arg === 'object' && arg.constructor && arg.constructor.name === 'Uint16Array' && arg.length > 100) {
+                    return `[TypedArray (${arg.constructor.name}): ${arg.length} items, sample: ${Array.from(arg.slice(0, 5)).join(',')}...]`;
+                }
+                return arg;
+            });
+            originalWarn.apply(console, safeArgs);
+        };
+        
         // Import Delaunator (peer dependency) from CDN
         import Delaunator from 'https://cdn.jsdelivr.net/npm/delaunator@5.0.1/+esm';
         

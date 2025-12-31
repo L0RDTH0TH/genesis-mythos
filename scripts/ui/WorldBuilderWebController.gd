@@ -47,6 +47,14 @@ const USE_SVG_DEFAULT: bool = true
 ## Fork mode is now the default - no debug flag needed
 var test_json_data: Dictionary = {}  # Store test JSON output
 
+## Debug flags for console message filtering
+const DEBUG_WEB_CONSOLE_VERBOSE: bool = false  # Set to true only when actively debugging JS
+const SUPPRESS_VERBOSE_WEB_CONSOLE: bool = true  # Default true to prevent overflow
+const MAX_CONSOLE_MESSAGE_LENGTH: int = 2000  # Maximum message length before truncation
+
+## Compiled regex for detecting large number arrays (lazy initialization)
+var array_pattern_regex: RegEx = null
+
 ## Archetype presets loaded from JSON (data-driven)
 var archetype_presets: Dictionary = {}
 
@@ -1193,20 +1201,67 @@ func _get_sample_params(params: Dictionary, count: int) -> Dictionary:
 
 
 func _on_console_message(level: int, message: String, source: String, line: int) -> void:
-	"""Handle console messages from WebView (for debugging)."""
-	# Filter for relevant messages
-	if message.contains("[Genesis World Builder]") or message.contains("[Genesis Azgaar]") or message.contains("CORS") or message.contains("timeout"):
+	"""Handle console messages from WebView (for debugging) with intelligent filtering to prevent overflow."""
+	# Initialize regex pattern on first use (lazy initialization)
+	if array_pattern_regex == null:
+		array_pattern_regex = RegEx.create_from_string(r"^\d+(,\d+){100,}")
+	
+	# Truncate extremely long messages to prevent overflow
+	var processed_message: String = message
+	if processed_message.length() > MAX_CONSOLE_MESSAGE_LENGTH:
+		var truncated_length: int = processed_message.length() - MAX_CONSOLE_MESSAGE_LENGTH
+		processed_message = processed_message.substr(0, MAX_CONSOLE_MESSAGE_LENGTH) + " ... [TRUNCATED " + str(truncated_length) + " chars]"
+	
+	# Suppress verbose non-prefixed messages unless debug mode is enabled
+	if SUPPRESS_VERBOSE_WEB_CONSOLE and not DEBUG_WEB_CONSOLE_VERBOSE:
+		# Always allow messages with important prefixes or error/warning levels
+		var has_important_prefix: bool = (
+			processed_message.contains("[Genesis World Builder]") or 
+			processed_message.contains("[Genesis Azgaar]") or 
+			processed_message.contains("CORS") or 
+			processed_message.contains("timeout") or
+			processed_message.contains("ERROR") or
+			processed_message.contains("WARN") or
+			processed_message.contains("Error") or
+			processed_message.contains("Warning")
+		)
+		
+		# Check if message appears to be a large number array dump
+		var is_likely_array_dump: bool = false
+		if array_pattern_regex != null:
+			var match_result = array_pattern_regex.search(processed_message)
+			if match_result:
+				is_likely_array_dump = true
+		
+		# Also check for very long comma-separated number patterns (heuristic)
+		if not is_likely_array_dump and processed_message.length() > 500:
+			# Count comma-separated numbers (simple heuristic)
+			var comma_count: int = processed_message.count(",")
+			var digit_count: int = 0
+			for i in range(processed_message.length()):
+				if processed_message[i].is_valid_int():
+					digit_count += 1
+			# If message is mostly digits and commas, likely an array dump
+			if comma_count > 50 and (digit_count + comma_count) > (processed_message.length() * 0.8):
+				is_likely_array_dump = true
+		
+		# Silently drop obvious array dumps unless they're errors/warnings
+		if is_likely_array_dump and not has_important_prefix and level < 2:  # level 2+ = WARN, 3 = ERROR
+			return  # Silently suppress
+	
+	# Filter for relevant messages or forward if debug mode enabled
+	if DEBUG_WEB_CONSOLE_VERBOSE or processed_message.contains("[Genesis World Builder]") or processed_message.contains("[Genesis Azgaar]") or processed_message.contains("CORS") or processed_message.contains("timeout") or processed_message.contains("ERROR") or processed_message.contains("WARN") or processed_message.contains("Error") or processed_message.contains("Warning"):
 		match level:
 			0:  # LOG_LEVEL_DEBUG
-				MythosLogger.debug("WorldBuilderWebController", "WebView console", {"level": "debug", "message": message, "source": source, "line": line})
+				MythosLogger.debug("WorldBuilderWebController", "WebView console", {"level": "debug", "message": processed_message, "source": source, "line": line})
 			1:  # LOG_LEVEL_INFO
-				MythosLogger.info("WorldBuilderWebController", "WebView console", {"level": "info", "message": message, "source": source, "line": line})
+				MythosLogger.info("WorldBuilderWebController", "WebView console", {"level": "info", "message": processed_message, "source": source, "line": line})
 			2:  # LOG_LEVEL_WARN
-				MythosLogger.warn("WorldBuilderWebController", "WebView console", {"level": "warn", "message": message, "source": source, "line": line})
+				MythosLogger.warn("WorldBuilderWebController", "WebView console", {"level": "warn", "message": processed_message, "source": source, "line": line})
 			3:  # LOG_LEVEL_ERROR
-				MythosLogger.error("WorldBuilderWebController", "WebView console", {"level": "error", "message": message, "source": source, "line": line})
+				MythosLogger.error("WorldBuilderWebController", "WebView console", {"level": "error", "message": processed_message, "source": source, "line": line})
 			_:
-				MythosLogger.debug("WorldBuilderWebController", "WebView console", {"level": level, "message": message, "source": source, "line": line})
+				MythosLogger.debug("WorldBuilderWebController", "WebView console", {"level": level, "message": processed_message, "source": source, "line": line})
 
 func _print_scene_tree_diagnostics() -> void:
 	"""Print detailed scene tree structure for diagnostics."""
