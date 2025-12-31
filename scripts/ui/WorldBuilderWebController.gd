@@ -796,10 +796,9 @@ func _convert_params_to_fork_options(params: Dictionary) -> Dictionary:
 	if params.has("templateInput"):
 		options["template"] = params["templateInput"]
 	if params.has("pointsInput"):
-		# Convert slider value (1-13) to approximate cell count
+		# Pass points directly (1-13) - Azgaar fork maps to cells internally via CELLS_DENSITY_MAP
 		var slider_val: int = int(params["pointsInput"])
-		var approximate_cells: int = int(pow(10.0, float(slider_val)) * 1000.0)
-		options["cellsDesired"] = approximate_cells
+		options["points"] = slider_val
 	if params.has("heightExponentInput"):
 		options["heightExponent"] = float(params["heightExponentInput"])
 	if params.has("allowErosion"):
@@ -965,9 +964,9 @@ func _generate_initial_default_map() -> void:
 		MythosLogger.warn("WorldBuilderWebController", "No defaults from JSON, using hardcoded defaults")
 		default_params = {
 			"templateInput": "continents",
-			"pointsInput": 5,
-			"mapWidthInput": 960,
-			"mapHeightInput": 540
+			"pointsInput": 6,
+			"mapWidthInput": 2000,
+			"mapHeightInput": 1000
 		}
 	
 	# Use random seed for initial generation if optionsSeed not already set

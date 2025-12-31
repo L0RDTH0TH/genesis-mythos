@@ -280,12 +280,12 @@ function createTypedArray({ maxValue, length, from }) {
 }
 const DEFAULT_OPTIONS = {
   // Map dimensions (canvas size)
-  mapWidth: 960,
-  mapHeight: 540,
+  mapWidth: 2000,
+  mapHeight: 1000,
   // Generation parameters
   seed: null,
   // Will be generated if not provided
-  points: 4,
+  points: 6,
   // Maps to 10000 cells via cellsDensityMap (1=1K, 2=2K, 3=5K, 4=10K, etc.)
   template: null,
   // Heightmap template ID (null = random)
@@ -1094,7 +1094,7 @@ function calculateTemperatures({ grid, options, mapCoordinates: providedMapCoord
   }
   const { temperatureEquator, temperatureNorthPole, temperatureSouthPole } = options;
   const heightExponent = options.heightExponent || 1.8;
-  const height = options.mapHeight || 540;
+  const height = options.mapHeight || 1000;
   for (let rowCellId = 0; rowCellId < cells.i.length; rowCellId += grid.cellsX) {
     const [, y] = grid.points[rowCellId];
     const rowLatitude = mapCoordinates.latN - y / height * mapCoordinates.latT;
