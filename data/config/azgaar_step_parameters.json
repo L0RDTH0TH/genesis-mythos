@@ -55,11 +55,11 @@
           "min": 1,
           "max": 13,
           "step": 1,
-          "default": 5,
+          "default": 6,
           "description": "Cell density (1=1K cells, 13=100K cells)",
           "curated": true,
           "clamped_min": 1,
-          "clamped_max": 10
+          "clamped_max": 12
         },
         {
           "name": "optionsSeed",
@@ -78,11 +78,11 @@
           "min": 240,
           "max": 3840,
           "step": 10,
-          "default": 960,
+          "default": 2000,
           "description": "Canvas width in pixels",
           "curated": true,
           "clamped_min": 800,
-          "clamped_max": 2000
+          "clamped_max": 3840
         },
         {
           "name": "mapHeightInput",
@@ -91,11 +91,11 @@
           "min": 135,
           "max": 2160,
           "step": 10,
-          "default": 540,
+          "default": 1000,
           "description": "Canvas height in pixels",
           "curated": true,
           "clamped_min": 450,
-          "clamped_max": 1500
+          "clamped_max": 2160
         },
         {
           "name": "mapSizeInput",
