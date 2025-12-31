@@ -3175,31 +3175,45 @@ let state = {
 };
 function createBasicPack(grid, options) {
   const { cells: gridCells, points, vertices } = grid;
+  const cellCount = gridCells.i.length;
+  // Ensure cells.v is properly initialized - critical for SVG rendering
+  let cellsV = [];
+  if (gridCells.v && Array.isArray(gridCells.v)) {
+    // cells.v exists - copy it and ensure all entries are arrays (fill undefined gaps)
+    let hasUndefined = false;
+    for (let i = 0; i < cellCount; i++) {
+      if (i < gridCells.v.length && gridCells.v[i] !== undefined && Array.isArray(gridCells.v[i])) {
+        cellsV.push([...gridCells.v[i]]);
+      } else {
+        cellsV.push([]);
+        if (i < gridCells.v.length && gridCells.v[i] === undefined) {
+          hasUndefined = true;
+        }
+      }
+    }
+    if (hasUndefined && typeof console !== "undefined" && console.warn) {
+      console.warn(`createBasicPack: cells.v contained undefined entries, filled with empty arrays`);
+    }
+  } else {
+    // cells.v is missing or not an array - create array of empty arrays with correct length
+    if (typeof console !== "undefined" && console.warn && cellCount > 0) {
+      console.warn(`createBasicPack: cells.v missing or invalid (type: ${typeof gridCells.v}, length: ${gridCells.v?.length || 0} vs expected ${cellCount}), creating placeholder array`);
+    }
+    for (let i = 0; i < cellCount; i++) {
+      cellsV.push([]);
+    }
+  }
   const packCells = {
-    i: createTypedArray({ maxValue: gridCells.i.length, length: gridCells.i.length }).map((_, i) => i),
+    i: createTypedArray({ maxValue: cellCount, length: cellCount }).map((_, i) => i),
     p: points.slice(),
-    g: createTypedArray({ maxValue: gridCells.i.length, length: gridCells.i.length }).map((_, i) => i),
+    g: createTypedArray({ maxValue: cellCount, length: cellCount }).map((_, i) => i),
     h: new Uint8Array(gridCells.h.length),
     c: gridCells.c ? gridCells.c.slice() : [],
-    v: (() => {
-      // Ensure cells.v is properly initialized - critical for SVG rendering
-      const cellCount = gridCells.i ? gridCells.i.length : 0;
-      if (gridCells.v && Array.isArray(gridCells.v) && gridCells.v.length === cellCount) {
-        // Valid cells.v exists - map it properly
-        return gridCells.v.map((v) => Array.isArray(v) ? [...v] : v);
-      } else {
-        // cells.v is missing, empty, or wrong length - create array of empty arrays
-        const placeholder = [];
-        for (let i = 0; i < cellCount; i++) {
-          placeholder.push([]);
-        }
-        return placeholder;
-      }
-    })(),
-    b: gridCells.b ? new Uint8Array(gridCells.b.length) : new Uint8Array(gridCells.i.length),
-    t: gridCells.t ? new Int8Array(gridCells.t.length) : new Int8Array(gridCells.i.length),
-    f: gridCells.f ? new Uint16Array(gridCells.f.length) : new Uint16Array(gridCells.i.length),
-    area: new Float32Array(gridCells.i.length)
+    v: cellsV,
+    b: gridCells.b ? new Uint8Array(gridCells.b.length) : new Uint8Array(cellCount),
+    t: gridCells.t ? new Int8Array(gridCells.t.length) : new Int8Array(cellCount),
+    f: gridCells.f ? new Uint16Array(gridCells.f.length) : new Uint16Array(cellCount),
+    area: new Float32Array(cellCount)
   };
   packCells.h.set(gridCells.h);
   if (gridCells.t) packCells.t.set(gridCells.t);
