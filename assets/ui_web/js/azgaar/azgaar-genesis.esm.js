@@ -1,3 +1,34 @@
+// Console capture fallback for GodotBridge integration
+if (typeof window !== "undefined" && window.GodotBridge && window.GodotBridge.postMessage) {
+  const originalLog = console.log;
+  const originalWarn = console.warn;
+  const originalError = console.error;
+  console.log = function(...args) {
+    originalLog.apply(console, args);
+    try {
+      window.GodotBridge.postMessage('console_log', {msg: args.join(' ')});
+    } catch (e) {
+      // Ignore postMessage errors
+    }
+  };
+  console.warn = function(...args) {
+    originalWarn.apply(console, args);
+    try {
+      window.GodotBridge.postMessage('console_warn', {msg: args.join(' ')});
+    } catch (e) {
+      // Ignore postMessage errors
+    }
+  };
+  console.error = function(...args) {
+    originalError.apply(console, args);
+    try {
+      window.GodotBridge.postMessage('console_error', {msg: args.join(' ')});
+    } catch (e) {
+      // Ignore postMessage errors
+    }
+  };
+}
+
 function aleaPRNG(...args) {
   var r, t, e, o, a, u = new Uint32Array(3), i = "";
   function c(n) {
@@ -542,6 +573,24 @@ class Voronoi {
         this.vertices.c[t] = this.pointsOfTriangle(t);
       }
     }
+    // Post-loop: Process all points explicitly to ensure cells.v is populated for all points
+    for (let p = 0; p < this.pointsN; p++) {
+      if (!this.cells.v[p] || !Array.isArray(this.cells.v[p]) || this.cells.v[p].length === 0) {
+        // Find any edge that starts at this point
+        for (let e = 0; e < this.delaunay.triangles.length; e++) {
+          const pointIndex = this.delaunay.triangles[this.nextHalfedge(e)];
+          if (pointIndex === p && pointIndex < this.pointsN) {
+            const edges = this.edgesAroundPoint(e);
+            if (edges && edges.length > 0) {
+              this.cells.v[p] = edges.map((e2) => this.triangleOfEdge(e2));
+              this.cells.c[p] = edges.map((e2) => this.delaunay.triangles[e2]).filter((c) => c < this.pointsN);
+              this.cells.b[p] = edges.length > this.cells.c[p].length ? 1 : 0;
+              break;
+            }
+          }
+        }
+      }
+    }
   }
   pointsOfTriangle(t) {
     return this.edgesOfTriangle(t).map((edge) => this.delaunay.triangles[edge]);
@@ -619,7 +668,7 @@ function getBoundaryPoints(width, height, spacing) {
 }
 function getJitteredGrid(width, height, spacing, rng) {
   const radius = spacing / 2;
-  const jittering = radius * 0.9;
+  const jittering = radius * 0.6;
   const jitter = () => rng.randFloat(-jittering, jittering);
   let points = [];
   for (let y = radius; y < height; y += spacing) {
@@ -655,26 +704,12 @@ function createVoronoiDiagram(options, rng, DelaunatorClass = null) {
   const voronoi = new Voronoi(delaunay, allPoints, points.length);
   const cells = voronoi.cells;
   cells.i = createTypedArray({ maxValue: points.length, length: points.length }).map((_, i) => i);
-  // Validation: Ensure cells.v exists and check for missing/empty vertex arrays
-  // Voronoi constructor should populate cells.v, but validate for debugging
+  // Validation: Ensure cells.v exists (Voronoi constructor should populate it via post-loop)
   if (!cells.v || !Array.isArray(cells.v)) {
     if (typeof console !== "undefined" && console.error) {
       console.error("[createVoronoiDiagram] cells.v missing or invalid after Voronoi construction");
     }
     cells.v = [];
-  }
-  let emptyVerticesCount = 0;
-  for (let i = 0; i < points.length; i++) {
-    if (!cells.v[i] || !Array.isArray(cells.v[i]) || cells.v[i].length === 0) {
-      emptyVerticesCount++;
-      // Voronoi constructor should have populated this - if missing, it's a bug
-      if (!cells.v[i]) {
-        cells.v[i] = [];  // Initialize as empty array (will cause isoline failure for this cell)
-      }
-    }
-  }
-  if (emptyVerticesCount > 0 && typeof console !== "undefined" && console.warn) {
-    console.warn(`[createVoronoiDiagram] ${emptyVerticesCount}/${points.length} cells have missing/empty vertex arrays - isolines may fail for these cells`);
   }
   const vertices = voronoi.vertices;
   return {
@@ -2834,18 +2869,28 @@ function getIsolines(pack, getType, options = { fill: false, waterGap: false, ha
       skippedCount++;
       continue;  // Skip invalid cell
     }
-    const startingVertex = (_e = cells.v[cellId]) == null ? void 0 : _e.find(
+    let startingVertex = (_e = cells.v[cellId]) == null ? void 0 : _e.find(
       (v) => {
         var _a2;
         return (_a2 = vertices.c[v]) == null ? void 0 : _a2.some(ofDifferentType);
       }
     );
+    // Fallback: if no starting vertex found via condition, try first vertex in cells.v[cellId]
     if (startingVertex === void 0) {
-      if (skippedCount < 10 && typeof console !== "undefined" && console.warn) {
-        console.warn(`[getIsolines] No starting vertex found for cell ${cellId} - skipping isoline`);
+      if (cells.v[cellId] && Array.isArray(cells.v[cellId]) && cells.v[cellId].length > 0) {
+        // Attempt fallback: use first vertex as starting point
+        startingVertex = cells.v[cellId][0];
+        if (typeof console !== "undefined" && console.warn && skippedCount < 5) {
+          console.warn(`[getIsolines] No starting vertex found via condition for cell ${cellId} - using first vertex ${startingVertex} as fallback`);
+        }
+      } else {
+        // No vertices available - cannot create isoline
+        if (skippedCount < 10 && typeof console !== "undefined" && console.warn) {
+          console.warn(`[getIsolines] No starting vertex found for cell ${cellId} (cells.v[${cellId}] is empty) - skipping isoline`);
+        }
+        skippedCount++;
+        continue;
       }
-      skippedCount++;
-      continue;
     }
     const vertexChain = connectVertices({
       vertices,
@@ -3176,35 +3221,89 @@ function renderMapSVG(data, options = {}) {
   const height = options.height || mapHeight || 600;
   const biomesData = getDefaultBiomes();
   const layers = [];
+  // Ocean base layer
   layers.push(`<rect x="0" y="0" width="${width}" height="${height}" fill="${STYLE_CONSTANTS.oceanBase}" />`);
+  // Features layer
   const featuresSVG = drawFeaturesSVG(pack);
-  if (featuresSVG) {
+  if (featuresSVG && featuresSVG.length > 0) {
     layers.push(`<g id="features">${featuresSVG}</g>`);
+    if (typeof console !== "undefined" && console.log) {
+      console.log(`[renderMapSVG] Features layer: ${featuresSVG.length} chars`);
+    }
+  } else {
+    if (typeof console !== "undefined" && console.warn) {
+      console.warn("[renderMapSVG] Features layer is empty");
+    }
   }
+  // Land base layer
   layers.push(`<rect x="0" y="0" width="${width}" height="${height}" fill="${STYLE_CONSTANTS.landBase}" />`);
+  // Biomes layer (critical for full rendering)
   const biomesSVG = drawBiomesSVG(pack, biomesData);
-  if (biomesSVG) {
+  if (biomesSVG && biomesSVG.length > 0) {
     layers.push(`<g id="biomes" opacity="0.7">${biomesSVG}</g>`);
+    if (typeof console !== "undefined" && console.log) {
+      console.log(`[renderMapSVG] Biomes layer: ${biomesSVG.length} chars`);
+    }
+  } else {
+    if (typeof console !== "undefined" && console.warn) {
+      console.warn("[renderMapSVG] Biomes layer is empty - this will cause 'dot painting' appearance");
+    }
   }
+  // States layer
   const statesSVG = drawStatesSVG(pack);
-  if (statesSVG) {
+  if (statesSVG && statesSVG.length > 0) {
     layers.push(`<g id="states" opacity="0.6">${statesSVG}</g>`);
+    if (typeof console !== "undefined" && console.log) {
+      console.log(`[renderMapSVG] States layer: ${statesSVG.length} chars`);
+    }
+  } else {
+    if (typeof console !== "undefined" && console.warn) {
+      console.warn("[renderMapSVG] States layer is empty");
+    }
   }
+  // Rivers layer
   const riversSVG = drawRiversSVG(pack);
-  if (riversSVG) {
+  if (riversSVG && riversSVG.length > 0) {
     layers.push(`<g id="rivers">${riversSVG}</g>`);
+    if (typeof console !== "undefined" && console.log) {
+      console.log(`[renderMapSVG] Rivers layer: ${riversSVG.length} chars`);
+    }
+  } else {
+    if (typeof console !== "undefined" && console.warn) {
+      console.warn("[renderMapSVG] Rivers layer is empty");
+    }
   }
+  // Borders layer
   const borders = drawBordersSVG(pack);
   if (borders.stateBorders || borders.provinceBorders) {
-    layers.push(`<g id="borders">${borders.stateBorders}${borders.provinceBorders}</g>`);
+    const bordersSVG = (borders.stateBorders || "") + (borders.provinceBorders || "");
+    layers.push(`<g id="borders">${bordersSVG}</g>`);
+    if (typeof console !== "undefined" && console.log) {
+      console.log(`[renderMapSVG] Borders layer: ${bordersSVG.length} chars (state: ${borders.stateBorders?.length || 0}, province: ${borders.provinceBorders?.length || 0})`);
+    }
+  } else {
+    if (typeof console !== "undefined" && console.warn) {
+      console.warn("[renderMapSVG] Borders layer is empty");
+    }
   }
+  // Burgs layer
   const burgsSVG = drawBurgsSVG(pack);
-  if (burgsSVG) {
+  if (burgsSVG && burgsSVG.length > 0) {
     layers.push(`<g id="burgs">${burgsSVG}</g>`);
+    if (typeof console !== "undefined" && console.log) {
+      console.log(`[renderMapSVG] Burgs layer: ${burgsSVG.length} chars`);
+    }
+  } else {
+    if (typeof console !== "undefined" && console.warn) {
+      console.warn("[renderMapSVG] Burgs layer is empty");
+    }
   }
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
 ${layers.join("\n")}
 </svg>`;
+  if (typeof console !== "undefined" && console.log) {
+    console.log(`[renderMapSVG] Complete SVG: ${svg.length} chars, ${layers.length} layers`);
+  }
   return svg;
 }
 let state = {
@@ -3220,34 +3319,48 @@ function createBasicPack(grid, options) {
   const { cells: gridCells, points, vertices } = grid;
   const cellCount = gridCells.i.length;
   // Ensure cells.v is properly initialized - critical for SVG rendering
+  // Note: Reconstruction should happen in createVoronoiDiagram (which has voronoi instance access)
+  // Here we copy and validate, logging issues for debugging
   let cellsV = [];
   let emptyCount = 0;
+  let validCount = 0;
   if (gridCells.v && Array.isArray(gridCells.v)) {
     // cells.v exists - copy it and preserve valid vertex arrays
     for (let i = 0; i < cellCount; i++) {
       if (i < gridCells.v.length && Array.isArray(gridCells.v[i]) && gridCells.v[i].length > 0) {
         cellsV.push([...gridCells.v[i]]);  // Copy valid vertex array
+        validCount++;
       } else {
-        // Missing or empty vertex array - log warning for first few, then use empty as fallback
+        // Missing or empty vertex array - should have been reconstructed in createVoronoiDiagram
+        // Log warning for first few cells, then use empty as fallback
         if (i < 10 && typeof console !== "undefined" && console.warn) {
-          console.warn(`[createBasicPack] cells.v[${i}] is missing or empty (length: ${gridCells.v[i]?.length || 0}) - isolines will fail for this cell`);
+          console.warn(`[createBasicPack] cells.v[${i}] is missing or empty (length: ${gridCells.v[i]?.length || 0}) - isolines will fail for this cell (should have been reconstructed in createVoronoiDiagram)`);
         }
         emptyCount++;
-        cellsV.push([]);  // Fallback empty array (cannot reconstruct without Voronoi instance)
+        cellsV.push([]);  // Fallback empty array (cannot reconstruct without Voronoi instance - should have been done earlier)
       }
     }
+    // Error if >10% empty cells.v - indicates serious Voronoi construction issue
+    const emptyPercent = (emptyCount / cellCount) * 100;
+    if (emptyPercent > 10) {
+      const errorMsg = `[createBasicPack] Too many empty cells.v: ${emptyCount}/${cellCount} (${emptyPercent.toFixed(1)}%) - Voronoi constructor failed to populate cells.v correctly`;
+      if (typeof console !== "undefined" && console.error) {
+        console.error(errorMsg);
+      }
+      throw new Error(errorMsg);
+    }
     if (emptyCount > 0 && typeof console !== "undefined" && console.warn) {
-      console.warn(`[createBasicPack] ${emptyCount}/${cellCount} cells have missing/empty vertex arrays - isolines may fail`);
+      console.warn(`[createBasicPack] ${emptyCount}/${cellCount} cells have missing/empty vertex arrays (${validCount} valid) - isolines may fail for empty cells`);
+    } else if (typeof console !== "undefined" && console.log) {
+      console.log(`[createBasicPack] All ${validCount} cells have valid vertex arrays`);
     }
   } else {
-    // cells.v is missing or not an array - create array of empty arrays with correct length
-    if (typeof console !== "undefined" && console.warn && cellCount > 0) {
-      console.warn(`[createBasicPack] cells.v missing or invalid (type: ${typeof gridCells.v}, length: ${gridCells.v?.length || 0} vs expected ${cellCount}) - creating placeholder array (isolines will fail)`);
+    // cells.v is missing or not an array - this is a critical error
+    const errorMsg = `[createBasicPack] cells.v missing or invalid (type: ${typeof gridCells.v}, length: ${gridCells.v?.length || 0} vs expected ${cellCount}) - Voronoi constructor failed completely`;
+    if (typeof console !== "undefined" && console.error) {
+      console.error(errorMsg);
     }
-    for (let i = 0; i < cellCount; i++) {
-      cellsV.push([]);
-    }
-    emptyCount = cellCount;
+    throw new Error(errorMsg);
   }
   const packCells = {
     i: createTypedArray({ maxValue: cellCount, length: cellCount }).map((_, i) => i),

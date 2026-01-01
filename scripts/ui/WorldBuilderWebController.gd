@@ -1654,6 +1654,23 @@ func _handle_svg_preview(data: Dictionary) -> void:
 		"height": height
 	})
 	
+	# Save SVG to file for debugging/analysis
+	var debug_dir := DirAccess.open("user://")
+	if debug_dir and not debug_dir.dir_exists("debug"):
+		debug_dir.make_dir("debug")
+	
+	var svg_path: String = "user://debug/azgaar_sample_svg.svg"
+	var svg_file := FileAccess.open(svg_path, FileAccess.WRITE)
+	if svg_file:
+		svg_file.store_string(svg_data)
+		svg_file.close()
+		MythosLogger.info("SVG Saved", svg_path)
+	else:
+		MythosLogger.error("WorldBuilderWebController", "Failed to save SVG file", {
+			"path": svg_path,
+			"error": FileAccess.get_open_error()
+		})
+	
 	# Store SVG data for potential future use (e.g., export, conversion, etc.)
 	# Note: SVG rendering is handled in the WebView HTML template via Alpine.js
 	# This handler is primarily for logging and potential future processing
@@ -1798,6 +1815,40 @@ func _save_test_json_to_file(json_data: Dictionary, seed: String) -> void:
 	print("File: " + file_path)
 	print("Size: " + str(json_string.length()) + " bytes")
 	print("Seed: " + seed)
+	
+	# JSON Analysis: Parse saved JSON and analyze cells.v structure
+	var json_parser := JSON.new()
+	var parse_result := json_parser.parse(json_string)
+	if parse_result == OK:
+		var parsed_data = json_parser.data
+		if parsed_data is Dictionary and parsed_data.has("pack") and parsed_data.pack is Dictionary:
+			var pack = parsed_data.pack
+			if pack.has("cells") and pack.cells is Dictionary:
+				var cells = pack.cells
+				if cells.has("v") and cells.v is Array:
+					var cells_v: Array = cells.v
+					var total: int = cells_v.size()
+					var empty: int = 0
+					var total_vertices: int = 0
+					
+					for v in cells_v:
+						if not v is Array or v.is_empty():
+							empty += 1
+						else:
+							total_vertices += v.size()
+					
+					var percent: float = (float(empty) / float(total)) * 100.0 if total > 0 else 0.0
+					var avg_length: float = float(total_vertices) / float(total - empty) if (total - empty) > 0 else 0.0
+					
+					MythosLogger.info("JSON Analysis", "Total cells: %d, Empty: %d (%.1f%%), Avg vertices: %.1f" % [total, empty, percent, avg_length])
+				else:
+					MythosLogger.warn("JSON Analysis", "cells.v missing or invalid in saved JSON")
+			else:
+				MythosLogger.warn("JSON Analysis", "pack.cells missing or invalid in saved JSON")
+		else:
+			MythosLogger.warn("JSON Analysis", "pack missing or invalid in saved JSON")
+	else:
+		MythosLogger.error("JSON Analysis", "Failed to parse saved JSON for analysis", {"error": json_parser.get_error_message()})
 
 
 func _convert_and_preview_heightmap(json_data: Dictionary) -> void:
