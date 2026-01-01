@@ -655,6 +655,30 @@ function createVoronoiDiagram(options, rng, DelaunatorClass = null) {
   const voronoi = new Voronoi(delaunay, allPoints, points.length);
   const cells = voronoi.cells;
   cells.i = createTypedArray({ maxValue: points.length, length: points.length }).map((_, i) => i);
+  
+  // Priority 1 Fix: Validate and ensure all cells.v arrays are populated
+  // The Voronoi constructor should populate cells.v, but we validate and ensure array structure
+  if (!cells.v || !Array.isArray(cells.v)) {
+    cells.v = [];
+  }
+  // Ensure cells.v has entries for all cells (Voronoi constructor may skip some)
+  let missingVerticesCount = 0;
+  for (let i = 0; i < points.length; i++) {
+    if (!cells.v[i] || !Array.isArray(cells.v[i]) || cells.v[i].length === 0) {
+      // Initialize empty array if missing (Voronoi constructor should have populated this)
+      if (!cells.v[i]) {
+        cells.v[i] = [];
+      }
+      missingVerticesCount++;
+      if (typeof console !== "undefined" && console.warn && missingVerticesCount <= 10) {
+        console.warn(`[Voronoi] Cell ${i} has missing/empty cells.v array - isolines will fail for this cell`);
+      }
+    }
+  }
+  if (missingVerticesCount > 0 && typeof console !== "undefined" && console.warn) {
+    console.warn(`[Voronoi] ${missingVerticesCount}/${points.length} cells have missing/empty cells.v arrays - isolines may fail for these cells`);
+  }
+  
   const vertices = voronoi.vertices;
   return {
     seed: options.seed || null,
@@ -2787,6 +2811,15 @@ function getIsolines(pack, getType, options = { fill: false, waterGap: false, ha
   const checkedCells = new Uint8Array(cells.i.length);
   const addToChecked = (cellId) => checkedCells[cellId] = 1;
   const isChecked = (cellId) => checkedCells[cellId] === 1;
+  
+  // Priority 3 Fix: Validate cells.v exists and is an array
+  if (!cells.v || !Array.isArray(cells.v)) {
+    if (typeof console !== "undefined" && console.warn) {
+      console.warn(`[getIsolines] cells.v missing or invalid - isolines cannot be generated`);
+    }
+    return {};
+  }
+  
   for (const cellId of cells.i) {
     if (isChecked(cellId) || !getType(cellId)) continue;
     addToChecked(cellId);
@@ -2797,6 +2830,17 @@ function getIsolines(pack, getType, options = { fill: false, waterGap: false, ha
     if (onborderCell === void 0) continue;
     const feature = (_c = pack.features) == null ? void 0 : _c[(_b = cells.f) == null ? void 0 : _b[onborderCell]];
     if ((feature == null ? void 0 : feature.type) === "lake" && ((_d = feature.shoreline) == null ? void 0 : _d.every(ofSameType))) continue;
+    
+    // Priority 3 Fix: Validate cells.v[cellId] before using it
+    if (!cells.v[cellId] || !Array.isArray(cells.v[cellId])) {
+      // Skip invalid cell silently (already logged during creation)
+      continue;
+    }
+    if (cells.v[cellId].length === 0) {
+      // Skip empty vertex array (already logged during creation)
+      continue;
+    }
+    
     const startingVertex = (_e = cells.v[cellId]) == null ? void 0 : _e.find(
       (v) => {
         var _a2;
@@ -3176,28 +3220,40 @@ let state = {
 function createBasicPack(grid, options) {
   const { cells: gridCells, points, vertices } = grid;
   const cellCount = gridCells.i.length;
-  // Ensure cells.v is properly initialized - critical for SVG rendering
+  // Priority 2 Fix: Ensure cells.v is properly initialized - critical for SVG rendering
   let cellsV = [];
   if (gridCells.v && Array.isArray(gridCells.v)) {
     // cells.v exists - copy it and ensure all entries are arrays (fill undefined gaps)
     let hasUndefined = false;
+    let emptyCount = 0;
     for (let i = 0; i < cellCount; i++) {
       if (i < gridCells.v.length && gridCells.v[i] !== undefined && Array.isArray(gridCells.v[i])) {
-        cellsV.push([...gridCells.v[i]]);
+        // Copy valid vertex array (preserve non-empty arrays)
+        if (gridCells.v[i].length > 0) {
+          cellsV.push([...gridCells.v[i]]);
+        } else {
+          cellsV.push([]);
+          emptyCount++;
+        }
       } else {
         cellsV.push([]);
         if (i < gridCells.v.length && gridCells.v[i] === undefined) {
           hasUndefined = true;
+        } else {
+          emptyCount++;
         }
       }
     }
     if (hasUndefined && typeof console !== "undefined" && console.warn) {
-      console.warn(`createBasicPack: cells.v contained undefined entries, filled with empty arrays`);
+      console.warn(`[createBasicPack] cells.v contained undefined entries, filled with empty arrays`);
+    }
+    if (emptyCount > 0 && typeof console !== "undefined" && console.warn) {
+      console.warn(`[createBasicPack] ${emptyCount}/${cellCount} cells have empty cells.v arrays - isolines will fail for these cells`);
     }
   } else {
     // cells.v is missing or not an array - create array of empty arrays with correct length
     if (typeof console !== "undefined" && console.warn && cellCount > 0) {
-      console.warn(`createBasicPack: cells.v missing or invalid (type: ${typeof gridCells.v}, length: ${gridCells.v?.length || 0} vs expected ${cellCount}), creating placeholder array`);
+      console.warn(`[createBasicPack] cells.v missing or invalid (type: ${typeof gridCells.v}, length: ${gridCells.v?.length || 0} vs expected ${cellCount}), creating placeholder array`);
     }
     for (let i = 0; i < cellCount; i++) {
       cellsV.push([]);
@@ -3461,12 +3517,31 @@ function renderPreviewSVG(options = {}) {
     throw new NoDataError();
   }
   try {
+    // Priority 4 Fix: Validate cells.v before rendering
+    if (!state.data.pack || !state.data.pack.cells) {
+      if (typeof console !== "undefined" && console.error) {
+        console.error('[Genesis Azgaar] pack.cells missing - cannot render');
+      }
+      return '';
+    }
+    if (!state.data.pack.cells.v || !Array.isArray(state.data.pack.cells.v)) {
+      if (typeof console !== "undefined" && console.error) {
+        console.error('[Genesis Azgaar] pack.cells.v missing or invalid - isolines will not render');
+      }
+      // Return empty SVG to avoid partial render
+      return '';
+    }
+    const emptyCount = state.data.pack.cells.v.filter(v => !v || !Array.isArray(v) || v.length === 0).length;
+    if (emptyCount > 0 && typeof console !== "undefined" && console.warn) {
+      console.warn(`[Genesis Azgaar] ${emptyCount}/${state.data.pack.cells.v.length} cells have invalid cells.v - partial isolines may fail`);
+    }
+    
     // Debug: Log cells.v state before SVG rendering
     if (typeof console !== "undefined" && console.log) {
-      const cellsV = state.data.pack && state.data.pack.cells ? state.data.pack.cells.v : null;
+      const cellsV = state.data.pack.cells.v;
       const cellsVLength = cellsV ? cellsV.length : 0;
       const cellsVSample = cellsV && cellsV.length > 0 ? cellsV[0] : null;
-      console.log(`[Genesis Azgaar] Before renderMapSVG: pack.cells.v length=${cellsVLength}, sample[0]=${cellsVSample ? JSON.stringify(cellsVSample) : 'null'}`);
+      console.log(`[Genesis Azgaar] Before renderMapSVG: pack.cells.v length=${cellsVLength}, sample[0]=${cellsVSample ? JSON.stringify(cellsVSample) : 'null'}, empty=${emptyCount}`);
     }
     let width = options.width;
     let height = options.height;
