@@ -1654,22 +1654,8 @@ func _handle_svg_preview(data: Dictionary) -> void:
 		"height": height
 	})
 	
-	# Save SVG to file for debugging/analysis
-	var debug_dir := DirAccess.open("user://")
-	if debug_dir and not debug_dir.dir_exists("debug"):
-		debug_dir.make_dir("debug")
-	
-	var svg_path: String = "user://debug/azgaar_sample_svg.svg"
-	var svg_file := FileAccess.open(svg_path, FileAccess.WRITE)
-	if svg_file:
-		svg_file.store_string(svg_data)
-		svg_file.close()
-		MythosLogger.info("SVG Saved", svg_path)
-	else:
-		MythosLogger.error("WorldBuilderWebController", "Failed to save SVG file", {
-			"path": svg_path,
-			"error": FileAccess.get_open_error()
-		})
+	# Save SVG to file for debugging/audit
+	_save_svg_to_file(svg_data)
 	
 	# Store SVG data for potential future use (e.g., export, conversion, etc.)
 	# Note: SVG rendering is handled in the WebView HTML template via Alpine.js
@@ -1816,39 +1802,94 @@ func _save_test_json_to_file(json_data: Dictionary, seed: String) -> void:
 	print("Size: " + str(json_string.length()) + " bytes")
 	print("Seed: " + seed)
 	
-	# JSON Analysis: Parse saved JSON and analyze cells.v structure
-	var json_parser := JSON.new()
-	var parse_result := json_parser.parse(json_string)
-	if parse_result == OK:
-		var parsed_data = json_parser.data
-		if parsed_data is Dictionary and parsed_data.has("pack") and parsed_data.pack is Dictionary:
-			var pack = parsed_data.pack
-			if pack.has("cells") and pack.cells is Dictionary:
-				var cells = pack.cells
-				if cells.has("v") and cells.v is Array:
-					var cells_v: Array = cells.v
-					var total: int = cells_v.size()
-					var empty: int = 0
-					var total_vertices: int = 0
-					
-					for v in cells_v:
-						if not v is Array or v.is_empty():
-							empty += 1
-						else:
-							total_vertices += v.size()
-					
-					var percent: float = (float(empty) / float(total)) * 100.0 if total > 0 else 0.0
-					var avg_length: float = float(total_vertices) / float(total - empty) if (total - empty) > 0 else 0.0
-					
-					MythosLogger.info("JSON Analysis", "Total cells: %d, Empty: %d (%.1f%%), Avg vertices: %.1f" % [total, empty, percent, avg_length])
-				else:
-					MythosLogger.warn("JSON Analysis", "cells.v missing or invalid in saved JSON")
-			else:
-				MythosLogger.warn("JSON Analysis", "pack.cells missing or invalid in saved JSON")
+	# Analyze JSON for cells.v statistics
+	_analyze_json_cells_v(json_data)
+
+
+func _analyze_json_cells_v(json_data: Dictionary) -> void:
+	"""Analyze JSON map data for cells.v statistics (total cells, empty count, percentage, average vertex length)."""
+	if not json_data.has("pack"):
+		MythosLogger.warn("WorldBuilderWebController", "JSON analysis: missing 'pack' key in map data")
+		return
+	
+	var pack: Dictionary = json_data.get("pack", {})
+	if not pack.has("cells"):
+		MythosLogger.warn("WorldBuilderWebController", "JSON analysis: missing 'cells' key in pack")
+		return
+	
+	var cells: Dictionary = pack.get("cells", {})
+	if not cells.has("v"):
+		MythosLogger.warn("WorldBuilderWebController", "JSON analysis: missing 'cells.v' key")
+		return
+	
+	var cells_v: Array = cells.get("v", [])
+	var total_cells: int = cells_v.size()
+	var empty_count: int = 0
+	var total_vertex_length: float = 0.0
+	
+	for i in range(total_cells):
+		var cell_v: Variant = cells_v[i]
+		if cell_v == null or not cell_v is Array:
+			empty_count += 1
+		elif cell_v.is_empty():
+			empty_count += 1
 		else:
-			MythosLogger.warn("JSON Analysis", "pack missing or invalid in saved JSON")
-	else:
-		MythosLogger.error("JSON Analysis", "Failed to parse saved JSON for analysis", {"error": json_parser.get_error_message()})
+			total_vertex_length += float(cell_v.size())
+	
+	var percentage_empty: float = (float(empty_count) / float(total_cells) * 100.0) if total_cells > 0 else 0.0
+	var valid_count: int = total_cells - empty_count
+	var average_vertex_length: float = (total_vertex_length / float(valid_count)) if valid_count > 0 else 0.0
+	
+	MythosLogger.info("WorldBuilderWebController", "JSON cells.v analysis", {
+		"total_cells": total_cells,
+		"empty_count": empty_count,
+		"valid_count": valid_count,
+		"percentage_empty": percentage_empty,
+		"average_vertex_length": average_vertex_length
+	})
+	
+	print("=== AZGAAR JSON CELLS.V ANALYSIS ===")
+	print("Total cells: %d" % total_cells)
+	print("Empty cells: %d (%.2f%%)" % [empty_count, percentage_empty])
+	print("Valid cells: %d" % valid_count)
+	print("Average vertex length: %.2f" % average_vertex_length)
+
+
+func _save_svg_to_file(svg_data: String) -> void:
+	"""Save SVG string to user://debug/azgaar_sample_svg.svg"""
+	# Create debug directory if needed
+	var debug_dir := DirAccess.open("user://")
+	if not debug_dir:
+		MythosLogger.error("WorldBuilderWebController", "Cannot open user:// directory for SVG save")
+		return
+	
+	if not debug_dir.dir_exists("debug"):
+		var err := debug_dir.make_dir("debug")
+		if err != OK:
+			MythosLogger.error("WorldBuilderWebController", "Failed to create debug directory for SVG", {"error": err})
+			return
+	
+	# Save SVG file
+	var file_path: String = "user://debug/azgaar_sample_svg.svg"
+	var file := FileAccess.open(file_path, FileAccess.WRITE)
+	if not file:
+		MythosLogger.error("WorldBuilderWebController", "Failed to open SVG file for writing", {
+			"path": file_path,
+			"error": FileAccess.get_open_error()
+		})
+		return
+	
+	file.store_string(svg_data)
+	file.close()
+	
+	MythosLogger.info("WorldBuilderWebController", "Saved SVG to file", {
+		"path": file_path,
+		"size_bytes": svg_data.length()
+	})
+	
+	print("=== AZGAAR SVG SAVED ===")
+	print("File: " + file_path)
+	print("Size: " + str(svg_data.length()) + " bytes")
 
 
 func _convert_and_preview_heightmap(json_data: Dictionary) -> void:

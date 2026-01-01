@@ -1,34 +1,3 @@
-// Console capture fallback for GodotBridge integration
-if (typeof window !== "undefined" && window.GodotBridge && window.GodotBridge.postMessage) {
-  const originalLog = console.log;
-  const originalWarn = console.warn;
-  const originalError = console.error;
-  console.log = function(...args) {
-    originalLog.apply(console, args);
-    try {
-      window.GodotBridge.postMessage('console_log', {msg: args.join(' ')});
-    } catch (e) {
-      // Ignore postMessage errors
-    }
-  };
-  console.warn = function(...args) {
-    originalWarn.apply(console, args);
-    try {
-      window.GodotBridge.postMessage('console_warn', {msg: args.join(' ')});
-    } catch (e) {
-      // Ignore postMessage errors
-    }
-  };
-  console.error = function(...args) {
-    originalError.apply(console, args);
-    try {
-      window.GodotBridge.postMessage('console_error', {msg: args.join(' ')});
-    } catch (e) {
-      // Ignore postMessage errors
-    }
-  };
-}
-
 function aleaPRNG(...args) {
   var r, t, e, o, a, u = new Uint32Array(3), i = "";
   function c(n) {
@@ -573,13 +542,13 @@ class Voronoi {
         this.vertices.c[t] = this.pointsOfTriangle(t);
       }
     }
-    // Post-loop: Process all points explicitly to ensure cells.v is populated for all points
+    // Post-loop: Process all skipped points explicitly
     for (let p = 0; p < this.pointsN; p++) {
-      if (!this.cells.v[p] || !Array.isArray(this.cells.v[p]) || this.cells.v[p].length === 0) {
-        // Find any edge that starts at this point
+      if (!this.cells.c[p]) {
+        // Find any edge starting at this point
         for (let e = 0; e < this.delaunay.triangles.length; e++) {
-          const pointIndex = this.delaunay.triangles[this.nextHalfedge(e)];
-          if (pointIndex === p && pointIndex < this.pointsN) {
+          const pointIdx = this.delaunay.triangles[this.nextHalfedge(e)];
+          if (pointIdx === p && pointIdx < this.pointsN) {
             const edges = this.edgesAroundPoint(e);
             if (edges && edges.length > 0) {
               this.cells.v[p] = edges.map((e2) => this.triangleOfEdge(e2));
@@ -668,7 +637,7 @@ function getBoundaryPoints(width, height, spacing) {
 }
 function getJitteredGrid(width, height, spacing, rng) {
   const radius = spacing / 2;
-  const jittering = radius * 0.6;
+  const jittering = radius * 1.2;  // Increased to 0.6 * spacing (was 0.9 * radius = 0.45 * spacing)
   const jitter = () => rng.randFloat(-jittering, jittering);
   let points = [];
   for (let y = radius; y < height; y += spacing) {
@@ -704,7 +673,8 @@ function createVoronoiDiagram(options, rng, DelaunatorClass = null) {
   const voronoi = new Voronoi(delaunay, allPoints, points.length);
   const cells = voronoi.cells;
   cells.i = createTypedArray({ maxValue: points.length, length: points.length }).map((_, i) => i);
-  // Validation: Ensure cells.v exists (Voronoi constructor should populate it via post-loop)
+  // Validation: Ensure cells.v exists and check for missing/empty vertex arrays
+  // Voronoi constructor should populate cells.v (including post-loop processing), but validate for debugging
   if (!cells.v || !Array.isArray(cells.v)) {
     if (typeof console !== "undefined" && console.error) {
       console.error("[createVoronoiDiagram] cells.v missing or invalid after Voronoi construction");
@@ -3319,8 +3289,8 @@ function createBasicPack(grid, options) {
   const { cells: gridCells, points, vertices } = grid;
   const cellCount = gridCells.i.length;
   // Ensure cells.v is properly initialized - critical for SVG rendering
-  // Note: Reconstruction should happen in createVoronoiDiagram (which has voronoi instance access)
-  // Here we copy and validate, logging issues for debugging
+  // Note: Voronoi constructor should populate cells.v (including post-loop processing)
+  // Validate and throw error if >10% are empty (indicates serious generation failure)
   let cellsV = [];
   let emptyCount = 0;
   let validCount = 0;
@@ -3331,32 +3301,28 @@ function createBasicPack(grid, options) {
         cellsV.push([...gridCells.v[i]]);  // Copy valid vertex array
         validCount++;
       } else {
-        // Missing or empty vertex array - should have been reconstructed in createVoronoiDiagram
-        // Log warning for first few cells, then use empty as fallback
-        if (i < 10 && typeof console !== "undefined" && console.warn) {
-          console.warn(`[createBasicPack] cells.v[${i}] is missing or empty (length: ${gridCells.v[i]?.length || 0}) - isolines will fail for this cell (should have been reconstructed in createVoronoiDiagram)`);
-        }
+        // Missing or empty vertex array - should have been populated by Voronoi constructor
         emptyCount++;
-        cellsV.push([]);  // Fallback empty array (cannot reconstruct without Voronoi instance - should have been done earlier)
+        cellsV.push([]);  // Fallback empty array
       }
     }
-    // Error if >10% empty cells.v - indicates serious Voronoi construction issue
-    const emptyPercent = (emptyCount / cellCount) * 100;
-    if (emptyPercent > 10) {
-      const errorMsg = `[createBasicPack] Too many empty cells.v: ${emptyCount}/${cellCount} (${emptyPercent.toFixed(1)}%) - Voronoi constructor failed to populate cells.v correctly`;
+    // Throw error if more than 10% of cells.v are empty (critical failure)
+    const emptyPercentage = cellCount > 0 ? (emptyCount / cellCount) : 1.0;
+    if (emptyPercentage > 0.1) {
+      const errorMsg = `[createBasicPack] CRITICAL: ${emptyCount}/${cellCount} cells (${(emptyPercentage * 100).toFixed(1)}%) have empty vertex arrays - Voronoi generation failed. This will cause rendering to fail.`;
       if (typeof console !== "undefined" && console.error) {
         console.error(errorMsg);
       }
       throw new Error(errorMsg);
     }
     if (emptyCount > 0 && typeof console !== "undefined" && console.warn) {
-      console.warn(`[createBasicPack] ${emptyCount}/${cellCount} cells have missing/empty vertex arrays (${validCount} valid) - isolines may fail for empty cells`);
+      console.warn(`[createBasicPack] ${emptyCount}/${cellCount} cells have empty vertex arrays (${validCount} valid, ${(emptyPercentage * 100).toFixed(1)}% empty)`);
     } else if (typeof console !== "undefined" && console.log) {
       console.log(`[createBasicPack] All ${validCount} cells have valid vertex arrays`);
     }
   } else {
     // cells.v is missing or not an array - this is a critical error
-    const errorMsg = `[createBasicPack] cells.v missing or invalid (type: ${typeof gridCells.v}, length: ${gridCells.v?.length || 0} vs expected ${cellCount}) - Voronoi constructor failed completely`;
+    const errorMsg = `[createBasicPack] CRITICAL: cells.v missing or invalid (type: ${typeof gridCells.v}, length: ${gridCells.v?.length || 0} vs expected ${cellCount}) - Voronoi generation failed.`;
     if (typeof console !== "undefined" && console.error) {
       console.error(errorMsg);
     }
