@@ -1402,6 +1402,93 @@ function markupPack({ pack }) {
     return feature;
   }
 }
+function calculateSettlementScores({ pack, grid, options }) {
+  // Calculate settlement scores (cells.s) based on terrain, biome, temperature, precipitation, and rivers
+  if (!pack || !pack.cells) {
+    throw new Error("Pack object with cells is required");
+  }
+  if (!grid || !grid.cells) {
+    throw new Error("Grid object with cells is required");
+  }
+  const { cells } = pack;
+  const { h: heights, biome, r: rivers, f: features } = cells;
+  const { temp, prec } = grid.cells;
+  const n = cells.i.length;
+  
+  // Create settlement score array (cells.s) - Float32Array for fractional scores
+  if (!cells.s) {
+    cells.s = new Float32Array(n);
+  }
+  
+  // Calculate settlement score for each cell
+  for (let i = 0; i < n; i++) {
+    const height = heights[i];
+    // Skip water cells
+    if (height < 20) {
+      cells.s[i] = 0;
+      continue;
+    }
+    
+    // Base score from biome (fertile biomes get higher scores)
+    let score = 0;
+    const biomeId = biome ? biome[i] : 0;
+    // Biome scores: 1=desert (low), 2=grassland (high), 3=savanna (med-high), 4=tropical (high),
+    // 5=tundra (low), 6=forest (med), 7=taiga (low-med), 8=wetland (med), 9=jungle (high)
+    const biomeScores = [0, 10, 50, 40, 45, 15, 35, 20, 30, 45, 0, 0, 0];
+    score += biomeScores[biomeId] || 20;
+    
+    // Temperature factor (moderate temperatures preferred, -5 to 25°C ideal)
+    const temperature = temp ? temp[grid.cells.g ? grid.cells.g[i] : i] : 10;
+    let tempFactor = 1.0;
+    if (temperature < -10 || temperature > 35) {
+      tempFactor = 0.3; // Too cold or too hot
+    } else if (temperature >= -5 && temperature <= 25) {
+      tempFactor = 1.2; // Ideal temperature range
+    } else {
+      tempFactor = 0.7; // Marginal
+    }
+    score *= tempFactor;
+    
+    // Precipitation factor (moderate precipitation preferred, 40-120 ideal)
+    const precipitation = prec ? prec[grid.cells.g ? grid.cells.g[i] : i] : 50;
+    let precFactor = 1.0;
+    if (precipitation < 20 || precipitation > 200) {
+      precFactor = 0.4; // Too dry or too wet
+    } else if (precipitation >= 40 && precipitation <= 120) {
+      precFactor = 1.3; // Ideal precipitation range
+    } else {
+      precFactor = 0.8; // Marginal
+    }
+    score *= precFactor;
+    
+    // Height factor (low-mid elevations preferred, avoid very high)
+    let heightFactor = 1.0;
+    if (height > 70) {
+      heightFactor = 0.5; // Too high
+    } else if (height >= 20 && height <= 50) {
+      heightFactor = 1.2; // Ideal height range
+    }
+    score *= heightFactor;
+    
+    // River bonus (rivers greatly increase settlement score)
+    if (rivers && rivers[i]) {
+      score *= 2.0; // Rivers are highly desirable
+    }
+    
+    // Coast bonus (coastal cells are slightly better)
+    // LAND_COAST = 1 (defined above as const)
+    if (cells.t && cells.t[i] === 1) {  // LAND_COAST = 1
+      score *= 1.3;
+    }
+    
+    cells.s[i] = Math.max(0, Math.round(score));
+  }
+  
+  console.log("[calculateSettlementScores] Settlement scores calculated for " + n + " cells");
+  const populatedCount = Array.from(cells.s).filter(s => s > 0).length;
+  console.log("[calculateSettlementScores] Populated cells (score > 0): " + populatedCount);
+}
+
 function specifyFeatures({ pack, grid, options }) {
   if (!pack || !pack.features) {
     throw new Error("Pack object with features is required");
@@ -1575,9 +1662,14 @@ function generateCultures({ pack, grid, options, rng, biomesData: providedBiomes
   const culturesSet = options.culturesSet || "world";
   const baseScore = cells.s || (cells.pop ? cells.pop : new Float32Array(cells.i.length));
   const populated = cells.i.filter((i) => baseScore[i] > 0);
+  
+  console.log("[generateCultures] Cultures requested: " + culturesNumber + ", populated cells: " + populated.length + ", required: " + (culturesNumber * 25));
+  
   if (populated.length < culturesNumber * 25) {
     const adjustedCount = Math.floor(populated.length / 50);
+    console.warn("[generateCultures] WARNING: Not enough populated cells (" + populated.length + " < " + (culturesNumber * 25) + "), adjusting count to: " + adjustedCount);
     if (!adjustedCount) {
+      console.warn("[generateCultures] WARNING: Adjusted count is 0, falling back to 'Wildlands' only - this indicates population/settlement score is not being calculated!");
       pack.cultures = [{ name: "Wildlands", i: 0, base: 1, shield: "round", origins: [null] }];
       cells.culture = cultureIds;
       return pack.cultures;
@@ -3399,23 +3491,58 @@ function generateMapInternal(options, DelaunatorClass) {
     allowErosion: options.allowErosion !== false
   });
   const biomesData = getDefaultBiomes();
+  console.log("[Genesis Azgaar] Starting cultural/political generation pipeline...");
   assignBiomes({ pack, grid, options, biomesData });
+  console.log("[Genesis Azgaar] Biomes assigned");
   markupPack({ pack });
   specifyFeatures({ pack, grid, options });
+  console.log("[Genesis Azgaar] Features specified");
+  
+  // Calculate settlement scores (cells.s) - required for culture/state generation
+  // Settlement score determines where cultures and states can form
+  calculateSettlementScores({ pack, grid, options });
+  console.log("[Genesis Azgaar] Settlement scores calculated");
+  
+  // Generate cultures
+  console.log("[Genesis Azgaar] Generating cultures (target: " + (options.cultures || 12) + ")...");
   generateCultures({ pack, grid, options, rng, biomesData });
+  console.log("[Genesis Azgaar] Cultures generated: " + (pack.cultures ? pack.cultures.length : 0) + " total");
   expandCultures({ pack, options, biomesData });
+  console.log("[Genesis Azgaar] Cultures expanded");
+  
+  // Generate burgs (settlements)
+  console.log("[Genesis Azgaar] Generating burgs...");
   generateBurgs({ pack, grid, options, rng });
+  console.log("[Genesis Azgaar] Burgs generated: " + (pack.burgs ? pack.burgs.length : 0) + " total");
+  
+  // Generate states
+  const statesTarget = options.statesNumber || 18;
+  console.log("[Genesis Azgaar] Generating states (target: " + statesTarget + ")...");
   generateStates({ pack, options, rng });
+  console.log("[Genesis Azgaar] States generated: " + (pack.states ? pack.states.length : 0) + " total");
+  
+  // Generate provinces
+  console.log("[Genesis Azgaar] Generating provinces (ratio: " + (options.provincesRatio || 20) + ")...");
   generateProvinces({ pack, options, rng });
-  if (options.religionsNumber > 0) {
+  console.log("[Genesis Azgaar] Provinces generated: " + (pack.provinces ? pack.provinces.length : 0) + " total");
+  
+  // Generate religions
+  const religionsTarget = options.religionsNumber || 6;
+  if (religionsTarget > 0) {
+    console.log("[Genesis Azgaar] Generating religions (target: " + religionsTarget + ")...");
     generateReligions({ pack, options, rng });
+    console.log("[Genesis Azgaar] Religions generated: " + (pack.religions ? pack.religions.length : 0) + " total");
   } else {
     pack.religions = [{ name: "No religion", i: 0 }];
     if (!pack.cells.religion) {
       pack.cells.religion = createTypedArray({ maxValue: 65535, length: pack.cells.i.length });
     }
+    console.log("[Genesis Azgaar] Religions disabled, using default");
   }
+  
   generateEmblems({ pack, options, rng });
+  console.log("[Genesis Azgaar] Emblems generated");
+  console.log("[Genesis Azgaar] Generation pipeline complete!");
   return {
     grid,
     pack,

@@ -157,9 +157,9 @@ document.addEventListener('alpine:init', () => {
             this.setStep(0);
             console.log('[WorldBuilder] Initialized, current step:', this.currentStep, 'total steps:', this.steps.length);
             
-            // Azgaar is now handled via direct JS injection from GDScript (WorldBuilderAzgaar)
-            // No iframe or message listener setup needed
-            console.log('[WorldBuilder] Azgaar will be controlled via direct JS injection from GDScript');
+            // Azgaar is now handled via fork integration (clean integration - January 2026)
+            // Fork provides modular ESM API - no iframe, no bundle dependencies
+            console.log('[WorldBuilder] Azgaar fork integration ready');
         },
     
     // All iframe/postMessage code removed - using direct JS injection via GDScript now
@@ -907,7 +907,7 @@ document.addEventListener('alpine:init', () => {
         this.progressValue = 0;
         this.statusText = 'Preparing generation...';
         
-        // Send to Godot - it will handle direct JS injection via WorldBuilderAzgaar
+        // Send to Godot - fork integration handles generation (clean integration - January 2026)
         // Only send params (which includes optionsSeed from Step 1)
         try {
             GodotBridge.postMessage('generate', { 

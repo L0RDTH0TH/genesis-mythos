@@ -97,8 +97,7 @@ const RANDOMIZE_BTN_SIZE: Vector2 = Vector2(64, 50)  ## Randomize button size
 const MAX_POINTS_LOW_HW: int = 500000  ## Maximum points for low-end hardware
 const MAX_POINTS_HIGH_HW: int = 2000000  ## Maximum points for high-end hardware
 const AZGAAR_BASE_URL: String = "https://azgaar.github.io/Fantasy-Map-Generator/"
-const AZGAAR_JSON_URL: String = AZGAAR_BASE_URL + "?json=user://azgaar/options.json#"
-const DOWNLOADS_DIR: String = "user://azgaar/downloads/"
+const DOWNLOADS_DIR: String = "user://downloads/"  # Updated January 2026: removed user://azgaar/ dependency
 
 ## Get clamped value based on hardware capabilities.
 static func get_clamped_points(base_points: int) -> int:

@@ -2,6 +2,7 @@
 # ║ AzgaarDataConverter.gd
 # ║ Desc: Utility for converting Azgaar fork JSON data to Godot Images and extracted features
 # ║ Author: Lordthoth
+# ║ Updated: January 2026 - Clean fork integration (assumes complete pack.cells.v)
 # ╚═══════════════════════════════════════════════════════════
 
 class_name AzgaarDataConverter
@@ -15,6 +16,8 @@ const FORMAT_HEIGHTMAP: int = Image.FORMAT_RF
 """
 Converts Azgaar JSON height data to a rasterized Godot Image.
 Uses spatial hashing for efficient nearest-neighbor lookup during rasterization.
+Clean fork integration (January 2026) - assumes complete pack.cells.v structure.
+
 :param json_data: Dictionary from getMapData() with 'options', 'grid' keys (fork JSON structure)
 :return: Image with normalized heights (0.0-1.0 float in red channel)
 """

@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>World Builder - Genesis Mythos</title>
     <link rel="stylesheet" href="../css/world_builder.css">
+    <script src="../js/bridge.js"></script>
+    <script defer src="../js/alpine.min.js"></script>
 </head>
 <body>
     <div class="world-builder-container" x-data="worldBuilder">
@@ -41,10 +43,25 @@
                 </div>
             </div>
 
-            <!-- Center Panel: Azgaar Preview -->
-            <!-- Azgaar is embedded as iframe for proper positioning and layering -->
-            <div class="center-panel" style="background: transparent; position: relative;">
-                <iframe id="azgaar-iframe" src="http://127.0.0.1:8080/index.html" style="width:100%; height:100%; border:none; background:transparent;"></iframe>
+            <!-- Center Panel: Status/Preview (Fork mode with SVG/canvas preview) -->
+            <div class="center-panel" style="background: #1a1a1a; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden;">
+                <!-- SVG Preview Container (scalable, layered map preview) -->
+                <div id="map-preview" class="svg-preview" x-show="previewMode === 'svg' && previewSvg" x-html="previewSvg" style="width: 100%; height: 100%; overflow: auto; background: #0a0a0a;"></div>
+                <!-- Canvas for Azgaar preview rendering (fallback, shown when rendered) -->
+                <canvas id="azgaar-canvas" x-show="previewMode === 'canvas' && previewImageUrl" style="width: 100%; height: 100%; object-fit: contain; background: #0a0a0a; display: none;"></canvas>
+                <!-- Preview image (fallback if canvas not available, from Godot conversion) -->
+                <img id="map-preview-img" x-show="previewMode === 'canvas' && previewImageUrl" :src="previewImageUrl" style="width: 100%; height: 100%; object-fit: contain;" alt="Map Preview">
+                <!-- Preview Mode Toggle (shown when preview is available) -->
+                <div x-show="(previewSvg || previewImageUrl) && !isGenerating" style="position: absolute; top: 10px; right: 10px; z-index: 10;">
+                    <button @click="togglePreviewMode()" class="preview-toggle-button" style="padding: 0.5rem 1rem; background: rgba(0, 0, 0, 0.7); color: #fff; border: 1px solid #666; border-radius: 4px; cursor: pointer;">
+                        <span x-text="previewMode === 'svg' ? 'Switch to Canvas' : 'Switch to SVG'"></span>
+                    </button>
+                </div>
+                <!-- Status message (shown when no preview) -->
+                <div id="azgaar-status" x-show="!previewSvg && !previewImageUrl" style="padding: 2rem; text-align: center; color: #aaa; font-size: 1.2em;">
+                    <p x-text="statusText || 'Azgaar Genesis Fork - Ready'"></p>
+                    <p style="font-size: 0.8em; margin-top: 1rem; color: #666;" x-show="!isGenerating">Using modular API - Generate a map to see preview</p>
+                </div>
             </div>
 
             <!-- Right Panel: Parameters (Floating Panel Style) -->
@@ -109,8 +126,8 @@
                                                 type="number" 
                                                 x-model.number="params[param.azgaar_key]"
                                                 @change="updateParam(param.azgaar_key, parseFloat($event.target.value))"
-                                                :min="param.clamped_min !== undefined ? param.clamped_min : (param.min || 0)"
-                                                :max="param.clamped_max !== undefined ? param.clamped_max : (param.max || 999999)"
+                                                :min="param.min"
+                                                :max="param.max"
                                                 :step="param.step || 1">
                                         </template>
 
@@ -130,81 +147,540 @@
             </div>
         </div>
 
-        <!-- Bottom Bar: Navigation -->
+        <!-- Bottom Bar: Navigation & Generate -->
         <div class="bottom-bar">
-            <div class="bottom-content">
-                <div class="spacer-left"></div>
-                <button @click="previousStep()" :disabled="currentStep === 0" class="nav-button">← Back</button>
-                <button @click="generate()" class="nav-button generate-btn">✨ Generate / Apply Changes</button>
-                <button @click="nextStep()" :disabled="currentStep >= totalSteps - 1" class="nav-button">Next →</button>
-                <div class="progress-section" x-show="isGenerating">
-                    <progress :value="progressValue" max="100" class="progress-bar"></progress>
-                    <span class="status-label" x-text="statusText"></span>
-                </div>
+            <button class="nav-button" @click="previousStep()" :disabled="currentStep === 0">Previous</button>
+            <button class="nav-button" @click="nextStep()" :disabled="currentStep >= totalSteps - 1">Next</button>
+            <button class="generate-button" @click="generate()" :disabled="isGenerating">
+                <span x-show="!isGenerating">Generate Map</span>
+                <span x-show="isGenerating">Generating...</span>
+            </button>
+            <div class="progress-container" x-show="isGenerating">
+                <div class="progress-bar" :style="'width: ' + progressValue + '%'"></div>
+                <span class="progress-text" x-text="statusText || 'Generating...'"></span>
             </div>
         </div>
     </div>
 
-    <script src="../js/bridge.js"></script>
-    <script src="../js/world_builder.js"></script>
-    <script src="../js/alpine.min.js" defer></script>
-    <script>
-        // Setup iframe load listener for Azgaar embedding
-        document.addEventListener('DOMContentLoaded', function() {
-            var iframe = document.getElementById('azgaar-iframe');
-            if (iframe) {
-                iframe.addEventListener('load', function() {
-                    console.log('[WorldBuilder] Azgaar iframe loaded');
-                    if (window.GodotBridge && window.GodotBridge.postMessage) {
-                        window.GodotBridge.postMessage({
-                            type: 'azgaar_loaded',
-                            data: {}
-                        });
-                    }
-                });
+    <!-- Azgaar Genesis Fork Integration (Clean Integration - January 2026) -->
+    <script type="module">
+        /**
+         * Azgaar Genesis Fork Integration - Clean Integration (January 2026)
+         * Uses modular ESM API - no iframe, no bundle, no repair workarounds
+         * Assumes fork provides complete pack.cells.v data structure
+         */
+        
+        // Safety override for accidental large array logging (prevents console overflow)
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        
+        console.log = function(...args) {
+            const safeArgs = args.map(arg => {
+                if (Array.isArray(arg) && arg.length > 100) {
+                    return `[Large Array: ${arg.length} items, sample: ${JSON.stringify(arg.slice(0, 5))}...]`;
+                }
+                if (arg && typeof arg === 'object' && arg.constructor && arg.constructor.name === 'Uint16Array' && arg.length > 100) {
+                    return `[TypedArray (${arg.constructor.name}): ${arg.length} items, sample: ${Array.from(arg.slice(0, 5)).join(',')}...]`;
+                }
+                if (arg && typeof arg === 'object' && arg.constructor && arg.constructor.name === 'Uint8Array' && arg.length > 100) {
+                    return `[TypedArray (${arg.constructor.name}): ${arg.length} items, sample: ${Array.from(arg.slice(0, 5)).join(',')}...]`;
+                }
+                return arg;
+            });
+            originalLog.apply(console, safeArgs);
+        };
+        
+        console.error = function(...args) {
+            const safeArgs = args.map(arg => {
+                if (Array.isArray(arg) && arg.length > 100) {
+                    return `[Large Array: ${arg.length} items, sample: ${JSON.stringify(arg.slice(0, 5))}...]`;
+                }
+                if (arg && typeof arg === 'object' && arg.constructor && arg.constructor.name === 'Uint16Array' && arg.length > 100) {
+                    return `[TypedArray (${arg.constructor.name}): ${arg.length} items, sample: ${Array.from(arg.slice(0, 5)).join(',')}...]`;
+                }
+                return arg;
+            });
+            originalError.apply(console, safeArgs);
+        };
+        
+        console.warn = function(...args) {
+            const safeArgs = args.map(arg => {
+                if (Array.isArray(arg) && arg.length > 100) {
+                    return `[Large Array: ${arg.length} items, sample: ${JSON.stringify(arg.slice(0, 5))}...]`;
+                }
+                if (arg && typeof arg === 'object' && arg.constructor && arg.constructor.name === 'Uint16Array' && arg.length > 100) {
+                    return `[TypedArray (${arg.constructor.name}): ${arg.length} items, sample: ${Array.from(arg.slice(0, 5)).join(',')}...]`;
+                }
+                return arg;
+            });
+            originalWarn.apply(console, safeArgs);
+        };
+        
+        // Import Delaunator (peer dependency) from CDN
+        import Delaunator from 'https://cdn.jsdelivr.net/npm/delaunator@5.0.1/+esm';
+        
+        // Import Azgaar Genesis library (updated fork - January 2026)
+        // Assumes fork provides complete pack.cells.v with full polygon data
+        import { 
+            initGenerator, 
+            loadOptions, 
+            generateMap, 
+            getMapData, 
+            renderPreview,
+            renderPreviewSVG 
+        } from '../js/azgaar/azgaar-genesis.esm.js';
+
+        // Initialize generator with canvas for preview rendering
+        const canvas = document.getElementById('azgaar-canvas');
+        function resizeCanvas() {
+            if (canvas) {
+                const container = canvas.parentElement;
+                if (container) {
+                    canvas.width = container.clientWidth;
+                    canvas.height = container.clientHeight;
+                    console.log('[Azgaar Genesis] Canvas resized', { width: canvas.width, height: canvas.height });
+                }
             }
-            
-            // Listen for completion messages from Azgaar iframe
-            window.addEventListener('message', function(event) {
-                // Accept messages from Azgaar iframe (localhost:8080)
-                if (event.origin !== 'http://127.0.0.1:8080' && event.origin !== 'http://localhost:8080') {
-                    return;
+        }
+        
+        try {
+            if (canvas) {
+                // Set initial canvas size
+                resizeCanvas();
+                
+                // Resize on window resize
+                window.addEventListener('resize', resizeCanvas);
+                
+                // Validate canvas before initialization
+                if (!canvas.getContext) {
+                    console.warn('[Azgaar Genesis] Canvas element found but getContext not available');
                 }
                 
-                if (event.data && event.data.type === 'generation_complete') {
-                    console.log('[WorldBuilder] Received generation_complete message from Azgaar', {
-                        timestamp: event.data.timestamp
-                    });
-                    
-                    // Forward to Godot via IPC
-                    if (window.GodotBridge && window.GodotBridge.postMessage) {
-                        window.GodotBridge.postMessage({
-                            type: 'generation_complete',
-                            data: {
-                                timestamp: event.data.timestamp
-                            }
-                        });
-                    }
-                } else if (event.data && event.data.type === 'generation_failed') {
-                    console.error('[WorldBuilder] Received generation_failed message from Azgaar', {
-                        error: event.data.error,
-                        timestamp: event.data.timestamp
-                    });
-                    
-                    // Forward to Godot via IPC
-                    if (window.GodotBridge && window.GodotBridge.postMessage) {
-                        window.GodotBridge.postMessage({
-                            type: 'generation_failed',
-                            data: {
-                                error: event.data.error,
-                                timestamp: event.data.timestamp
-                            }
-                        });
-                    }
+                initGenerator({ canvas: canvas });
+                console.log('[Azgaar Genesis] Generator initialized with canvas');
+                
+                // Explicitly check and log canvas state after initGenerator
+                // Note: state may not be immediately accessible from module, check canvas element directly
+                const canvasValid = canvas && typeof canvas.toDataURL === 'function';
+                // Try to access state after initialization (may not be available immediately)
+                let stateCanvasSet = false;
+                if (window.AzgaarGenesis && window.AzgaarGenesis.state) {
+                    stateCanvasSet = !!window.AzgaarGenesis.state.canvas;
+                }
+                console.log('[Genesis Azgaar] Canvas initialized:', {
+                    canvasElement: !!canvas,
+                    canvasToDataURL: canvasValid,
+                    stateCanvas: stateCanvasSet
+                });
+                
+                if (!canvasValid) {
+                    console.warn('[Genesis Azgaar] Canvas element invalid - canvas rendering will not be available');
+                }
+            } else {
+                console.warn('[Azgaar Genesis] Canvas element not found - canvas rendering will not be available');
+                initGenerator({ canvas: null }); // Fallback to headless
+                console.log('[Azgaar Genesis] Generator initialized (headless mode - no canvas)');
+            }
+        } catch (error) {
+            console.error('[Azgaar Genesis] Initialization error:', error);
+            // Send error to Godot
+            if (window.GodotBridge && window.GodotBridge.postMessage) {
+                window.GodotBridge.postMessage('map_generation_failed', {
+                    error: 'Fork initialization failed: ' + error.message,
+                    stack: error.stack
+                });
+            }
+        }
+        
+        // Store generator functions globally for Alpine.js access
+        window.AzgaarGenesis = {
+            Delaunator,
+            loadOptions,
+            generateMap,
+            getMapData,
+            renderPreview,
+            renderPreviewSVG,
+            initialized: true
+        };
+        
+        console.log('[Azgaar Genesis] Library loaded and ready');
+        
+        // Notify Godot that fork is ready via IPC
+        if (window.GodotBridge && window.GodotBridge.postMessage) {
+            window.GodotBridge.postMessage('fork_ready', {});
+            console.log('[Azgaar Genesis] Sent fork_ready IPC message to Godot');
+        } else {
+            console.warn('[Azgaar Genesis] GodotBridge.postMessage not available - cannot notify Godot');
+        }
+        
+        // Listen for IPC messages from Godot
+        if (window.GodotBridge && window.GodotBridge.onMessage) {
+            window.GodotBridge.onMessage((message) => {
+                console.log('[Azgaar Genesis] Received message from Godot:', message);
+                if (message.type === 'generate_map') {
+                    handleGenerateMap(message.options || {});
                 }
             });
-        });
+        } else {
+            console.warn('[Azgaar Genesis] GodotBridge.onMessage not available');
+        }
+        
+        /**
+         * Handle map generation request
+         */
+        async function handleGenerateMap(options) {
+            const statusDiv = document.getElementById('azgaar-status');
+            const canvas = document.getElementById('azgaar-canvas');
+            const { Delaunator, loadOptions, generateMap, getMapData, renderPreview } = window.AzgaarGenesis;
+            
+            if (!window.AzgaarGenesis.initialized) {
+                console.error('[Azgaar Genesis] Generator not initialized');
+                statusDiv.innerHTML = '<p style="color: #f44;">Error: Generator not initialized</p>';
+                return;
+            }
+            
+            try {
+                statusDiv.innerHTML = '<p>Loading options...</p>';
+                console.log('[Azgaar Genesis] Loading options:', options);
+                
+                loadOptions(options);
+                
+                statusDiv.innerHTML = '<p>Generating map...</p>';
+                console.log('[Azgaar Genesis] Starting generation...');
+                
+                const startTime = performance.now();
+                const data = generateMap(Delaunator);
+                const generateTime = performance.now() - startTime;
+                
+                console.log('[Azgaar Genesis] Generation complete:', {
+                    seed: data.seed,
+                    time: generateTime.toFixed(2) + 'ms'
+                });
+                
+                statusDiv.innerHTML = '<p>Extracting JSON data...</p>';
+                const json = getMapData();
+                
+                console.log('[Azgaar Genesis] JSON extracted:', {
+                    size: JSON.stringify(json).length,
+                    hasGrid: !!json.grid,
+                    hasPack: !!json.pack
+                });
+                
+                // Render preview (SVG forced by default, canvas fallback only on error)
+                let previewDataUrl = '';
+                let previewSvgString = '';
+                const useSvg = options.use_svg !== false && options.use_svg !== undefined ? options.use_svg : true; // Default to true (forced SVG mode)
+                const DEBUG_RENDERING = false; // Set to true for verbose rendering logs
+                
+                // Validate map data before rendering (clean fork - no repair workarounds)
+                // Updated fork (January 2026) should provide complete pack.cells.v structure
+                let validation = validateMapData(json);
+                
+                // If validation fails, send error and skip rendering (no repair attempts)
+                if (!validation.valid) {
+                    console.error('[Azgaar Genesis] Data validation failed - fork should provide complete data:', validation.errors);
+                    if (window.GodotBridge && window.GodotBridge.postMessage) {
+                        window.GodotBridge.postMessage('render_failed', {
+                            type: 'validation',
+                            error: 'Data validation failed: ' + validation.errors.join('; '),
+                            validationErrors: validation.errors
+                        });
+                    }
+                    statusDiv.innerHTML = '<p style="color: #f44;">Error: Data validation failed - fork may need update</p>';
+                    return; // Exit early, do not attempt rendering
+                } else if (DEBUG_RENDERING) {
+                    console.log('[Azgaar Genesis] Data validation passed');
+                }
+                
+                // Force SVG rendering (default enabled)
+                if (useSvg && window.AzgaarGenesis.renderPreviewSVG) {
+                    try {
+                        statusDiv.innerHTML = '<p>Rendering SVG preview...</p>';
+                        if (DEBUG_RENDERING) {
+                            console.log('[Azgaar Genesis] Rendering SVG preview (forced mode)...', { useSvg, hasFunction: !!window.AzgaarGenesis.renderPreviewSVG });
+                        }
+                        
+                        // Re-validate right before rendering (data should already be valid, but double-check)
+                        const preRenderValidation = validateMapData(json);
+                        if (!preRenderValidation.valid) {
+                            throw new Error('Pre-render validation failed: ' + preRenderValidation.errors.join(', '));
+                        }
+                        
+                        const svgContainer = document.getElementById('map-preview');
+                        if (!svgContainer) {
+                            throw new Error('SVG container element not found');
+                        }
+                        
+                        // Clear previous content
+                        svgContainer.innerHTML = '';
+                        
+                        // Calculate dimensions
+                        const containerRect = svgContainer.getBoundingClientRect();
+                        const width = containerRect.width > 0 ? containerRect.width : (options.mapWidth || 1024);
+                        const height = containerRect.height > 0 ? containerRect.height : (options.mapHeight || 768);
+                        
+                        if (DEBUG_RENDERING) {
+                            console.log('[Azgaar Genesis] SVG container dimensions:', { width, height, containerWidth: containerRect.width, containerHeight: containerRect.height });
+                        }
+                        
+                        // Render SVG to container
+                        const svgOptions = {
+                            container: svgContainer,
+                            width: Math.max(width, 512),  // Ensure minimum size
+                            height: Math.max(height, 384)
+                        };
+                        
+                        // Call renderPreviewSVG - it should append to container or return string
+                        const svgResult = window.AzgaarGenesis.renderPreviewSVG(svgOptions);
+                        
+                        // Extract SVG string from container (function appends to container)
+                        if (svgContainer.firstChild || svgContainer.innerHTML) {
+                            previewSvgString = svgContainer.innerHTML;
+                        } else if (typeof svgResult === 'string' && svgResult.length > 0) {
+                            // Function returned SVG string directly
+                            previewSvgString = svgResult;
+                            svgContainer.innerHTML = previewSvgString;
+                        }
+                        
+                        if (previewSvgString && previewSvgString.length > 0) {
+                            console.log('[Azgaar Genesis] SVG preview rendered successfully, length:', previewSvgString.length);
+                            
+                            // Update Alpine.js component
+                            if (window.worldBuilderInstance) {
+                                window.worldBuilderInstance.previewSvg = previewSvgString;
+                                window.worldBuilderInstance.previewMode = 'svg';
+                            }
+                            
+                            // Send SVG data to Godot via IPC
+                            if (window.GodotBridge && window.GodotBridge.postMessage) {
+                                window.GodotBridge.postMessage('svg_preview_ready', {
+                                    svgData: previewSvgString,
+                                    width: svgOptions.width,
+                                    height: svgOptions.height
+                                });
+                                if (DEBUG_RENDERING) {
+                                    console.log('[Azgaar Genesis] Sent svg_preview_ready IPC message');
+                                }
+                            }
+                        } else {
+                            throw new Error('SVG rendering returned empty result');
+                        }
+                    } catch (svgError) {
+                        console.error('[Azgaar Genesis] SVG preview render failed:', svgError.message, svgError.stack);
+                        // Notify Godot of SVG failure with detailed error info
+                        if (window.GodotBridge && window.GodotBridge.postMessage) {
+                            window.GodotBridge.postMessage('render_failed', {
+                                type: 'svg',
+                                error: svgError.message,
+                                stack: svgError.stack,
+                                validationErrors: validation.valid ? [] : validation.errors
+                            });
+                            // Also send legacy svg_failed for compatibility
+                            window.GodotBridge.postMessage('svg_failed', {
+                                error: svgError.message,
+                                stack: svgError.stack
+                            });
+                        }
+                        // Fall through to canvas rendering as fallback
+                        console.warn('[Azgaar Genesis] Falling back to canvas rendering due to SVG failure');
+                    }
+                } else if (!useSvg) {
+                    console.log('[Azgaar Genesis] SVG rendering disabled by options.use_svg = false');
+                } else if (!window.AzgaarGenesis.renderPreviewSVG) {
+                    console.error('[Azgaar Genesis] renderPreviewSVG function not available');
+                }
+                
+                // Fallback to canvas rendering (only if SVG explicitly failed AND validation passed)
+                // DEPRECATED: Canvas is unreliable in Godot WebView - deprioritize it
+                // Only attempt canvas if SVG failed AND validation passed AND canvas is available
+                const ENABLE_CANVAS_FALLBACK = false; // Disabled due to WebView canvas limitations
+                const canvasAvailable = canvas && typeof canvas.toDataURL === 'function';
+                
+                if (!previewSvgString && ENABLE_CANVAS_FALLBACK && canvasAvailable && validation.valid && window.AzgaarGenesis.renderPreview) {
+                    try {
+                        statusDiv.innerHTML = '<p>Rendering canvas preview (legacy fallback)...</p>';
+                        console.warn('[Azgaar Genesis] Using deprecated canvas rendering fallback (SVG preferred)');
+                        
+                        // Re-validate data before canvas rendering
+                        const preCanvasValidation = validateMapData(json);
+                        if (!preCanvasValidation.valid) {
+                            throw new Error('Pre-canvas validation failed: ' + preCanvasValidation.errors.join(', '));
+                        }
+                        
+                        // Check if canvas is properly initialized (may not be set in state due to WebView limitations)
+                        const state = window.AzgaarGenesis?.state;
+                        if (!state || !state.canvas) {
+                            console.warn('[Azgaar Genesis] Canvas not set in state (WebView limitation), attempting renderPreview anyway');
+                            // Don't throw - try anyway since canvas element exists
+                        }
+                        
+                        window.AzgaarGenesis.renderPreview();
+                        previewDataUrl = canvas.toDataURL('image/png');
+                        
+                        if (!previewDataUrl || previewDataUrl.length === 0) {
+                            throw new Error('Canvas toDataURL returned empty result');
+                        }
+                        
+                        // Show canvas after rendering
+                        canvas.style.display = 'block';
+                        if (statusDiv) {
+                            statusDiv.style.display = 'none';
+                        }
+                        console.log('[Azgaar Genesis] Canvas preview rendered (fallback), data URL length:', previewDataUrl.length);
+                        
+                        // Update Alpine.js component
+                        if (window.worldBuilderInstance) {
+                            window.worldBuilderInstance.previewMode = 'canvas';
+                            window.worldBuilderInstance.previewImageUrl = previewDataUrl;
+                        }
+                    } catch (renderError) {
+                        console.error('[Azgaar Genesis] Canvas preview render failed:', renderError.message, renderError.stack);
+                        // Notify Godot of canvas failure with detailed error info
+                        if (window.GodotBridge && window.GodotBridge.postMessage) {
+                            window.GodotBridge.postMessage('render_failed', {
+                                type: 'canvas',
+                                error: renderError.message,
+                                stack: renderError.stack,
+                                validationErrors: validation.valid ? [] : validation.errors
+                            });
+                        }
+                        statusDiv.innerHTML = '<p style="color: #f44;">Error: Canvas rendering failed (fallback)</p>';
+                    }
+                } else if (!previewSvgString && useSvg) {
+                    // SVG was requested but failed
+                    if (!ENABLE_CANVAS_FALLBACK || !canvasAvailable) {
+                        console.error('[Azgaar Genesis] SVG rendering failed and canvas fallback disabled/unavailable');
+                        statusDiv.innerHTML = '<p style="color: #f44;">Error: SVG rendering failed (canvas fallback disabled)</p>';
+                    } else if (!validation.valid) {
+                        console.error('[Azgaar Genesis] SVG rendering failed and validation failed, skipping canvas fallback');
+                        statusDiv.innerHTML = '<p style="color: #f44;">Error: SVG rendering failed (data validation failed, cannot use canvas fallback)</p>';
+                    } else {
+                        console.error('[Azgaar Genesis] SVG rendering failed but canvas fallback should have been attempted');
+                        statusDiv.innerHTML = '<p style="color: #f44;">Error: SVG rendering failed</p>';
+                    }
+                }
+                
+                // Send to Godot via IPC (with preview if available)
+                if (window.GodotBridge && window.GodotBridge.postMessage) {
+                    window.GodotBridge.postMessage('map_generated', {
+                        data: json,
+                        seed: data.seed,
+                        generationTime: generateTime,
+                        previewDataUrl: previewDataUrl,
+                        previewSvg: previewSvgString || null
+                    });
+                    console.log('[Azgaar Genesis] Sent map_generated message to Godot', {
+                        hasCanvasPreview: previewDataUrl.length > 0,
+                        hasSvgPreview: previewSvgString.length > 0
+                    });
+                } else {
+                    console.warn('[Azgaar Genesis] GodotBridge.postMessage not available');
+                }
+                
+                // Preview is now visible via canvas rendering
+                // Alpine.js will handle showing/hiding based on previewImageUrl
+                console.log('[Azgaar Genesis] Generation and preview complete');
+            } catch (error) {
+                console.error('[Azgaar Genesis] Generation error:', error);
+                statusDiv.innerHTML = `
+                    <p style="color: #f44;">Error: ${error.message}</p>
+                    <p style="font-size: 0.8em; color: #aaa; margin-top: 0.5rem;">${error.stack || ''}</p>
+                `;
+                
+                // Send error to Godot
+                if (window.GodotBridge && window.GodotBridge.postMessage) {
+                    window.GodotBridge.postMessage('map_generation_failed', {
+                        error: error.message,
+                        stack: error.stack
+                    });
+                }
+            }
+        }
+        
+        /**
+         * Validate map data structure before rendering with deep integrity checks
+         * Returns {valid: boolean, errors: string[]}
+         */
+        function validateMapData(data) {
+            const errors = [];
+            if (!data?.pack) {
+                errors.push('Missing pack object');
+                return {valid: false, errors};
+            }
+            const {cells, vertices} = data.pack;
+            
+            // Check cells structure with length validation
+            if (!cells) {
+                errors.push('Missing pack.cells');
+                return {valid: false, errors};
+            }
+            
+            if (!cells.i || !Array.isArray(cells.i) || cells.i.length === 0) {
+                errors.push('cells.i empty or missing');
+            }
+            
+            const expectedLength = cells.i ? cells.i.length : 0;
+            
+            // Validate cells.v - critical for SVG rendering (causes "undefined is not an object" errors)
+            if (!cells.v || !Array.isArray(cells.v)) {
+                errors.push('cells.v missing or not an array');
+            } else if (cells.v.length !== expectedLength) {
+                errors.push(`cells.v length mismatch (${cells.v.length} vs ${expectedLength})`);
+            } else {
+                // Check for undefined holes in cells.v array (critical for SVG rendering)
+                for (let i = 0; i < Math.min(cells.v.length, 1000); i++) { // Limit check to first 1000 to avoid performance issues
+                    if (cells.v[i] === undefined) {
+                        errors.push(`cells.v[${i}] undefined`);
+                        break; // Report first undefined entry
+                    }
+                }
+            }
+            
+            // Validate cells.c
+            if (!cells.c || !Array.isArray(cells.c)) {
+                errors.push('cells.c missing or not an array');
+            } else if (cells.c.length !== expectedLength) {
+                errors.push(`cells.c length mismatch (${cells.c.length} vs ${expectedLength})`);
+            }
+            
+            // Validate cells.biome (required for SVG rendering)
+            if (!cells.biome || !Array.isArray(cells.biome)) {
+                errors.push('cells.biome missing or not an array (required for SVG rendering)');
+            } else if (cells.biome.length !== expectedLength) {
+                errors.push(`cells.biome length mismatch (${cells.biome.length} vs ${expectedLength})`);
+            }
+            
+            // Validate cells.state (required for SVG rendering)
+            if (!cells.state || !Array.isArray(cells.state)) {
+                errors.push('cells.state missing or not an array (required for SVG rendering)');
+            } else if (cells.state.length !== expectedLength) {
+                errors.push(`cells.state length mismatch (${cells.state.length} vs ${expectedLength})`);
+            }
+            
+            // Check vertices structure
+            if (!vertices) {
+                errors.push('Missing pack.vertices');
+            } else {
+                if (!vertices.c || typeof vertices.c !== 'object') {
+                    errors.push('Missing or invalid vertices.c (required for isolines)');
+                }
+                if (!vertices.p || !Array.isArray(vertices.p)) {
+                    errors.push('Missing or invalid vertices.p (required for isolines)');
+                }
+            }
+            
+            return {valid: errors.length === 0, errors};
+        }
+        
+        // repairMapData function removed - clean fork (January 2026) should provide complete data
+        // No repair workarounds needed
+        
+        // Make handleGenerateMap available globally for direct calls
+        window.handleGenerateMap = handleGenerateMap;
     </script>
+    
+    <!-- Alpine.js World Builder Controller -->
+    <script src="../js/world_builder.js"></script>
 </body>
 </html>
-
