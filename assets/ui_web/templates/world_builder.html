@@ -217,8 +217,8 @@
             originalWarn.apply(console, safeArgs);
         };
         
-        // Import Delaunator (peer dependency) from CDN
-        import Delaunator from 'https://cdn.jsdelivr.net/npm/delaunator@5.0.1/+esm';
+        // Import Delaunator (peer dependency) from local file (January 2026 fork build)
+        import Delaunator from '../js/azgaar/delaunator.esm.js';
         
         // Import Azgaar Genesis library (updated fork - January 2026)
         // Assumes fork provides complete pack.cells.v with full polygon data
