@@ -1444,40 +1444,41 @@ func _handle_options_set(data: Dictionary) -> void:
 func _handle_svg_preview(data: Dictionary) -> void:
 	"""Handle SVG preview ready IPC message."""
 	var svg_data: String = data.get("svgData", "")
-	var width: int = data.get("width", 1024)
-	var height: int = data.get("height", 768)
-	
-	# Fix 3: Debug logging - log SVG receive/size before processing
-	var svg_size: int = svg_data.length()
-	var svg_size_kb: float = svg_size / 1024.0
-	MythosLogger.info("WorldBuilderWebController", "SVG preview received", {
-		"svg_length": svg_size,
-		"svg_length_kb": "%.2f" % svg_size_kb,
-		"width": width,
-		"height": height,
-		"first_chars": svg_data.substr(0, 100) if svg_size > 0 else ""
-	})
+	var width: int = data.get("width", 960)  # Reduced default for testing
+	var height: int = data.get("height", 540)  # Reduced default for testing
+	var render_time: float = data.get("renderTime", 0.0)
 	
 	if svg_data.is_empty():
 		MythosLogger.warn("WorldBuilderWebController", "SVG preview data is empty")
 		return
 	
+	# Enhanced debug logging with timing information
+	MythosLogger.info("WorldBuilderWebController", "SVG preview received", {
+		"svg_length": svg_data.length(),
+		"width": width,
+		"height": height,
+		"render_time_ms": render_time,
+		"svg_size_kb": svg_data.length() / 1024.0
+	})
+	
 	# Save SVG to file for debugging/audit
 	_save_svg_to_file(svg_data)
 	
 	# Store SVG data for potential future use (e.g., export, conversion, etc.)
-	# Fix 2: SVG rendering is handled via direct DOM manipulation (bypassing Alpine x-html)
-	# This handler is primarily for logging and potential future processing
+	# Note: SVG rendering is handled in the WebView HTML template via direct DOM manipulation (Fix 2)
+	# Alpine.js x-html binding was removed to avoid blocking synchronous parsing
 	
 	# Optional: Could convert SVG to Image if needed for Godot display
-	# SVG is displayed directly in the WebView via direct innerHTML assignment (no Alpine reactivity)
+	# For now, SVG is displayed directly in the WebView via direct innerHTML assignment
 	
-	# Log success message for debugging
+	# Log success message with timing details
 	MythosLogger.info("WorldBuilderWebController", "SVG preview processed successfully", {
 		"length": svg_data.length(),
 		"characters": svg_data.length(),
 		"width": width,
-		"height": height
+		"height": height,
+		"render_time_ms": render_time,
+		"svg_size_kb": "%.2f" % (svg_data.length() / 1024.0)
 	})
 
 
