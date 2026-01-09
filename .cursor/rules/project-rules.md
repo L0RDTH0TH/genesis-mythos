@@ -1,6 +1,6 @@
 # ╔═══════════════════════════════════════════════════════════
 # ║ COMPLETE & FINAL PROJECT RULES – ITERATION 6
-# ║ GENESIS MYTHOS – FULL FIRST PERSON 3D VIRTUAL TABLETOP RPG IN GODOT 4.5.1
+# ║ GENESIS MYTHOS – FULL FIRST PERSON 3D VIRTUAL TABLETOP RPG IN GODOT 4.6-BETA2
 # ║ Valid for Grok AND Cursor – major changes require explicit approval
 # ╚═══════════════════════════════════════════════════════════
 
@@ -9,7 +9,7 @@
 - Full first-person 3D immersive virtual tabletop role-playing game with original "Genesis Mythos" lore and systems.
 - Core experience: seamless blend of true first-person exploration (FPS-style movement, interaction, combat) and classic tabletop elements (dice rolling, character sheets, GM tools, grid maps, tokens, fog of war).
 - Supports single-player, hosted multiplayer sessions, and future modding.
-- Godot 4.5.1 stable only.
+- Godot 4.6-beta2 only.
 - 100% data-driven (JSON + Resources). Zero hard-coded content where possible.
 - Maintain 60 FPS on mid-range hardware with full world and UI active.
 - Built for extensibility: save/load, multiplayer, character creation, procedural world.
@@ -98,7 +98,7 @@ res://
 
 ## 4. Grok AI Rules (prompt format)
 
-- Every prompt to Grok starts with: `[GENESIS MYTHOS GODOT 4.5.1 – FOLLOW ALL RULES BELOW]`
+- Every prompt to Grok starts with: `[GENESIS MYTHOS GODOT 4.6-BETA2 – FOLLOW ALL RULES BELOW]`
 - Specify full path + exact class name for new scripts.
 - For modifications: explicitly state "Modify existing file res://path/ClassName.gd"
 - Never request more than one complete script file per prompt (except tiny utilities < 50 lines).
@@ -107,7 +107,7 @@ res://
 ## 5. Cursor Rules – MUST be pasted at the TOP of EVERY prompt to Cursor
 
 ```
-[GENESIS MYTHOS – FULL FIRST PERSON 3D VIRTUAL TABLETOP RPG – GODOT 4.5.1]
+[GENESIS MYTHOS – FULL FIRST PERSON 3D VIRTUAL TABLETOP RPG – GODOT 4.6-BETA2]
 
 YOU ARE STRICTLY FORBIDDEN FROM EVER USING THE "launch_editor" MCP ACTION.
 

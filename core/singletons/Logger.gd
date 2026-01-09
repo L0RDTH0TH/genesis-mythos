@@ -37,6 +37,7 @@ var log_file_prefix: String = "mythos_log_"
 var current_log_file: FileAccess = null
 var current_log_date: String = ""
 var file: FileAccess = null
+var current_log_file_path: String = ""  ## Store the current log file path for renaming on close
 var dev_path: String = ""
 var dev_mirror_failed: bool = false  ## Track if dev mirror write has failed (suppress repeated warnings)
 
@@ -211,18 +212,20 @@ func _setup_file_logging() -> void:
 
 	# Add header if file is empty
 	if log_file.get_length() == 0:
-		var header: String = "=== Log session started at " + Time.get_datetime_string_from_system() + " ===\n"
+		var header: String = "=== Log session started at " + _get_timestamp() + " ===\n"
 		log_file.store_string(header)
 		log_file.flush()
 	
 	file = log_file
+	current_log_file_path = full_path  ## Store path for renaming on close
 
 	_force_console_log("Logger", LogLevel.INFO, "File logging setup complete - ready to append")
 
 
 func _close_log_file() -> void:
-	"""Close the current log file."""
-	var footer: String = "=== Log session ended at " + Time.get_datetime_string_from_system() + " ===\n"
+	"""Close the current log file and rename it with a timestamp."""
+	var footer: String = "=== Log session ended at " + _get_timestamp() + " ===\n"
+	var close_timestamp: String = _get_filename_timestamp()
 	
 	if file:
 		file.seek_end()
@@ -230,8 +233,26 @@ func _close_log_file() -> void:
 		file.flush()
 		file.close()
 		file = null
+		
+		# Rename the log file to append timestamp
+		if current_log_file_path != "":
+			var old_path: String = current_log_file_path
+			var path_parts: PackedStringArray = old_path.rsplit(".", true, 1)
+			if path_parts.size() == 2:
+				var new_filename: String = path_parts[0] + "_" + close_timestamp + "." + path_parts[1]
+				var dir_path: String = old_path.get_base_dir()
+				var old_filename: String = old_path.get_file()
+				var new_filename_only: String = new_filename.get_file()
+				
+				var dir_access: DirAccess = DirAccess.open(dir_path)
+				if dir_access:
+					var rename_err: Error = dir_access.rename(old_filename, new_filename_only)
+					if rename_err != OK:
+						_force_console_log("Logger", LogLevel.WARN, "Failed to rename log file: " + str(rename_err))
+				else:
+					_force_console_log("Logger", LogLevel.WARN, "Failed to open log directory for rename: " + dir_path)
 	
-	# Also close dev mirror if open
+	# Also close and rename dev mirror if open
 	if config.get("dev_mode", true) and dev_path != "":
 		var dev_file: FileAccess = FileAccess.open(dev_path, FileAccess.READ_WRITE)
 		if dev_file == null:
@@ -241,9 +262,26 @@ func _close_log_file() -> void:
 			dev_file.store_string(footer)
 			dev_file.flush()
 			dev_file.close()
+			
+			# Rename dev mirror file
+			var dev_path_parts: PackedStringArray = dev_path.rsplit(".", true, 1)
+			if dev_path_parts.size() == 2:
+				var new_dev_filename: String = dev_path_parts[0] + "_" + close_timestamp + "." + dev_path_parts[1]
+				var dev_dir_path: String = dev_path.get_base_dir()
+				var dev_old_filename: String = dev_path.get_file()
+				var dev_new_filename_only: String = new_dev_filename.get_file()
+				
+				var dir_access: DirAccess = DirAccess.open(dev_dir_path)
+				if dir_access:
+					var rename_err: Error = dir_access.rename(dev_old_filename, dev_new_filename_only)
+					if rename_err != OK:
+						_force_console_log("Logger", LogLevel.WARN, "Failed to rename dev mirror log file: " + str(rename_err))
+				else:
+					_force_console_log("Logger", LogLevel.WARN, "Failed to open dev log directory for rename: " + dev_dir_path)
 	
 	current_log_file = null
 	current_log_date = ""
+	current_log_file_path = ""
 
 func _get_timestamp() -> String:
 	"""Get formatted timestamp string."""
@@ -257,6 +295,15 @@ func _get_timestamp() -> String:
 	formatted = formatted.replace("%M", "%02d" % int(datetime.minute))
 	formatted = formatted.replace("%S", "%02d" % int(datetime.second))
 	return formatted
+
+func _get_filename_timestamp() -> String:
+	"""Get timestamp string formatted for use in filenames (no spaces or colons)."""
+	var datetime: Dictionary = Time.get_datetime_dict_from_system()
+	# Format as YYYYMMDD_HHMMSS for filename safety
+	return "%04d%02d%02d_%02d%02d%02d" % [
+		int(datetime.year), int(datetime.month), int(datetime.day),
+		int(datetime.hour), int(datetime.minute), int(datetime.second)
+	]
 
 func _should_log(system: String, level: LogLevel) -> bool:
 	"""Check if a log entry should be logged based on system and level."""

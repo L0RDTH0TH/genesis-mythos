@@ -1447,25 +1447,30 @@ func _handle_svg_preview(data: Dictionary) -> void:
 	var width: int = data.get("width", 1024)
 	var height: int = data.get("height", 768)
 	
+	# Fix 3: Debug logging - log SVG receive/size before processing
+	var svg_size: int = svg_data.length()
+	var svg_size_kb: float = svg_size / 1024.0
+	MythosLogger.info("WorldBuilderWebController", "SVG preview received", {
+		"svg_length": svg_size,
+		"svg_length_kb": "%.2f" % svg_size_kb,
+		"width": width,
+		"height": height,
+		"first_chars": svg_data.substr(0, 100) if svg_size > 0 else ""
+	})
+	
 	if svg_data.is_empty():
 		MythosLogger.warn("WorldBuilderWebController", "SVG preview data is empty")
 		return
-	
-	MythosLogger.info("WorldBuilderWebController", "SVG preview received", {
-		"svg_length": svg_data.length(),
-		"width": width,
-		"height": height
-	})
 	
 	# Save SVG to file for debugging/audit
 	_save_svg_to_file(svg_data)
 	
 	# Store SVG data for potential future use (e.g., export, conversion, etc.)
-	# Note: SVG rendering is handled in the WebView HTML template via Alpine.js
+	# Fix 2: SVG rendering is handled via direct DOM manipulation (bypassing Alpine x-html)
 	# This handler is primarily for logging and potential future processing
 	
 	# Optional: Could convert SVG to Image if needed for Godot display
-	# For now, SVG is displayed directly in the WebView via x-html binding
+	# SVG is displayed directly in the WebView via direct innerHTML assignment (no Alpine reactivity)
 	
 	# Log success message for debugging
 	MythosLogger.info("WorldBuilderWebController", "SVG preview processed successfully", {

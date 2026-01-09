@@ -46,19 +46,22 @@
             <!-- Center Panel: Status/Preview (Fork mode with SVG/canvas preview) -->
             <div class="center-panel" style="background: #1a1a1a; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden;">
                 <!-- SVG Preview Container (scalable, layered map preview) -->
-                <div id="map-preview" class="svg-preview" x-show="previewMode === 'svg' && previewSvg" x-html="previewSvg" style="width: 100%; height: 100%; overflow: auto; background: #0a0a0a;"></div>
+                <!-- Fix 2: Direct DOM manipulation - bypass Alpine x-html to avoid blocking -->
+                <div id="map-preview" class="svg-preview" x-show="previewMode === 'svg' && hasPreview" style="width: 100%; height: 100%; overflow: auto; background: #0a0a0a;"></div>
                 <!-- Canvas for Azgaar preview rendering (fallback, shown when rendered) -->
                 <canvas id="azgaar-canvas" x-show="previewMode === 'canvas' && previewImageUrl" style="width: 100%; height: 100%; object-fit: contain; background: #0a0a0a; display: none;"></canvas>
                 <!-- Preview image (fallback if canvas not available, from Godot conversion) -->
                 <img id="map-preview-img" x-show="previewMode === 'canvas' && previewImageUrl" :src="previewImageUrl" style="width: 100%; height: 100%; object-fit: contain;" alt="Map Preview">
                 <!-- Preview Mode Toggle (shown when preview is available) -->
-                <div x-show="(previewSvg || previewImageUrl) && !isGenerating" style="position: absolute; top: 10px; right: 10px; z-index: 10;">
+                <!-- Fix 2: Use hasPreview flag instead of previewSvg -->
+                <div x-show="(hasPreview || previewImageUrl) && !isGenerating" style="position: absolute; top: 10px; right: 10px; z-index: 10;">
                     <button @click="togglePreviewMode()" class="preview-toggle-button" style="padding: 0.5rem 1rem; background: rgba(0, 0, 0, 0.7); color: #fff; border: 1px solid #666; border-radius: 4px; cursor: pointer;">
                         <span x-text="previewMode === 'svg' ? 'Switch to Canvas' : 'Switch to SVG'"></span>
                     </button>
                 </div>
                 <!-- Status message (shown when no preview) -->
-                <div id="azgaar-status" x-show="!previewSvg && !previewImageUrl" style="padding: 2rem; text-align: center; color: #aaa; font-size: 1.2em;">
+                <!-- Fix 2: Use hasPreview flag instead of previewSvg for visibility check -->
+                <div id="azgaar-status" x-show="!hasPreview && !previewImageUrl" style="padding: 2rem; text-align: center; color: #aaa; font-size: 1.2em;">
                     <p x-text="statusText || 'Azgaar Genesis Fork - Ready'"></p>
                     <p style="font-size: 0.8em; margin-top: 1rem; color: #666;" x-show="!isGenerating">Using modular API - Generate a map to see preview</p>
                 </div>
@@ -334,6 +337,18 @@
             const canvas = document.getElementById('azgaar-canvas');
             const { Delaunator, loadOptions, generateMap, getMapData, renderPreview } = window.AzgaarGenesis;
             
+            // Fix 2: Clear SVG container and reset hasPreview flag at start of generation
+            const svgContainer = document.getElementById('map-preview');
+            if (svgContainer) {
+                svgContainer.innerHTML = '';
+                console.log('[Azgaar Genesis] SVG container cleared at start of generation');
+            }
+            if (window.worldBuilderInstance) {
+                window.worldBuilderInstance.hasPreview = false;
+                window.worldBuilderInstance.previewSvg = null;
+                console.log('[Azgaar Genesis] Alpine.js hasPreview flag reset');
+            }
+            
             if (!window.AzgaarGenesis.initialized) {
                 console.error('[Azgaar Genesis] Generator not initialized');
                 statusDiv.innerHTML = '<p style="color: #f44;">Error: Generator not initialized</p>';
@@ -416,9 +431,10 @@
                         svgContainer.innerHTML = '';
                         
                         // Calculate dimensions
+                        // Fix 1: Default to smaller map size (960x540) for faster testing
                         const containerRect = svgContainer.getBoundingClientRect();
-                        const width = containerRect.width > 0 ? containerRect.width : (options.mapWidth || 1024);
-                        const height = containerRect.height > 0 ? containerRect.height : (options.mapHeight || 768);
+                        const width = containerRect.width > 0 ? containerRect.width : (options.mapWidth || 960);
+                        const height = containerRect.height > 0 ? containerRect.height : (options.mapHeight || 540);
                         
                         if (DEBUG_RENDERING) {
                             console.log('[Azgaar Genesis] SVG container dimensions:', { width, height, containerWidth: containerRect.width, containerHeight: containerRect.height });
@@ -431,37 +447,93 @@
                             height: Math.max(height, 384)
                         };
                         
+                        // Fix 2: Direct DOM manipulation - bypass Alpine x-html to avoid blocking hang
+                        // Step 1: Get SVG string from renderPreviewSVG
+                        const renderStartTime = performance.now();
+                        console.log('[Azgaar Genesis] Starting SVG render...', {
+                            width: svgOptions.width,
+                            height: svgOptions.height,
+                            containerExists: !!svgContainer
+                        });
+                        
                         // Call renderPreviewSVG - it should append to container or return string
                         const svgResult = window.AzgaarGenesis.renderPreviewSVG(svgOptions);
+                        const renderEndTime = performance.now();
+                        console.log('[Azgaar Genesis] SVG render function completed', {
+                            time_ms: (renderEndTime - renderStartTime).toFixed(2),
+                            resultType: typeof svgResult,
+                            resultLength: typeof svgResult === 'string' ? svgResult.length : 'N/A'
+                        });
                         
                         // Extract SVG string from container (function appends to container)
+                        const extractStartTime = performance.now();
                         if (svgContainer.firstChild || svgContainer.innerHTML) {
                             previewSvgString = svgContainer.innerHTML;
+                            console.log('[Azgaar Genesis] SVG string extracted from container', {
+                                length: previewSvgString.length,
+                                firstChars: previewSvgString.substring(0, 100)
+                            });
                         } else if (typeof svgResult === 'string' && svgResult.length > 0) {
                             // Function returned SVG string directly
                             previewSvgString = svgResult;
-                            svgContainer.innerHTML = previewSvgString;
+                            console.log('[Azgaar Genesis] SVG string obtained from return value', {
+                                length: previewSvgString.length,
+                                firstChars: previewSvgString.substring(0, 100)
+                            });
                         }
+                        const extractEndTime = performance.now();
+                        console.log('[Azgaar Genesis] SVG extraction completed', {
+                            time_ms: (extractEndTime - extractStartTime).toFixed(2),
+                            svgLength: previewSvgString.length
+                        });
                         
                         if (previewSvgString && previewSvgString.length > 0) {
-                            console.log('[Azgaar Genesis] SVG preview rendered successfully, length:', previewSvgString.length);
+                            console.log('[Azgaar Genesis] SVG preview string received, length:', previewSvgString.length);
                             
-                            // Update Alpine.js component
-                            if (window.worldBuilderInstance) {
-                                window.worldBuilderInstance.previewSvg = previewSvgString;
-                                window.worldBuilderInstance.previewMode = 'svg';
-                            }
+                            // Fix 2: Direct DOM manipulation - bypass Alpine x-html reactivity overhead
+                            const domInsertStartTime = performance.now();
+                            statusDiv.innerHTML = '<p>Inserting SVG into DOM...</p>';
                             
-                            // Send SVG data to Godot via IPC
-                            if (window.GodotBridge && window.GodotBridge.postMessage) {
-                                window.GodotBridge.postMessage('svg_preview_ready', {
-                                    svgData: previewSvgString,
-                                    width: svgOptions.width,
-                                    height: svgOptions.height
+                            // Clear container first
+                            svgContainer.innerHTML = '';
+                            
+                            // Insert SVG string directly (bypass Alpine x-html binding)
+                            // Use DOMParser for safer parsing if needed, but direct innerHTML is faster
+                            try {
+                                svgContainer.innerHTML = previewSvgString;
+                                const domInsertEndTime = performance.now();
+                                console.log('[Azgaar Genesis] SVG inserted into DOM directly', {
+                                    time_ms: (domInsertEndTime - domInsertStartTime).toFixed(2),
+                                    containerHasContent: svgContainer.firstChild !== null
                                 });
-                                if (DEBUG_RENDERING) {
-                                    console.log('[Azgaar Genesis] Sent svg_preview_ready IPC message');
+                                
+                                // Update Alpine.js state for UI visibility only (not rendering)
+                                // Set hasPreview flag to trigger x-show binding
+                                if (window.worldBuilderInstance) {
+                                    window.worldBuilderInstance.previewSvg = previewSvgString; // Store for reference
+                                    window.worldBuilderInstance.previewMode = 'svg';
+                                    window.worldBuilderInstance.hasPreview = true; // Trigger x-show
+                                    console.log('[Azgaar Genesis] Alpine.js state updated (UI only, not rendering)');
                                 }
+                                
+                                statusDiv.innerHTML = '<p style="color: #0f0;">SVG preview rendered successfully!</p>';
+                                
+                                // Send SVG data to Godot via IPC
+                                if (window.GodotBridge && window.GodotBridge.postMessage) {
+                                    window.GodotBridge.postMessage('svg_preview_ready', {
+                                        svgData: previewSvgString,
+                                        width: svgOptions.width,
+                                        height: svgOptions.height
+                                    });
+                                    console.log('[Azgaar Genesis] Sent svg_preview_ready IPC message to Godot', {
+                                        svgLength: previewSvgString.length,
+                                        width: svgOptions.width,
+                                        height: svgOptions.height
+                                    });
+                                }
+                            } catch (domError) {
+                                console.error('[Azgaar Genesis] DOM insert failed:', domError.message, domError.stack);
+                                throw new Error('DOM insert failed: ' + domError.message);
                             }
                         } else {
                             throw new Error('SVG rendering returned empty result');

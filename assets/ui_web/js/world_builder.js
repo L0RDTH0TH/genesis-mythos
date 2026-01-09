@@ -79,8 +79,9 @@ document.addEventListener('alpine:init', () => {
         errorMessage: null,
         errorDetails: null,
         previewImageUrl: null,  // Preview image data URL or URL (canvas preview)
-        previewSvg: null,       // SVG preview string (SVG rendering)
+        previewSvg: null,       // SVG preview string (SVG rendering) - stored for reference only
         previewMode: 'svg',     // 'svg' or 'canvas' - preferred preview mode
+        hasPreview: false,      // Fix 2: Flag to trigger x-show (bypasses Alpine x-html binding)
         
         init() {
             // Store instance for global access
@@ -816,11 +817,11 @@ document.addEventListener('alpine:init', () => {
     },
     
     togglePreviewMode() {
-        // Toggle between SVG and canvas preview modes
-        if (this.previewSvg && this.previewImageUrl) {
+        // Fix 2: Toggle between SVG and canvas preview modes (use hasPreview instead of previewSvg)
+        if (this.hasPreview && this.previewImageUrl) {
             this.previewMode = this.previewMode === 'svg' ? 'canvas' : 'svg';
             console.log('[Genesis World Builder] Preview mode toggled:', this.previewMode);
-        } else if (this.previewSvg) {
+        } else if (this.hasPreview) {
             this.previewMode = 'svg';
         } else if (this.previewImageUrl) {
             this.previewMode = 'canvas';
@@ -892,6 +893,7 @@ document.addEventListener('alpine:init', () => {
         this.errorDetails = null;
         this.previewImageUrl = null;  // Clear canvas preview when starting new generation
         this.previewSvg = null;       // Clear SVG preview when starting new generation
+        this.hasPreview = false;      // Fix 2: Clear hasPreview flag when starting new generation
         
         // Hide canvas and show status
         const canvas = document.getElementById('azgaar-canvas');
