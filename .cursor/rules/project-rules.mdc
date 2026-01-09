@@ -2,7 +2,7 @@
 alwaysApply: true
 ---
 # ╔═══════════════════════════════════════════════════════════
-# ║ COMPLETE & FINAL PROJECT RULES – ITERATION 6
+# ║ COMPLETE & FINAL PROJECT RULES – ITERATION 7
 # ║ GENESIS MYTHOS – FULL FIRST PERSON 3D VIRTUAL TABLETOP RPG IN GODOT 4.6-BETA2
 # ║ Valid for Grok AND Cursor – major changes require explicit approval
 # ╚═══════════════════════════════════════════════════════════
@@ -134,6 +134,49 @@ Never create files outside allowed paths.
 Always use godot_wry WebView for GUI.
 ```
 
+## 5.5 Interactive Testing & Wait Time Protocol
+
+To ensure accurate testing during interactive sessions (e.g., via run_project), ALWAYS calculate and apply wait times based on the following three parts: an Estimation Table for baselines, Adjustment Rules for refinements, and a Workflow Protocol for execution. This protocol applies whenever run_project is used for user-involved testing, such as triggering UI interactions, scene navigation, or event responses.
+
+### Estimation Table
+Use this table for baseline wait times. Categories are based on common Genesis Mythos testing patterns. All times are in seconds.
+
+| Interaction Type          | Base Wait | Extended Wait | Use Extended When                  | Completion Signals                                                                 |
+|---------------------------|-----------|---------------|------------------------------------|------------------------------------------------------------------------------------|
+| Simple UI Click/Hover     | 5         | 10            | Multi-step or first attempt        | "Button clicked" log, state change event, or "UI interaction complete"            |
+| Multi-Step UI Flow        | 15        | 30            | >3 steps or form dependencies      | "Form submitted" log, final step confirmation, or "Wizard complete"               |
+| Scene Navigation/Exploration | 20     | 45            | Procedural loads or large terrain  | "Scene ready" log, FPS stabilized >30 for 5s, or "Navigation complete"            |
+| Event Trigger & Response  | 10        | 25            | Physics/animation heavy            | "Interaction complete" log, no active physics updates, or animation end signal    |
+| Procedural Generation     | 30        | 60            | Large world or Azgaar integration  | "Generation complete" log, "Terrain loaded" signal, or no pending procedural tasks|
+| Multiplayer/Networking Sim| 20        | 40            | Session join/host or sync checks   | "Network connected" log, "Sync complete" signal, or stable connection status      |
+| Full Feature Test         | 45        | 90            | End-to-end flows (e.g., load → create → overlay) | Sum of sub-interaction signals, "Feature test complete" log                       |
+
+- **First Run Flag**: For the first run after major changes (e.g., new feature addition), always use Extended Wait and add a 20s cold-start buffer.
+
+### Adjustment Rules
+1. **Scale by Complexity**: For interactions with >3 steps or dependencies (e.g., IPC with WebView), multiply base/extended by 1.5x.
+2. **User Factors**: If prior feedback indicates slow user (from chat history or adjustments), add 10-20s buffer. For fast users, reduce by 20%.
+3. **Hardware Guidelines**: If debug output shows sustained FPS <30, consider adding 50% buffer. If load times >5s, add 15s. These are guidelines—apply judgment to avoid over-adjustment during natural fluctuations (e.g., terrain streaming).
+4. **Dynamic Polling**: During waits, use get_debug_output every 10s to check for completion signals. Use exact log strings where possible (e.g., "World generation complete"). Fallback: If no signal, check for absence of error logs and stable FPS (>30) for 5s.
+5. **Signal Timeout**: If expected signal not found within 2x base wait, treat as potential failure, notify user (e.g., "No completion signal detected—possible issue?"), and extend by 50%.
+6. **Max Cap**: Never exceed 120s without explicit user confirmation. If needed, pause and ask: "Need more time? Reply to continue."
+7. **Learning Loop**: After each test, log adjustments in commit messages using this format: `[WAIT-ADJUSTMENT] Interaction: [type], Estimated: [X]s, Actual Needed: [Y]s, Adjustment: [+/-Z]s`. Reference prior adjustments in future estimates for similar interactions. Also, store in memory for immediate session reference.
+8. **Sequential Interactions**: For N sequential interactions, sum individual waits + 10s buffer per transition. Example: UI click (5s) → Scene nav (20s) → Event trigger (10s) = 35s + 20s buffer = 55s.
+9. **Parallel Interactions**: If user indicates testing multiple unrelated features simultaneously, sum individual waits without transition buffers.
+10. **Debug Output Fallback**: If get_debug_output is empty or malformed, rely on time-based estimates only and add 25% safety buffer.
+11. **User Intervention**: If the user sends any message during the wait, immediately stop the timer, call get_debug_output to check current state, and proceed or adjust based on output before resuming.
+
+### Workflow Protocol
+Follow these steps strictly for every run_project call involving user interactions:
+1. **Before run_project**: Explicitly state the expected interaction type(s), estimated wait time (after adjustments), and key completion signals in your response (e.g., "Waiting 30s for procedural generation; looking for 'Generation complete' log").
+2. **After run_project**: Start the timer and begin polling get_debug_output every 10s.
+3. **During Wait**:
+   - At 50% of estimated time: Send a brief status message (e.g., "Waiting for [interaction]... halfway through estimated time").
+   - Check for completion signals in each poll.
+   - If incomplete at 100% of estimated time: Extend by 50%, notify user (e.g., "Extending wait by 15s as interaction not complete").
+4. **On Completion**: Confirm with a message (e.g., "Interaction complete; proceeding"), log the [WAIT-ADJUSTMENT] for the learning loop.
+5. **Post-Session Feedback (Optional)**: If there's uncertainty (e.g., extension triggered), ask: "Was the wait time sufficient? This helps calibrate future tests." Avoid if session was smooth to prevent annoyance.
+
 ## 6. MCP Usage Policy
 
 - **`launch_editor` is PERMANENTLY DISABLED.**
@@ -253,3 +296,5 @@ Always use godot_wry WebView for GUI.
 **THESE RULES ARE CURRENT AND AUTHORITATIVE AS OF 2025-12-28. MAJOR CHANGES REQUIRE EXPLICIT APPROVAL AND AUDIT.**
 
 **UPDATE 2025-12-28:** Full migration to godot_wry WebView + HTML/CSS/JS/Alpine.js for all GUI complete. Built-in Godot Control-based UI deprecated. New `assets/ui_web/` structure added.
+
+**UPDATE 2026-01-09:** Added section 5.5 for interactive testing wait time protocol to improve testing consistency.
