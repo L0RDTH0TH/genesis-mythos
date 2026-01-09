@@ -13,6 +13,14 @@ extends Control
 ## Flag to track if fork is ready
 var fork_ready: bool = false
 
+## Flag to track if full Azgaar UI is ready
+var azgaar_full_ready: bool = false
+
+## Current mode: "fork" (modular) or "full" (original Azgaar UI)
+var current_mode: String = "fork"
+const MODE_FORK: String = "fork"
+const MODE_FULL: String = "full"
+
 ## Timer for generation completion timeout (fallback)
 var generation_timeout_timer: Timer = null
 const GENERATION_TIMEOUT_SECONDS: float = 60.0  # 60 seconds timeout
@@ -65,10 +73,12 @@ func _ready() -> void:
 	# Load archetype presets from JSON
 	_load_archetype_presets()
 	
-	# Load the World Builder HTML file (clean fork integration - January 2026)
+	# Load the World Builder HTML file (default: fork mode)
+	# Can be switched to full Azgaar UI mode via set_mode()
+	current_mode = MODE_FORK
 	var html_url: String = "res://assets/ui_web/templates/world_builder.html"
 	web_view.load_url(html_url)
-	MythosLogger.info("WorldBuilderWebController", "Loaded World Builder HTML (clean fork integration)", {"url": html_url})
+	MythosLogger.info("WorldBuilderWebController", "Loaded World Builder HTML (fork mode)", {"url": html_url, "mode": current_mode})
 	
 	# Connect IPC message signal for bidirectional communication
 	if web_view.has_signal("ipc_message"):
@@ -368,6 +378,10 @@ func _on_ipc_message(message: String) -> void:
 			_handle_map_generation_failed(message_data)
 		"fork_ready":
 			_handle_fork_ready(message_data)
+		"azgaar_full_ready":
+			_handle_azgaar_full_ready(message_data)
+		"options_set":
+			_handle_options_set(message_data)
 		"svg_preview_ready":
 			_handle_svg_preview(message_data)
 		"svg_failed":
@@ -542,11 +556,18 @@ func _handle_generate(data: Dictionary) -> void:
 		"sample_params": _get_sample_params(current_params, 5)
 	})
 	
-	send_progress_update(10.0, "Checking fork availability...", true)
+	send_progress_update(10.0, "Checking mode availability...", true)
 	
-	# Use fork_ready flag instead of execute_js to avoid WebView binding panics
-	# fork_ready is set to true when fork_ready IPC message is received
-	if fork_ready:
+	# Check current mode and use appropriate generation method
+	if current_mode == MODE_FULL:
+		# Full Azgaar UI mode - use GenesisAzgaar API
+		if azgaar_full_ready:
+			_trigger_full_azgaar_generation(current_params)
+		else:
+			MythosLogger.warn("WorldBuilderWebController", "Full Azgaar UI not ready yet, waiting...")
+			send_progress_update(0.0, "Full Azgaar UI not ready, please wait...", false)
+			return
+	elif fork_ready:
 		# Use fork mode (only mode - iframe removed in January 2026 clean integration)
 		MythosLogger.info("WorldBuilderWebController", "Fork ready - generating via fork mode")
 		_generate_via_fork(current_params)
@@ -554,6 +575,142 @@ func _handle_generate(data: Dictionary) -> void:
 		# Fork not ready - wait or show error
 		MythosLogger.warn("WorldBuilderWebController", "Fork not ready (fork_ready flag is false) - cannot generate")
 		send_progress_update(0.0, "Error: Azgaar fork not ready. Please wait for initialization.", false)
+
+
+func _trigger_full_azgaar_generation(params: Dictionary) -> void:
+	"""Generate map using full Azgaar UI mode (original Azgaar with menu system)."""
+	MythosLogger.info("WorldBuilderWebController", "Generating via full Azgaar UI mode")
+	
+	if not web_view:
+		MythosLogger.error("WorldBuilderWebController", "Cannot generate via full Azgaar - WebView is null")
+		send_progress_update(0.0, "Error: WebView not available", false)
+		return
+	
+	send_progress_update(20.0, "Setting options in full Azgaar UI...", true)
+	
+	# Convert params to Azgaar options format
+	var azgaar_options: Dictionary = _convert_params_to_azgaar_options(params)
+	MythosLogger.debug("WorldBuilderWebController", "Full Azgaar options prepared", {
+		"options_keys": azgaar_options.keys(),
+		"seed": azgaar_options.get("seed", "not_set")
+	})
+	
+	# Set options and trigger generation via GenesisAzgaar API
+	var set_options_script: String = """
+		(function() {
+			try {
+				if (!window.GenesisAzgaar || !window.GenesisAzgaar.isReady()) {
+					console.error('[Full Azgaar] GenesisAzgaar not ready');
+					if (window.GodotBridge && window.GodotBridge.postMessage) {
+						window.GodotBridge.postMessage('map_generation_failed', {
+							error: 'Full Azgaar UI not ready'
+						});
+					}
+					return 'error: not ready';
+				}
+				
+				console.log('[Full Azgaar] Setting options...');
+				window.GenesisAzgaar.setOptions(%s);
+				
+				console.log('[Full Azgaar] Triggering generation...');
+				const startTime = performance.now();
+				const result = window.GenesisAzgaar.generate();
+				const generationTime = performance.now() - startTime;
+				
+				if (result) {
+					console.log('[Full Azgaar] Generation triggered', { time: generationTime });
+					return 'triggered';
+				} else {
+					console.error('[Full Azgaar] Generation failed');
+					if (window.GodotBridge && window.GodotBridge.postMessage) {
+						window.GodotBridge.postMessage('map_generation_failed', {
+							error: 'Generation trigger failed'
+						});
+					}
+					return 'error: generation failed';
+				}
+			} catch (error) {
+				console.error('[Full Azgaar] Error:', error);
+				if (window.GodotBridge && window.GodotBridge.postMessage) {
+					window.GodotBridge.postMessage('map_generation_failed', {
+						error: error.message,
+						stack: error.stack
+					});
+				}
+				return 'error: ' + error.message;
+			}
+		})();
+	""" % [JSON.stringify(azgaar_options)]
+	
+	if web_view.has_method("execute_js"):
+		var result = web_view.execute_js(set_options_script)
+		send_progress_update(50.0, "Generating map (full Azgaar UI mode)...", true)
+		MythosLogger.info("WorldBuilderWebController", "Full Azgaar generation triggered", {
+			"result": result,
+			"result_type": typeof(result)
+		})
+		if result != "triggered" and result != "success":
+			MythosLogger.warn("WorldBuilderWebController", "Full Azgaar generation script returned unexpected result", {"result": result})
+	elif web_view.has_method("eval"):
+		web_view.eval(set_options_script)
+		send_progress_update(50.0, "Generating map (full Azgaar UI mode)...", true)
+		MythosLogger.info("WorldBuilderWebController", "Full Azgaar generation triggered (eval)")
+	else:
+		MythosLogger.error("WorldBuilderWebController", "Cannot execute JS - WebView method not available")
+		send_progress_update(0.0, "Error: Cannot execute generation", false)
+
+
+func _convert_params_to_azgaar_options(params: Dictionary) -> Dictionary:
+	"""Convert UI params to full Azgaar options format (original Azgaar API)."""
+	var options: Dictionary = {}
+	
+	# Map common parameters (same as fork, but use original Azgaar keys)
+	if params.has("optionsSeed"):
+		options["seed"] = str(int(params["optionsSeed"]))
+	if params.has("mapWidthInput"):
+		options["mapWidth"] = int(params["mapWidthInput"])
+	if params.has("mapHeightInput"):
+		options["mapHeight"] = int(params["mapHeightInput"])
+	if params.has("templateInput"):
+		options["template"] = params["templateInput"]
+	if params.has("pointsInput"):
+		options["points"] = int(params["pointsInput"])
+	if params.has("religionsInput"):
+		options["religionsNumber"] = int(params["religionsInput"])
+	if params.has("culturesInput"):
+		options["culturesNumber"] = int(params["culturesInput"])
+	
+	# Add other parameters directly (Azgaar will ignore unknown keys)
+	for key in params.keys():
+		if not options.has(key):
+			options[key] = params[key]
+	
+	return options
+
+
+func set_mode(mode: String) -> void:
+	"""Switch between fork mode and full Azgaar UI mode."""
+	if mode == MODE_FORK or mode == MODE_FULL:
+		if current_mode == mode:
+			MythosLogger.debug("WorldBuilderWebController", "Already in mode", {"mode": mode})
+			return
+		
+		current_mode = mode
+		var html_url: String = ""
+		if mode == MODE_FULL:
+			html_url = "res://assets/ui_web/azgaar_full/index.html"
+			azgaar_full_ready = false  # Reset flag - will be set when ready IPC received
+		else:
+			html_url = "res://assets/ui_web/templates/world_builder.html"
+			fork_ready = false  # Reset flag - will be set when ready IPC received
+		
+		if web_view:
+			web_view.load_url(html_url)
+			MythosLogger.info("WorldBuilderWebController", "Switched to mode", {"mode": mode, "url": html_url})
+		else:
+			MythosLogger.error("WorldBuilderWebController", "Cannot switch mode - WebView is null")
+	else:
+		MythosLogger.warn("WorldBuilderWebController", "Invalid mode", {"mode": mode, "valid_modes": [MODE_FORK, MODE_FULL]})
 
 
 func _generate_via_fork(params: Dictionary) -> void:
@@ -1265,9 +1422,23 @@ func _handle_map_generation_failed(data: Dictionary) -> void:
 
 
 func _handle_fork_ready(data: Dictionary) -> void:
-	"""Handle fork ready IPC message."""
+	"""Handle fork ready IPC message (modular fork mode)."""
 	fork_ready = true
+	current_mode = MODE_FORK
 	MythosLogger.info("WorldBuilderWebController", "Fork is ready for generation - fork_ready IPC received, flag set to true")
+
+
+func _handle_azgaar_full_ready(data: Dictionary) -> void:
+	"""Handle azgaar_full_ready IPC message from WebView (full Azgaar UI mode)."""
+	MythosLogger.info("WorldBuilderWebController", "Full Azgaar UI ready signal received from WebView")
+	azgaar_full_ready = true
+	current_mode = MODE_FULL
+
+
+func _handle_options_set(data: Dictionary) -> void:
+	"""Handle options_set IPC message from WebView (full Azgaar mode confirmation)."""
+	var options: Dictionary = data.get("options", {})
+	MythosLogger.info("WorldBuilderWebController", "Options set in full Azgaar UI", {"options_keys": options.keys()})
 
 
 func _handle_svg_preview(data: Dictionary) -> void:
